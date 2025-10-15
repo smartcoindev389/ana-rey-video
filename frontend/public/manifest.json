@@ -1,0 +1,27 @@
+{
+  "name": "Sacrart - Learn Anytime, Anywhere",
+  "short_name": "Sacrart",
+  "description": "Stream thousands of educational courses from the world's best instructors. Start your learning journey today with Sacrart.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#EDEAE5",
+  "theme_color": "#a36464",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["education", "learning", "courses"],
+  "icons": [
+    {
+      "src": "/src/assets/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/src/assets/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
