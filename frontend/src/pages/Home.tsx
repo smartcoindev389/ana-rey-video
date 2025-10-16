@@ -22,6 +22,7 @@ import {
 import { generateMockSeries, generateMockVideos, MockSeries } from '@/services/mockData';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import CourseHeroSection from '@/components/CourseHeroSection';
 import cover1 from '@/assets/cover1.webp';
 import cover2 from '@/assets/cover2.webp';
 import cover3 from '@/assets/cover3.webp';
@@ -45,6 +46,122 @@ const Home = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
 
+  // Featured Course Data for Hero Section
+  const featuredCourse = {
+    id: 1,
+    title: "Master Classical Sculpture Techniques",
+    description: "Learn the fundamentals of classical sculpture from ancient techniques to modern applications. Perfect for beginners and intermediate artists.",
+    image: cover1,
+    category: "Sculpture",
+    duration: "12 hours",
+    rating: 4.9,
+    studentsCount: 15420,
+    instructor: "Ana Rey",
+    price: "$89",
+    isFree: false,
+    badge: "Featured"
+  };
+
+  // Course Categories Data
+  const courseCategories = [
+    {
+      id: 1,
+      title: "Classical Sculpture",
+      image: cover1,
+      courseCount: 24,
+      description: "Traditional sculpting techniques and classical forms",
+      category: "Sculpture"
+    },
+    {
+      id: 2,
+      title: "Contemporary Art",
+      image: cover2,
+      courseCount: 18,
+      description: "Modern artistic expressions and innovative approaches",
+      category: "Contemporary"
+    },
+    {
+      id: 3,
+      title: "Digital Art",
+      image: cover3,
+      courseCount: 32,
+      description: "3D modeling, digital sculpting, and virtual art",
+      category: "Digital"
+    },
+    {
+      id: 4,
+      title: "Art Restoration",
+      image: cover4,
+      courseCount: 15,
+      description: "Conservation techniques and restoration methods",
+      category: "Restoration"
+    }
+  ];
+
+  // Featured Courses Data for Second Carousel
+  const featuredCourses = [
+    {
+      id: 5,
+      title: "Advanced Marble Sculpting",
+      image: cover5,
+      duration: "8 hours",
+      rating: 4.8,
+      studentsCount: 3420,
+      instructor: "Ana Rey",
+      category: "Sculpture"
+    },
+    {
+      id: 6,
+      title: "Modern Clay Techniques",
+      image: cover6,
+      duration: "6 hours",
+      rating: 4.9,
+      studentsCount: 2890,
+      instructor: "Carlos Mendez",
+      category: "Contemporary"
+    },
+    {
+      id: 7,
+      title: "3D Digital Sculpting",
+      image: cover7,
+      duration: "10 hours",
+      rating: 4.7,
+      studentsCount: 4560,
+      instructor: "Sarah Chen",
+      category: "Digital"
+    },
+    {
+      id: 8,
+      title: "Classical Bust Restoration",
+      image: cover8,
+      duration: "12 hours",
+      rating: 4.9,
+      studentsCount: 1890,
+      instructor: "Marco Rossi",
+      category: "Restoration"
+    },
+    {
+      id: 9,
+      title: "Bronze Casting Masterclass",
+      image: cover1,
+      duration: "15 hours",
+      rating: 4.8,
+      studentsCount: 1230,
+      instructor: "Ana Rey",
+      category: "Sculpture"
+    },
+    {
+      id: 10,
+      title: "Abstract Form Creation",
+      image: cover2,
+      duration: "7 hours",
+      rating: 4.6,
+      studentsCount: 2100,
+      instructor: "Lisa Park",
+      category: "Contemporary"
+    }
+  ];
+
   const handleGetStarted = () => {
     if (email.trim()) {
       // Store email for later use in signup flow
@@ -55,6 +172,14 @@ const Home = () => {
     }
   };
 
+  const handleCourseClick = (courseId: number) => {
+    navigate(`/series/${courseId}`);
+  };
+
+  const handleCategoryClick = (categoryId: number) => {
+    navigate(`/explore?category=${categoryId}`);
+  };
+
   const centerActiveTab = (tabIndex: number) => {
     if (tabContainerRef.current) {
       const container = tabContainerRef.current;
@@ -62,18 +187,23 @@ const Home = () => {
       const activeButton = tabButtons[tabIndex];
       
       if (activeButton) {
-        // Calculate the center position
+        // Get container dimensions
         const containerWidth = container.clientWidth;
-        const buttonLeft = activeButton.offsetLeft;
-        const buttonWidth = activeButton.offsetWidth;
+        const containerRect = container.getBoundingClientRect();
         
-        // Center the button in the container
+        // Get active button dimensions and position
+        const buttonRect = activeButton.getBoundingClientRect();
+        const buttonLeft = buttonRect.left - containerRect.left + container.scrollLeft;
+        const buttonWidth = buttonRect.width;
+        
+        // Calculate the scroll position to center the button
         const scrollLeft = buttonLeft - (containerWidth / 2) + (buttonWidth / 2);
         
         // Ensure scroll position is within bounds
         const maxScroll = container.scrollWidth - containerWidth;
         const finalScrollLeft = Math.max(0, Math.min(scrollLeft, maxScroll));
         
+        // Smooth scroll to center the active tab
         container.scrollTo({
           left: finalScrollLeft,
           behavior: 'smooth'
@@ -93,6 +223,16 @@ const Home = () => {
     if (tabContainerRef.current) {
       setTimeout(() => centerActiveTab(activeTab), 100);
     }
+  }, [activeTab]);
+
+  // Handle window resize to maintain centering
+  useEffect(() => {
+    const handleResize = () => {
+      setTimeout(() => centerActiveTab(activeTab), 100);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [activeTab]);
 
   const toggleFaq = (index: number) => {
@@ -352,7 +492,8 @@ const Home = () => {
           {/* Tab Labels - Show all tabs like HBO Max */}
           <div 
             ref={tabContainerRef}
-            className="flex items-center space-x-6 lg:space-x-8 overflow-x-auto hide-scrollbar w-full"
+            className="flex items-center space-x-6 lg:space-x-8 overflow-x-auto hide-scrollbar w-full justify-center"
+            style={{ scrollBehavior: 'smooth' }}
           >
             {tabData.map((tab, index) => (
               <button
@@ -538,6 +679,15 @@ const Home = () => {
           </div>
         </div>
       </section>
+
+       {/* Course Hero Section - Two Part Layout */}
+       <CourseHeroSection
+         featuredCourse={featuredCourse}
+         courseCategories={courseCategories}
+         featuredCourses={featuredCourses}
+         onCourseClick={handleCourseClick}
+         onCategoryClick={handleCategoryClick}
+       />
 
        {/* Content Sections - HBO Max Style */}
        <div className="w-full px-4 md:px-8 lg:px-16 xl:px-24 2xl:px-32 pt-16 lg:pt-20 pb-12 lg:pb-20">
