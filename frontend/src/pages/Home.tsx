@@ -323,7 +323,7 @@ const Home = () => {
 
   const SeriesCard = ({ series }: { series: any }) => (
     <Card className="group cursor-pointer overflow-visible border-0 bg-transparent transform hover:scale-105 transition-all duration-300 hover:shadow-2xl" onClick={() => navigate(`/series/${series.id}`)}>
-      <div className="aspect-[2/3] bg-gradient-to-br from-gray-900 via-gray-800 to-gray-700 relative overflow-hidden rounded-lg shadow-lg">
+      <div className="aspect-[3/2] bg-gradient-to-br from-gray-900 via-gray-800 to-gray-700 relative overflow-hidden rounded-lg shadow-lg">
         {/* Background Image */}
         <img
           src={series.image}
@@ -540,7 +540,7 @@ const Home = () => {
               className="content-grid grid grid-flow-col grid-rows-2 gap-6 lg:gap-8 overflow-x-auto hide-scrollbar py-4 flex-1"
             >
               {currentTab.series.map((item) => (
-                <div key={item.id} className="w-56 flex-shrink-0 hover:z-50 transition-all duration-300 group">
+                <div key={item.id} className="w-72 md:w-80 lg:w-96 flex-shrink-0 hover:z-50 transition-all duration-300 group">
                   <SeriesCard series={item} />
                 </div>
               ))}

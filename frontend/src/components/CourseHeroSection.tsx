@@ -173,9 +173,9 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
                 <div
                   key={category.id}
                   onClick={() => onCategoryClick(category.id)}
-                  className="group cursor-pointer transition-all duration-300 hover:scale-105 flex-shrink-0 w-72 md:w-80"
+                  className="group cursor-pointer transition-all duration-300 hover:scale-105 flex-shrink-0 w-80 md:w-96 lg:w-[400px]"
                 >
-                  <div className="aspect-square rounded-lg overflow-hidden shadow-lg relative">
+                    <div className="aspect-[2/1] rounded-lg overflow-hidden shadow-lg relative">
                     <img
                       src={category.image}
                       alt={category.title}
@@ -254,9 +254,9 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
                   <div
                     key={course.id}
                     onClick={() => onCourseClick(course.id)}
-                    className="group cursor-pointer transition-all duration-300 hover:scale-105 flex-shrink-0 w-80 md:w-96 lg:w-[420px]"
+                    className="group cursor-pointer transition-all duration-300 hover:scale-105 flex-shrink-0 w-56 md:w-64 lg:w-72"
                   >
-                    <div className="aspect-[16/10] rounded-xl overflow-hidden shadow-2xl relative">
+                    <div className="aspect-[3/4] rounded-xl overflow-hidden shadow-2xl relative">
                       <img
                         src={course.image}
                         alt={course.title}
