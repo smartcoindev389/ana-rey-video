@@ -9,6 +9,7 @@ import CouponsDiscounts from './CouponsDiscounts';
 import MultilingualSettings from './MultilingualSettings';
 import SupportTickets from './SupportTickets';
 import FeedbackSuggestions from './FeedbackSuggestions';
+import FaqManagement from './FaqManagement';
 import Settings from './Settings';
 import AnalyticsReports from './AnalyticsReports';
 
@@ -25,6 +26,7 @@ const AdminRoutes = () => {
         <Route path="multilingual" element={<MultilingualSettings />} />
         <Route path="support" element={<SupportTickets />} />
         <Route path="feedback" element={<FeedbackSuggestions />} />
+        <Route path="faqs" element={<FaqManagement />} />
         <Route path="settings" element={<Settings />} />
         <Route path="analytics" element={<AnalyticsReports />} />
       </Route>
