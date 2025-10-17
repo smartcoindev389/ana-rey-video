@@ -53,6 +53,45 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
   const [showCategoriesRightArrow, setShowCategoriesRightArrow] = useState(true);
   const [showCoursesLeftArrow, setShowCoursesLeftArrow] = useState(false);
   const [showCoursesRightArrow, setShowCoursesRightArrow] = useState(true);
+  const [shouldCenterCategories, setShouldCenterCategories] = useState(false);
+  const [shouldCenterCourses, setShouldCenterCourses] = useState(false);
+
+  // Check if categories should be centered (when they all fit in viewport)
+  useEffect(() => {
+    const checkCenterCategories = () => {
+      if (categoriesCarouselRef.current) {
+        const container = categoriesCarouselRef.current;
+        const containerWidth = container.clientWidth;
+        const contentWidth = container.scrollWidth;
+        
+        // If content fits within container, center it
+        setShouldCenterCategories(contentWidth <= containerWidth);
+      }
+    };
+
+    const checkCenterCourses = () => {
+      if (coursesCarouselRef.current) {
+        const container = coursesCarouselRef.current;
+        const containerWidth = container.clientWidth;
+        const contentWidth = container.scrollWidth;
+        
+        // If content fits within container, center it
+        setShouldCenterCourses(contentWidth <= containerWidth);
+      }
+    };
+
+    checkCenterCategories();
+    checkCenterCourses();
+    
+    // Check on window resize
+    const handleResize = () => {
+      checkCenterCategories();
+      checkCenterCourses();
+    };
+    window.addEventListener('resize', handleResize);
+    
+    return () => window.removeEventListener('resize', handleResize);
+  }, [courseCategories, featuredCourses]);
 
   const scrollCategoriesCarousel = (direction: 'left' | 'right') => {
     if (categoriesCarouselRef.current) {
@@ -155,7 +194,7 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
           {/* Carousel Container */}
           <div className="relative group">
             {/* Left Arrow */}
-            {showCategoriesLeftArrow && (
+            {showCategoriesLeftArrow && !shouldCenterCategories && (
               <button
                 onClick={() => scrollCategoriesCarousel('left')}
                 className="absolute left-0 top-0 bottom-0 z-20 w-12 md:w-16 bg-black/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-black/90"
@@ -167,7 +206,7 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
             {/* Categories Carousel */}
             <div 
               ref={categoriesCarouselRef}
-              className="flex space-x-6 overflow-x-auto hide-scrollbar py-4"
+              className={`flex space-x-6 overflow-x-auto hide-scrollbar py-4 ${shouldCenterCategories ? 'justify-center' : ''}`}
             >
               {courseCategories.map((category) => (
                 <div
@@ -206,7 +245,7 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
             </div>
             
             {/* Right Arrow */}
-            {showCategoriesRightArrow && (
+            {showCategoriesRightArrow && !shouldCenterCategories && (
               <button
                 onClick={() => scrollCategoriesCarousel('right')}
                 className="absolute right-0 top-0 bottom-0 z-20 w-12 md:w-16 bg-black/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-black/90"
@@ -236,7 +275,7 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
             {/* Featured Courses Carousel Container */}
             <div className="relative group">
               {/* Left Arrow */}
-              {showCoursesLeftArrow && (
+              {showCoursesLeftArrow && !shouldCenterCourses && (
                 <button
                   onClick={() => scrollCoursesCarousel('left')}
                   className="absolute left-0 top-0 bottom-0 z-20 w-12 md:w-16 bg-black/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-black/90"
@@ -248,7 +287,7 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
               {/* Featured Courses Carousel */}
               <div 
                 ref={coursesCarouselRef}
-                className="flex space-x-8 overflow-x-auto hide-scrollbar py-4"
+                className={`flex space-x-8 overflow-x-auto hide-scrollbar py-4 ${shouldCenterCourses ? 'justify-center' : ''}`}
               >
                 {featuredCourses.map((course) => (
                   <div
@@ -292,7 +331,7 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
               </div>
               
               {/* Right Arrow */}
-              {showCoursesRightArrow && (
+              {showCoursesRightArrow && !shouldCenterCourses && (
                 <button
                   onClick={() => scrollCoursesCarousel('right')}
                   className="absolute right-0 top-0 bottom-0 z-20 w-12 md:w-16 bg-black/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-black/90"

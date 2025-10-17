@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\SeriesController;
 use App\Http\Controllers\Api\VideoController;
 use App\Http\Controllers\Api\UserProgressController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\FaqController;
+use App\Http\Controllers\Api\SettingsController;
 
 // Public routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -18,6 +20,13 @@ Route::get('/categories/public', [CategoryController::class, 'public']);
 Route::get('/series/featured', [SeriesController::class, 'featured']);
 Route::get('/series/popular', [SeriesController::class, 'popular']);
 Route::get('/series/new-releases', [SeriesController::class, 'newReleases']);
+
+// Public FAQ routes
+Route::get('/faqs', [FaqController::class, 'index']);
+Route::get('/faqs/categories', [FaqController::class, 'categories']);
+
+// Public Settings routes
+Route::get('/settings/public', [SettingsController::class, 'getPublicSettings']);
 
 // Public series and videos (with access control)
 Route::get('/series', [SeriesController::class, 'index']);
@@ -75,6 +84,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/admin/videos', [VideoController::class, 'index']);
         Route::get('/admin/videos/{video}', [VideoController::class, 'show']);
         Route::get('/admin/categories', [CategoryController::class, 'index']);
+
+        // FAQ Management (Admin CRUD)
+        Route::post('/admin/faqs', [FaqController::class, 'store']);
+        Route::put('/admin/faqs/{faq}', [FaqController::class, 'update']);
+        Route::delete('/admin/faqs/{faq}', [FaqController::class, 'destroy']);
+        Route::get('/admin/faqs', [FaqController::class, 'adminIndex']);
+
+        // Settings Management (Admin CRUD)
+        Route::get('/admin/settings', [SettingsController::class, 'index']);
+        Route::get('/admin/settings/{group}', [SettingsController::class, 'getByGroup']);
+        Route::put('/admin/settings', [SettingsController::class, 'bulkUpdate']);
     });
 
     // Public read access to categories

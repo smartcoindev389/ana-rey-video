@@ -23,6 +23,8 @@ import { generateMockSeries, generateMockVideos, MockSeries } from '@/services/m
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import CourseHeroSection from '@/components/CourseHeroSection';
+import { faqApi, Faq } from '@/services/faqApi';
+import { settingsApi } from '@/services/settingsApi';
 import cover1 from '@/assets/cover1.webp';
 import cover2 from '@/assets/cover2.webp';
 import cover3 from '@/assets/cover3.webp';
@@ -40,8 +42,11 @@ const Home = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
-  const [expandedCategory, setExpandedCategory] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState(0);
+  const [faqs, setFaqs] = useState<Faq[]>([]);
+  const [faqLoading, setFaqLoading] = useState(false);
+  const [heroSettings, setHeroSettings] = useState<Record<string, string>>({});
+  const [settingsLoading, setSettingsLoading] = useState(false);
   const tabContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -235,12 +240,8 @@ const Home = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, [activeTab]);
 
-  const toggleFaq = (index: number) => {
-    setExpandedFaq(expandedFaq === index ? null : index);
-  };
-
-  const toggleCategory = (index: number) => {
-    setExpandedCategory(expandedCategory === index ? null : index);
+  const toggleFaq = (faqId: number) => {
+    setExpandedFaq(expandedFaq === faqId ? null : faqId);
   };
 
 
@@ -291,6 +292,59 @@ const Home = () => {
     };
 
     fetchData();
+  }, []);
+
+  // Fetch FAQs from backend
+  useEffect(() => {
+    const fetchFaqs = async () => {
+      setFaqLoading(true);
+      try {
+        const response = await faqApi.getFaqs();
+        // Flatten all FAQs from all categories into a single array
+        const allFaqs: Faq[] = [];
+        Object.values(response.data).forEach(categoryFaqs => {
+          allFaqs.push(...categoryFaqs);
+        });
+        // Sort by sort_order
+        setFaqs(allFaqs.sort((a, b) => a.sort_order - b.sort_order));
+      } catch (error) {
+        console.error('Error fetching FAQs:', error);
+        // Fallback to empty state if API fails
+        setFaqs([]);
+      } finally {
+        setFaqLoading(false);
+      }
+    };
+
+    fetchFaqs();
+  }, []);
+
+  // Fetch Hero Settings from backend
+  useEffect(() => {
+    const fetchHeroSettings = async () => {
+      setSettingsLoading(true);
+      try {
+        const response = await settingsApi.getPublicSettings();
+        if (response.success) {
+          setHeroSettings(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching hero settings:', error);
+        // Fallback to default values if API fails
+        setHeroSettings({
+          hero_title: 'Sculpting Mastery',
+          hero_subtitle: 'Witness the artistry behind incredible sculpting techniques and restoration processes',
+          hero_cta_text: 'Start enjoying SACRART plans from only',
+          hero_price: '$9.99/month',
+          hero_cta_button_text: 'GET SACRART',
+          hero_disclaimer: '*Requires subscription and the Premium add-on (its availability varies depending on the subscription provider). Automatic renewal unless canceled. Subject to Terms and Conditions. Content availability varies by plan. +18.'
+        });
+      } finally {
+        setSettingsLoading(false);
+      }
+    };
+
+    fetchHeroSettings();
   }, []);
 
   const getVisibilityIcon = (visibility: string) => {
@@ -639,11 +693,8 @@ const Home = () => {
                     />
                   </div>
                   <p className="text-xl lg:text-2xl xl:text-3xl text-white/90 drop-shadow-lg font-light max-w-2xl mx-auto">
-                    Start enjoying SACRART plans from only $9.99/month
-                  </p>
-                  <p className="text-lg lg:text-xl text-white/80 drop-shadow-md">
-                    $5/month for the Premium add-on*
-                  </p>
+                    {settingsLoading ? 'Loading...' : `${heroSettings.hero_cta_text || 'Start enjoying SACRART plans from only'} ${heroSettings.hero_price || '$9.99/month'}`}
+                  </p>                 
                   </div>
 
                 {/* Subscribe Button */}
@@ -654,7 +705,7 @@ const Home = () => {
                       className="bg-white text-black hover:bg-white/90 font-bold text-lg lg:text-xl px-12 lg:px-16 py-4 lg:py-5 rounded-md shadow-xl transition-all duration-300 hover:scale-105"
                         onClick={() => navigate('/explore')}
                       >
-                        GET SACRART
+{settingsLoading ? 'Loading...' : (heroSettings.hero_cta_button_text || 'GET SACRART')}
                       </Button>
                   ) : (
                       <Button
@@ -662,7 +713,7 @@ const Home = () => {
                         size="lg"
                       className="bg-white text-black hover:bg-white/90 font-bold text-lg lg:text-xl px-12 lg:px-16 py-4 lg:py-5 rounded-md shadow-xl transition-all duration-300 hover:scale-105"
                       >
-                        GET SACRART
+{settingsLoading ? 'Loading...' : (heroSettings.hero_cta_button_text || 'GET SACRART')}
                       </Button>
                   )}
                 </div>
@@ -670,8 +721,7 @@ const Home = () => {
                 {/* Disclaimer */}
                 <div className="pt-8 lg:pt-12">
                   <p className="text-xs lg:text-sm text-white/70 max-w-4xl mx-auto leading-relaxed">
-                    *Requires subscription and the Premium add-on (its availability varies depending on the subscription provider). 
-                    Automatic renewal unless canceled. Subject to Terms and Conditions. Content availability varies by plan. +18.
+                    {settingsLoading ? 'Loading...' : (heroSettings.hero_disclaimer || '*Requires subscription and the Premium add-on (its availability varies depending on the subscription provider). Automatic renewal unless canceled. Subject to Terms and Conditions. Content availability varies by plan. +18.')}
                   </p>
                 </div>
               </div>
@@ -816,153 +866,37 @@ const Home = () => {
           </div>
 
           <div className="max-w-4xl mx-auto space-y-4">
-            {/* About Plans and Prices Category - Separate Card */}
-            <div className="bg-gray-900/50 rounded-xl border border-white/10 transform hover:border-primary/50 transition-all duration-300 backdrop-blur-sm">
-              <button
-                onClick={() => toggleCategory(0)}
-                className="w-full text-left px-6 py-4 flex justify-between items-center hover:bg-white/5 transition-colors duration-200 rounded-t-xl"
-              >
-                <h3 className="text-lg font-semibold text-white font-montserrat">About Plans and Prices</h3>
-                {expandedCategory === 0 ? (
-                  <X className="h-5 w-5 text-primary" />
-                ) : (
-                  <Plus className="h-5 w-5 text-gray-400" />
-                )}
-              </button>
-              {expandedCategory === 0 && (
-                <div className="px-6 pb-4 space-y-3">
-                  <div className="border-b border-white/10 pb-3">
-                    <button
-                      onClick={() => toggleFaq(1)}
-                      className="w-full text-left flex justify-between items-center py-2 text-gray-300 hover:text-white transition-colors duration-200"
-                    >
-                      <span className="font-medium">When does it open and how do I sign up?</span>
-                      {expandedFaq === 1 ? (
-                        <X className="h-4 w-4 text-primary" />
-                      ) : (
-                        <Plus className="h-4 w-4 text-gray-400" />
-                      )}
-                    </button>
-                    {expandedFaq === 1 && (
-                      <div className="text-gray-400 py-2 pl-4 font-montserrat">
-                        SACRART is now open! You can sign up anytime by clicking "Get Started" on our homepage. Simply enter your email address and choose your preferred plan. Registration takes less than 2 minutes.
-                      </div>
+            {faqLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-gray-400">Loading FAQs...</p>
+              </div>
+            ) : (
+              faqs.map((faq, index) => (
+                <div key={faq.id} className="bg-gray-900/50 rounded-xl border border-white/10 transform hover:border-primary/50 transition-all duration-300 backdrop-blur-sm">
+                  <button
+                    onClick={() => toggleFaq(faq.id)}
+                    className="w-full text-left px-6 py-4 flex justify-between items-center hover:bg-white/5 transition-colors duration-200 rounded-xl"
+                  >
+                    <span className="text-lg font-semibold text-white font-montserrat">
+                      {faq.question}
+                    </span>
+                    {expandedFaq === faq.id ? (
+                      <X className="h-5 w-5 text-primary" />
+                    ) : (
+                      <Plus className="h-5 w-5 text-gray-400" />
                     )}
-                  </div>
-                  <div className="border-b border-white/10 pb-3">
-                    <button
-                      onClick={() => toggleFaq(2)}
-                      className="w-full text-left flex justify-between items-center py-2 text-gray-300 hover:text-white transition-colors duration-200"
-                    >
-                      <span className="font-medium">What's the difference between the plans?</span>
-                      {expandedFaq === 2 ? (
-                        <X className="h-4 w-4 text-primary" />
-                      ) : (
-                        <Plus className="h-4 w-4 text-gray-400" />
-                      )}
-                    </button>
-                    {expandedFaq === 2 && (
-                      <div className="text-gray-400 py-2 pl-4 font-montserrat">
-                        <strong className="text-white">Freemium:</strong> Free access to basic content and community support.<br/>
-                        <strong className="text-white">Basic ($19/month):</strong> Advanced techniques, downloadable resources, and priority support.<br/>
-                        <strong className="text-white">Premium ($39/month):</strong> Everything in Basic plus 1-on-1 mentoring and exclusive masterclasses.
+                  </button>
+                  {expandedFaq === faq.id && (
+                    <div className="px-6 pb-4">
+                      <div className="text-gray-400 py-2 font-montserrat leading-relaxed">
+                        {faq.answer}
                       </div>
-                    )}
-                  </div>
-                  <div>
-                    <button
-                      onClick={() => toggleFaq(3)}
-                      className="w-full text-left flex justify-between items-center py-2 text-gray-300 hover:text-white transition-colors duration-200"
-                    >
-                      <span className="font-medium">How do I cancel my subscription?</span>
-                      {expandedFaq === 3 ? (
-                        <X className="h-4 w-4 text-primary" />
-                      ) : (
-                        <Plus className="h-4 w-4 text-gray-400" />
-                      )}
-                    </button>
-                    {expandedFaq === 3 && (
-                      <div className="text-gray-400 py-2 pl-4 font-montserrat">
-                        You can cancel your subscription anytime from your account settings. There are no cancellation fees or commitments. Simply go to your profile, click "Subscription," and select "Cancel Plan." Your access will continue until the end of your current billing period.
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-
-            {/* Content and Learning Category - Separate Card */}
-            <div className="bg-gray-900/50 rounded-xl border border-white/10 transform hover:border-primary/50 transition-all duration-300 backdrop-blur-sm">
-              <button
-                onClick={() => toggleCategory(1)}
-                className="w-full text-left px-6 py-4 flex justify-between items-center hover:bg-white/5 transition-colors duration-200 rounded-t-xl"
-              >
-                <h3 className="text-lg font-semibold text-white font-montserrat">Content and Watching</h3>
-                {expandedCategory === 1 ? (
-                  <X className="h-5 w-5 text-primary" />
-                ) : (
-                  <Plus className="h-5 w-5 text-gray-400" />
-                )}
-              </button>
-              {expandedCategory === 1 && (
-                <div className="px-6 pb-4 space-y-3">
-                  <div className="border-b border-white/10 pb-3">
-                    <button
-                      onClick={() => toggleFaq(5)}
-                      className="w-full text-left flex justify-between items-center py-2 text-gray-300 hover:text-white transition-colors duration-200"
-                    >
-                      <span className="font-medium">Do I need prior sculpting experience?</span>
-                      {expandedFaq === 5 ? (
-                        <X className="h-4 w-4 text-primary" />
-                      ) : (
-                        <Plus className="h-4 w-4 text-gray-400" />
-                      )}
-                    </button>
-                    {expandedFaq === 5 && (
-                      <div className="text-gray-400 py-2 pl-4 font-montserrat">
-                        Not at all! Our content is designed for all skill levels, from complete beginners to professional artists. Watch at your own pace and enjoy the journey.
-                      </div>
-                    )}
-                  </div>
-                  <div className="border-b border-white/10 pb-3">
-                    <button
-                      onClick={() => toggleFaq(6)}
-                      className="w-full text-left flex justify-between items-center py-2 text-gray-300 hover:text-white transition-colors duration-200"
-                    >
-                      <span className="font-medium">What materials do I need to get started?</span>
-                      {expandedFaq === 6 ? (
-                        <X className="h-4 w-4 text-primary" />
-                      ) : (
-                        <Plus className="h-4 w-4 text-gray-400" />
-                      )}
-                    </button>
-                    {expandedFaq === 6 && (
-                      <div className="text-gray-400 py-2 pl-4 font-montserrat">
-                        Each series includes detailed information about materials and techniques. You'll find recommendations for professional-grade tools and budget-friendly alternatives.
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <button
-                      onClick={() => toggleFaq(7)}
-                      className="w-full text-left flex justify-between items-center py-2 text-gray-300 hover:text-white transition-colors duration-200"
-                    >
-                      <span className="font-medium">Can I watch on mobile devices?</span>
-                      {expandedFaq === 7 ? (
-                        <X className="h-4 w-4 text-primary" />
-                      ) : (
-                        <Plus className="h-4 w-4 text-gray-400" />
-                      )}
-                    </button>
-                    {expandedFaq === 7 && (
-                      <div className="text-gray-400 py-2 pl-4 font-montserrat">
-                        Yes! Our platform is fully responsive and optimized for all devices. Watch from your phone, tablet, laptop, or smart TV. All features are available across all devices.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+              ))
+            )}
           </div>
         </div>
       </section>
