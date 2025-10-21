@@ -43,10 +43,11 @@ const Home = () => {
   const [email, setEmail] = useState("");
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState(0);
-  const [faqs, setFaqs] = useState<Faq[]>([]);
+  const [faqs, setFaqs] = useState<Record<string, Faq[]>>({});
   const [faqLoading, setFaqLoading] = useState(false);
   const [heroSettings, setHeroSettings] = useState<Record<string, string>>({});
   const [settingsLoading, setSettingsLoading] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | undefined>(undefined);
   const tabContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -182,21 +183,21 @@ const Home = () => {
   };
 
   const handleCategoryClick = (categoryId: number) => {
+    setSelectedCategoryId(categoryId);
     navigate(`/explore?category=${categoryId}`);
   };
 
   const centerActiveTab = (tabIndex: number) => {
     if (tabContainerRef.current) {
       const container = tabContainerRef.current;
-      const tabButtons = container.querySelectorAll('button');
-      const activeButton = tabButtons[tabIndex];
+      const activeButton = container.querySelector(`[data-tab-index="${tabIndex}"]`) as HTMLElement;
       
       if (activeButton) {
         // Get container dimensions
         const containerWidth = container.clientWidth;
         const containerRect = container.getBoundingClientRect();
         
-        // Get active button dimensions and position
+        // Get active button dimensions and position relative to container
         const buttonRect = activeButton.getBoundingClientRect();
         const buttonLeft = buttonRect.left - containerRect.left + container.scrollLeft;
         const buttonWidth = buttonRect.width;
@@ -226,14 +227,17 @@ const Home = () => {
   // Center the active tab when component mounts or activeTab changes
   useEffect(() => {
     if (tabContainerRef.current) {
-      setTimeout(() => centerActiveTab(activeTab), 100);
+      // Use a longer timeout to ensure all content is loaded
+      setTimeout(() => centerActiveTab(activeTab), 200);
     }
   }, [activeTab]);
 
-  // Handle window resize to maintain centering
+  // Center active tab on window resize
   useEffect(() => {
     const handleResize = () => {
-      setTimeout(() => centerActiveTab(activeTab), 100);
+      if (tabContainerRef.current) {
+        setTimeout(() => centerActiveTab(activeTab), 100);
+      }
     };
 
     window.addEventListener('resize', handleResize);
@@ -258,25 +262,49 @@ const Home = () => {
     visibility: "premium"
   };
 
-  // HBO Max style poster collage data
-  const posterCollage = [
-    { src: cover1, alt: "Sculpting Series", rotation: -8, x: 10, y: 15 },
-    { src: cover2, alt: "Art Techniques", rotation: 12, x: 25, y: 5 },
-    { src: cover3, alt: "Master Classes", rotation: -5, x: 45, y: 20 },
-    { src: cover4, alt: "Restoration", rotation: 8, x: 65, y: 10 },
-    { src: cover5, alt: "Behind Scenes", rotation: -12, x: 80, y: 25 },
-    { src: cover6, alt: "Professional Tips", rotation: 6, x: 15, y: 35 },
-    { src: cover7, alt: "Creative Process", rotation: -10, x: 35, y: 40 },
-    { src: cover8, alt: "Expert Insights", rotation: 9, x: 55, y: 35 },
-    { src: cover1, alt: "Studio Sessions", rotation: -7, x: 75, y: 45 },
-    { src: cover2, alt: "Art History", rotation: 11, x: 5, y: 55 },
-    { src: cover3, alt: "Modern Art", rotation: -9, x: 30, y: 60 },
-    { src: cover4, alt: "Classical Techniques", rotation: 7, x: 60, y: 55 },
-    { src: cover5, alt: "Digital Art", rotation: -11, x: 85, y: 65 },
-    { src: cover6, alt: "Traditional Methods", rotation: 5, x: 20, y: 75 },
-    { src: cover7, alt: "Contemporary Art", rotation: -6, x: 50, y: 75 },
-    { src: cover8, alt: "Artistic Vision", rotation: 10, x: 70, y: 80 }
-  ];
+  // HBO Max style poster collage data - now configurable from admin
+  const getPosterCollage = () => {
+    const defaultCollage = [
+      { src: cover1, alt: "Sculpting Series", rotation: -8, x: 10, y: 15 },
+      { src: cover2, alt: "Art Techniques", rotation: 12, x: 25, y: 5 },
+      { src: cover3, alt: "Master Classes", rotation: -5, x: 45, y: 20 },
+      { src: cover4, alt: "Restoration", rotation: 8, x: 65, y: 10 },
+      { src: cover5, alt: "Behind Scenes", rotation: -12, x: 80, y: 25 },
+      { src: cover6, alt: "Professional Tips", rotation: 6, x: 15, y: 35 },
+      { src: cover7, alt: "Creative Process", rotation: -10, x: 35, y: 40 },
+      { src: cover8, alt: "Expert Insights", rotation: 9, x: 55, y: 35 },
+      { src: cover1, alt: "Studio Sessions", rotation: -7, x: 75, y: 45 },
+      { src: cover2, alt: "Art History", rotation: 11, x: 5, y: 55 },
+      { src: cover3, alt: "Modern Art", rotation: -9, x: 30, y: 60 },
+      { src: cover4, alt: "Classical Techniques", rotation: 7, x: 60, y: 55 },
+      { src: cover5, alt: "Digital Art", rotation: -11, x: 85, y: 65 },
+      { src: cover6, alt: "Traditional Methods", rotation: 5, x: 20, y: 75 },
+      { src: cover7, alt: "Contemporary Art", rotation: -6, x: 50, y: 75 },
+      { src: cover8, alt: "Artistic Vision", rotation: 10, x: 70, y: 80 }
+    ];
+
+    // If hero settings have background images, use them
+    if (heroSettings.hero_background_images) {
+      try {
+        const customImages = JSON.parse(heroSettings.hero_background_images);
+        if (Array.isArray(customImages) && customImages.length > 0) {
+          return customImages.map((img, index) => ({
+            src: img.url || defaultCollage[index % defaultCollage.length].src,
+            alt: img.alt || `Background ${index + 1}`,
+            rotation: img.rotation || defaultCollage[index % defaultCollage.length].rotation,
+            x: img.x || defaultCollage[index % defaultCollage.length].x,
+            y: img.y || defaultCollage[index % defaultCollage.length].y
+          }));
+        }
+      } catch (error) {
+        console.error('Error parsing hero background images:', error);
+      }
+    }
+
+    return defaultCollage;
+  };
+
+  const posterCollage = getPosterCollage();
 
   useEffect(() => {
     // Simulate API call
@@ -300,17 +328,12 @@ const Home = () => {
       setFaqLoading(true);
       try {
         const response = await faqApi.getFaqs();
-        // Flatten all FAQs from all categories into a single array
-        const allFaqs: Faq[] = [];
-        Object.values(response.data).forEach(categoryFaqs => {
-          allFaqs.push(...categoryFaqs);
-        });
-        // Sort by sort_order
-        setFaqs(allFaqs.sort((a, b) => a.sort_order - b.sort_order));
+        // Keep the grouped structure for category display
+        setFaqs(response.data);
       } catch (error) {
         console.error('Error fetching FAQs:', error);
         // Fallback to empty state if API fails
-        setFaqs([]);
+        setFaqs({});
       } finally {
         setFaqLoading(false);
       }
@@ -546,12 +569,13 @@ const Home = () => {
           {/* Tab Labels - Show all tabs like HBO Max */}
           <div 
             ref={tabContainerRef}
-            className="flex items-center space-x-6 lg:space-x-8 overflow-x-auto hide-scrollbar w-full justify-center"
+            className="flex items-center space-x-6 lg:space-x-8 overflow-x-auto hide-scrollbar w-full"
             style={{ scrollBehavior: 'smooth' }}
           >
             {tabData.map((tab, index) => (
               <button
                 key={tab.id}
+                data-tab-index={index}
                 onClick={() => handleTabClick(index)}
                 className={`text-2xl lg:text-3xl xl:text-4xl font-light transition-colors duration-300 flex-shrink-0 ${
                   index === activeTab
@@ -737,12 +761,107 @@ const Home = () => {
          featuredCourses={featuredCourses}
          onCourseClick={handleCourseClick}
          onCategoryClick={handleCategoryClick}
+         selectedCategoryId={selectedCategoryId}
        />
 
        {/* Content Sections - HBO Max Style */}
        <div className="w-full px-4 md:px-8 lg:px-16 xl:px-24 2xl:px-32 pt-16 lg:pt-20 pb-12 lg:pb-20">
          <TabbedCarousel />
       </div>
+
+      {/* About Section */}
+      <section className="py-16 lg:py-24 bg-gradient-to-br from-gray-900 via-black to-gray-800">
+        <div className="container mx-auto px-4 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            <div className="space-y-6">
+              <h2 className="text-3xl lg:text-5xl font-bold text-white font-playfair">
+                {heroSettings.about_title || 'About SACRART'}
+              </h2>
+              <p className="text-lg lg:text-xl text-gray-400 font-montserrat leading-relaxed">
+                {heroSettings.about_description || 'SACRART is the premier platform for classical and contemporary sculpting education. Our mission is to preserve and teach traditional art techniques while embracing modern innovations in the field of sculpture and restoration.'}
+              </p>
+              <div className="grid grid-cols-2 gap-6 pt-4">
+                <div className="text-center">
+                  <div className="text-3xl lg:text-4xl font-bold text-primary mb-2">50+</div>
+                  <div className="text-gray-400 font-montserrat">Expert Instructors</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl lg:text-4xl font-bold text-primary mb-2">1000+</div>
+                  <div className="text-gray-400 font-montserrat">Master Classes</div>
+                </div>
+              </div>
+            </div>
+            <div className="relative">
+              <div className="aspect-[4/3] rounded-xl overflow-hidden shadow-2xl">
+                <img
+                  src={heroSettings.about_image || cover1}
+                  alt="About SACRART"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonial Section */}
+      <section className="py-16 lg:py-24 bg-gradient-to-br from-black via-gray-900 to-black">
+        <div className="container mx-auto px-4 lg:px-8">
+          <div className="text-center mb-12 lg:mb-16">
+            <h2 className="text-3xl lg:text-5xl font-bold mb-4 font-playfair text-white">
+              {heroSettings.testimonial_title || 'What Our Students Say'}
+            </h2>
+            <p className="text-lg lg:text-xl text-gray-400 max-w-3xl mx-auto font-montserrat">
+              {heroSettings.testimonial_subtitle || 'Discover how SACRART has transformed the artistic journey of our community members.'}
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-12">
+            {[
+              {
+                name: heroSettings.testimonial_1_name || 'María González',
+                role: heroSettings.testimonial_1_role || 'Professional Sculptor',
+                content: heroSettings.testimonial_1_content || 'SACRART has revolutionized my understanding of classical techniques. The quality of instruction and attention to detail is unmatched.',
+                image: heroSettings.testimonial_1_image || cover2
+              },
+              {
+                name: heroSettings.testimonial_2_name || 'James Wilson',
+                role: heroSettings.testimonial_2_role || 'Art Restoration Specialist',
+                content: heroSettings.testimonial_2_content || 'The restoration courses are incredibly comprehensive. I\'ve been able to apply these techniques directly to my professional work.',
+                image: heroSettings.testimonial_2_image || cover3
+              },
+              {
+                name: heroSettings.testimonial_3_name || 'Elena Rossi',
+                role: heroSettings.testimonial_3_role || 'Contemporary Artist',
+                content: heroSettings.testimonial_3_content || 'The blend of traditional and modern approaches has opened new creative possibilities I never knew existed.',
+                image: heroSettings.testimonial_3_image || cover4
+              }
+            ].map((testimonial, index) => (
+              <div key={index} className="bg-gray-900/50 rounded-xl p-8 lg:p-10 border border-white/10 hover:border-primary/50 transition-all duration-300 backdrop-blur-sm">
+                <div className="flex items-center mb-6">
+                  <img
+                    src={testimonial.image}
+                    alt={testimonial.name}
+                    className="w-12 h-12 rounded-full object-cover mr-4"
+                  />
+                  <div>
+                    <h4 className="text-white font-semibold font-montserrat">{testimonial.name}</h4>
+                    <p className="text-gray-400 text-sm font-montserrat">{testimonial.role}</p>
+                  </div>
+                </div>
+                <p className="text-gray-300 leading-relaxed font-montserrat">
+                  "{testimonial.content}"
+                </p>
+                <div className="flex mt-4">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="h-4 w-4 text-yellow-400 fill-current" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* Subscription Plans Section */}
       <section className="py-16 lg:py-24 bg-gradient-to-b from-transparent to-black/50">
@@ -865,35 +984,44 @@ const Home = () => {
             </p>
           </div>
 
-          <div className="max-w-4xl mx-auto space-y-4">
+          <div className="max-w-4xl mx-auto">
             {faqLoading ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
                 <p className="text-gray-400">Loading FAQs...</p>
               </div>
             ) : (
-              faqs.map((faq, index) => (
-                <div key={faq.id} className="bg-gray-900/50 rounded-xl border border-white/10 transform hover:border-primary/50 transition-all duration-300 backdrop-blur-sm">
-                  <button
-                    onClick={() => toggleFaq(faq.id)}
-                    className="w-full text-left px-6 py-4 flex justify-between items-center hover:bg-white/5 transition-colors duration-200 rounded-xl"
-                  >
-                    <span className="text-lg font-semibold text-white font-montserrat">
-                      {faq.question}
-                    </span>
-                    {expandedFaq === faq.id ? (
-                      <X className="h-5 w-5 text-primary" />
-                    ) : (
-                      <Plus className="h-5 w-5 text-gray-400" />
-                    )}
-                  </button>
-                  {expandedFaq === faq.id && (
-                    <div className="px-6 pb-4">
-                      <div className="text-gray-400 py-2 font-montserrat leading-relaxed">
-                        {faq.answer}
+              Object.entries(faqs).map(([category, categoryFaqs]) => (
+                <div key={category} className="mb-12">
+                  <h3 className="text-2xl font-bold text-white mb-6 font-playfair capitalize">
+                    {category.replace('_', ' ')} FAQs
+                  </h3>
+                  <div className="space-y-4">
+                    {categoryFaqs.map((faq: Faq) => (
+                      <div key={faq.id} className="bg-gray-900/50 rounded-xl border border-white/10 transform hover:border-primary/50 transition-all duration-300 backdrop-blur-sm">
+                        <button
+                          onClick={() => toggleFaq(faq.id)}
+                          className="w-full text-left px-6 py-4 flex justify-between items-center hover:bg-white/5 transition-colors duration-200 rounded-xl"
+                        >
+                          <span className="text-lg font-semibold text-white font-montserrat">
+                            {faq.question}
+                          </span>
+                          {expandedFaq === faq.id ? (
+                            <X className="h-5 w-5 text-primary" />
+                          ) : (
+                            <Plus className="h-5 w-5 text-gray-400" />
+                          )}
+                        </button>
+                        {expandedFaq === faq.id && (
+                          <div className="px-6 pb-4">
+                            <div className="text-gray-400 py-2 font-montserrat leading-relaxed">
+                              {faq.answer}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    ))}
+                  </div>
                 </div>
               ))
             )}

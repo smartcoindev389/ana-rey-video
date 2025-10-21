@@ -93,6 +93,8 @@ export interface Video {
   video_url: string | null;
   video_file_path: string | null;
   thumbnail: string | null;
+  intro_image: string | null;
+  intro_description: string | null;
   duration: number;
   file_size: number | null;
   video_format: string | null;

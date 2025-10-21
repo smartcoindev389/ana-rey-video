@@ -434,27 +434,40 @@ const UsersManagement = () => {
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => handleEditUser(user)}>
+                    <DropdownMenuContent align="end" className="w-48 bg-gray-800 border border-gray-700 shadow-lg">
+                      <DropdownMenuLabel className="text-white font-semibold px-3 py-2">Actions</DropdownMenuLabel>
+                      <DropdownMenuSeparator className="bg-gray-700" />
+                      <DropdownMenuItem 
+                        onClick={() => handleEditUser(user)}
+                        className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer"
+                      >
                         <Edit className="mr-2 h-4 w-4" />
                         Edit User
                       </DropdownMenuItem>
                       {user.subscription_type !== 'premium' && (
-                        <DropdownMenuItem onClick={() => handleUpgradeSubscription(user.id, 'premium')}>
+                        <DropdownMenuItem 
+                          onClick={() => handleUpgradeSubscription(user.id, 'premium')}
+                          className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer"
+                        >
                           <Crown className="mr-2 h-4 w-4" />
                           Upgrade to Premium
                         </DropdownMenuItem>
                       )}
                       {user.subscription_type === 'freemium' && (
-                        <DropdownMenuItem onClick={() => handleUpgradeSubscription(user.id, 'basic')}>
+                        <DropdownMenuItem 
+                          onClick={() => handleUpgradeSubscription(user.id, 'basic')}
+                          className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer"
+                        >
                           <Star className="mr-2 h-4 w-4" />
                           Upgrade to Basic
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuSeparator />
+                      <DropdownMenuSeparator className="bg-gray-700" />
                       {user.subscription_type !== 'freemium' && (
-                        <DropdownMenuItem onClick={() => handleSuspendUser(user.id)}>
+                        <DropdownMenuItem 
+                          onClick={() => handleSuspendUser(user.id)}
+                          className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer"
+                        >
                           {user.subscription_expires_at && new Date(user.subscription_expires_at) < new Date() ? (
                             <>
                               <CheckCircle className="mr-2 h-4 w-4" />
@@ -470,7 +483,7 @@ const UsersManagement = () => {
                       )}
                       <DropdownMenuItem 
                         onClick={() => handleDeleteUser(user.id)}
-                        className="text-red-600"
+                        className="text-red-400 hover:text-red-300 hover:bg-red-900/20 px-3 py-2 cursor-pointer"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
                         Delete User

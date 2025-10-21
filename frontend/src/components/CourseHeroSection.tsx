@@ -38,6 +38,7 @@ interface CourseHeroSectionProps {
   }>;
   onCourseClick: (courseId: number) => void;
   onCategoryClick: (categoryId: number) => void;
+  selectedCategoryId?: number;
 }
 
 const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
@@ -45,7 +46,8 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
   courseCategories,
   featuredCourses,
   onCourseClick,
-  onCategoryClick
+  onCategoryClick,
+  selectedCategoryId
 }) => {
   const categoriesCarouselRef = useRef<HTMLDivElement>(null);
   const coursesCarouselRef = useRef<HTMLDivElement>(null);
@@ -92,6 +94,27 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
     
     return () => window.removeEventListener('resize', handleResize);
   }, [courseCategories, featuredCourses]);
+
+  // Center the selected category
+  useEffect(() => {
+    if (selectedCategoryId && categoriesCarouselRef.current) {
+      const container = categoriesCarouselRef.current;
+      const selectedElement = container.querySelector(`[data-category-id="${selectedCategoryId}"]`) as HTMLElement;
+      
+      if (selectedElement) {
+        const containerRect = container.getBoundingClientRect();
+        const elementRect = selectedElement.getBoundingClientRect();
+        const elementCenter = elementRect.left + elementRect.width / 2;
+        const containerCenter = containerRect.left + containerRect.width / 2;
+        const scrollOffset = elementCenter - containerCenter;
+        
+        container.scrollTo({
+          left: container.scrollLeft + scrollOffset,
+          behavior: 'smooth'
+        });
+      }
+    }
+  }, [selectedCategoryId]);
 
   const scrollCategoriesCarousel = (direction: 'left' | 'right') => {
     if (categoriesCarouselRef.current) {
@@ -211,8 +234,11 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
               {courseCategories.map((category) => (
                 <div
                   key={category.id}
+                  data-category-id={category.id}
                   onClick={() => onCategoryClick(category.id)}
-                  className="group cursor-pointer transition-all duration-300 hover:scale-105 flex-shrink-0 w-80 md:w-96 lg:w-[400px]"
+                  className={`group cursor-pointer transition-all duration-300 hover:scale-105 flex-shrink-0 w-80 md:w-96 lg:w-[400px] ${
+                    selectedCategoryId === category.id ? 'ring-2 ring-white/50 scale-105' : ''
+                  }`}
                 >
                     <div className="aspect-[2/1] rounded-lg overflow-hidden shadow-lg relative">
                     <img

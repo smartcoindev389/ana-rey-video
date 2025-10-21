@@ -360,16 +360,25 @@ const CouponsDiscounts = () => {
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => copyCouponCode(coupon.code)}>
+                <DropdownMenuContent align="end" className="w-48 bg-gray-800 border border-gray-700 shadow-lg">
+                  <DropdownMenuItem 
+                    onClick={() => copyCouponCode(coupon.code)}
+                    className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer"
+                  >
                     <Copy className="mr-2 h-4 w-4" />
                     Copy Code
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleEditCoupon(coupon)}>
+                  <DropdownMenuItem 
+                    onClick={() => handleEditCoupon(coupon)}
+                    className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer"
+                  >
                     <Edit className="mr-2 h-4 w-4" />
                     Edit Coupon
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => toggleCouponStatus(coupon.id)}>
+                  <DropdownMenuItem 
+                    onClick={() => toggleCouponStatus(coupon.id)}
+                    className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer"
+                  >
                     {coupon.isActive ? (
                       <>
                         <XCircle className="mr-2 h-4 w-4" />

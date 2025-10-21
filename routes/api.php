@@ -110,5 +110,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/videos/{video}/stream', [VideoController::class, 'stream']);
     Route::get('/videos/{video}/accessible', [VideoController::class, 'isAccessibleTo']);
     
+    // Media upload routes (admin only)
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/media/images', [\App\Http\Controllers\Api\MediaController::class, 'uploadImages']);
+        Route::post('/media/videos', [\App\Http\Controllers\Api\MediaController::class, 'uploadVideos']);
+        Route::get('/media/images', [\App\Http\Controllers\Api\MediaController::class, 'getImages']);
+        Route::get('/media/videos', [\App\Http\Controllers\Api\MediaController::class, 'getVideos']);
+        Route::delete('/media/files', [\App\Http\Controllers\Api\MediaController::class, 'deleteFile']);
+    });
+    
 });
 

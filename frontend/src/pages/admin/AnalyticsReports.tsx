@@ -121,12 +121,12 @@ const AnalyticsReports = () => {
             <select 
               value={selectedPeriod}
               onChange={(e) => setSelectedPeriod(e.target.value)}
-              className="px-3 py-2 border rounded-md"
+              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white"
             >
-              <option value="week">Last Week</option>
-              <option value="month">Last Month</option>
-              <option value="quarter">Last Quarter</option>
-              <option value="year">Last Year</option>
+              <option value="week" className="bg-gray-800 text-white">Last Week</option>
+              <option value="month" className="bg-gray-800 text-white">Last Month</option>
+              <option value="quarter" className="bg-gray-800 text-white">Last Quarter</option>
+              <option value="year" className="bg-gray-800 text-white">Last Year</option>
             </select>
           </div>
           <div className="flex items-center space-x-2">
@@ -134,12 +134,12 @@ const AnalyticsReports = () => {
             <select 
               value={selectedMetric}
               onChange={(e) => setSelectedMetric(e.target.value)}
-              className="px-3 py-2 border rounded-md"
+              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white"
             >
-              <option value="all">All Metrics</option>
-              <option value="users">Users</option>
-              <option value="revenue">Revenue</option>
-              <option value="content">Content</option>
+              <option value="all" className="bg-gray-800 text-white">All Metrics</option>
+              <option value="users" className="bg-gray-800 text-white">Users</option>
+              <option value="revenue" className="bg-gray-800 text-white">Revenue</option>
+              <option value="content" className="bg-gray-800 text-white">Content</option>
             </select>
           </div>
         </div>

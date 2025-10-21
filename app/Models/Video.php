@@ -22,6 +22,8 @@ class Video extends Model
         'video_url',
         'video_file_path',
         'thumbnail',
+        'intro_image',
+        'intro_description',
         'duration',
         'file_size',
         'video_format',

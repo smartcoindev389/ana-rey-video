@@ -67,7 +67,7 @@ export interface MockTransaction {
   subscription: string;
   amount: number;
   currency: string;
-  status: 'completed' | 'pending' | 'failed';
+  status: 'completed' | 'pending' | 'failed' | 'refunded';
   type: 'subscription' | 'upgrade' | 'refund';
   paymentMethod: string;
   cardLastFour: string;

@@ -110,6 +110,8 @@ const PaymentsTransactions = () => {
         return <Clock className="h-4 w-4 text-yellow-500" />;
       case 'failed':
         return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'refunded':
+        return <XCircle className="h-4 w-4 text-orange-500" />;
       default:
         return null;
     }
@@ -119,7 +121,8 @@ const PaymentsTransactions = () => {
     const variants = {
       completed: 'default',
       pending: 'secondary',
-      failed: 'destructive'
+      failed: 'destructive',
+      refunded: 'secondary'
     } as const;
 
     return (
@@ -318,26 +321,28 @@ const PaymentsTransactions = () => {
             </div>
           </div>
           <div className="flex gap-2">
-            <select 
-              value={selectedFilter}
-              onChange={(e) => setSelectedFilter(e.target.value)}
-              className="px-3 py-2 border rounded-md"
-            >
-              <option value="all">All Status</option>
-              <option value="completed">Completed</option>
-              <option value="pending">Pending</option>
-              <option value="failed">Failed</option>
-            </select>
-            <select 
-              value={selectedPeriod}
-              onChange={(e) => setSelectedPeriod(e.target.value)}
-              className="px-3 py-2 border rounded-md"
-            >
-              <option value="week">This Week</option>
-              <option value="month">This Month</option>
-              <option value="quarter">This Quarter</option>
-              <option value="year">This Year</option>
-            </select>
+            <Select value={selectedFilter} onValueChange={setSelectedFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="failed">Failed</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Time period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="week">This Week</SelectItem>
+                <SelectItem value="month">This Month</SelectItem>
+                <SelectItem value="quarter">This Quarter</SelectItem>
+                <SelectItem value="year">This Year</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </Card>
@@ -410,24 +415,31 @@ const PaymentsTransactions = () => {
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => handleViewDetails(transaction)}>
+                    <DropdownMenuContent align="end" className="w-48 bg-gray-800 border border-gray-700 shadow-lg">
+                      <DropdownMenuLabel className="text-white font-semibold px-3 py-2">Actions</DropdownMenuLabel>
+                      <DropdownMenuSeparator className="bg-gray-700" />
+                      <DropdownMenuItem 
+                        onClick={() => handleViewDetails(transaction)}
+                        className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer"
+                      >
                         <Eye className="mr-2 h-4 w-4" />
                         View Details
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleRetryPayment(transaction.id)}>
+                      <DropdownMenuItem 
+                        onClick={() => handleRetryPayment(transaction.id)}
+                        className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer"
+                      >
                         <RefreshCw className="mr-2 h-4 w-4" />
                         Retry Payment
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer">
                         <Receipt className="mr-2 h-4 w-4" />
                         Download Receipt
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
+                      <DropdownMenuSeparator className="bg-gray-700" />
                       <DropdownMenuItem 
                         onClick={() => handleProcessRefund(transaction.id)}
-                        className="text-red-600"
+                        className="text-red-400 hover:text-red-300 hover:bg-red-900/20 px-3 py-2 cursor-pointer"
                       >
                         <XCircle className="mr-2 h-4 w-4" />
                         Process Refund

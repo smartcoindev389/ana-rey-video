@@ -13,7 +13,8 @@ import {
   Globe,
   FileText,
   Mail,
-  Phone
+  Phone,
+  Users
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -209,10 +210,18 @@ const Settings = () => {
 
       {/* Settings Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="hero" className="flex items-center">
             <Home className="mr-2 h-4 w-4" />
             Hero Section
+          </TabsTrigger>
+          <TabsTrigger value="about" className="flex items-center">
+            <FileText className="mr-2 h-4 w-4" />
+            About
+          </TabsTrigger>
+          <TabsTrigger value="testimonial" className="flex items-center">
+            <Users className="mr-2 h-4 w-4" />
+            Testimonials
           </TabsTrigger>
           <TabsTrigger value="general" className="flex items-center">
             <Globe className="mr-2 h-4 w-4" />
@@ -234,6 +243,26 @@ const Settings = () => {
             <h2 className="text-xl font-semibold mb-6">Hero Section Settings</h2>
             {settings.hero ? renderSettingsGroup('hero', settings.hero) : (
               <p className="text-muted-foreground">No hero settings found.</p>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* About Section Settings */}
+        <TabsContent value="about" className="mt-6">
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-6">About Section Settings</h2>
+            {settings.about ? renderSettingsGroup('about', settings.about) : (
+              <p className="text-muted-foreground">No about settings found.</p>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* Testimonial Section Settings */}
+        <TabsContent value="testimonial" className="mt-6">
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-6">Testimonial Section Settings</h2>
+            {settings.testimonial ? renderSettingsGroup('testimonial', settings.testimonial) : (
+              <p className="text-muted-foreground">No testimonial settings found.</p>
             )}
           </Card>
         </TabsContent>

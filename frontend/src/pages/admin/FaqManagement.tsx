@@ -34,6 +34,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const FaqManagement = () => {
   const { user } = useAuth();
   const [faqs, setFaqs] = useState<Faq[]>([]);
+  const [categories, setCategories] = useState<string[]>(['general', 'subscription', 'technical', 'content', 'billing']);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -48,6 +49,7 @@ const FaqManagement = () => {
 
   useEffect(() => {
     fetchFaqs();
+    fetchCategories();
   }, []);
 
   const fetchFaqs = async () => {
@@ -74,6 +76,17 @@ const FaqManagement = () => {
       console.error('Error details:', error.response?.data);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await faqApi.getCategories();
+      if (response.success) {
+        setCategories(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
     }
   };
 
@@ -160,7 +173,7 @@ const FaqManagement = () => {
     setIsEditDialogOpen(true);
   };
 
-  const categories = ['account', 'billing', 'technical', 'content', 'plans', 'general'];
+  // const categories = ['account', 'billing', 'technical', 'content', 'plans', 'general'];
 
   if (loading) {
     return (

@@ -313,8 +313,8 @@ const SubscriptionPlans = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="yearly">Yearly</SelectItem>
+                      <SelectItem value="monthly" className="text-white hover:text-white hover:bg-gray-700">Monthly</SelectItem>
+                      <SelectItem value="yearly" className="text-white hover:text-white hover:bg-gray-700">Yearly</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -370,9 +370,9 @@ const SubscriptionPlans = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="SD">SD</SelectItem>
-                      <SelectItem value="HD">HD</SelectItem>
-                      <SelectItem value="4K">4K</SelectItem>
+                      <SelectItem value="SD" className="text-white hover:text-white hover:bg-gray-700">SD</SelectItem>
+                      <SelectItem value="HD" className="text-white hover:text-white hover:bg-gray-700">HD</SelectItem>
+                      <SelectItem value="4K" className="text-white hover:text-white hover:bg-gray-700">4K</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

@@ -52,11 +52,12 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // Seed categories, series, and videos
+        // Seed categories, series, videos, and settings
         $this->call([
             CategorySeeder::class,
             SeriesSeeder::class,
             VideoSeeder::class,
+            SettingsSeeder::class,
         ]);
     }
 }
