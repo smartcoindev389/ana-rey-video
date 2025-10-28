@@ -5,7 +5,8 @@ namespace Database\Seeders;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\Video;
-use App\Models\Series;
+use App\Models\Category;
+use App\Models\User;
 
 class VideoSeeder extends Seeder
 {
@@ -14,201 +15,207 @@ class VideoSeeder extends Seeder
      */
     public function run(): void
     {
-        $reactSeries = Series::where('slug', 'react-fundamentals')->first();
-        $jsSeries = Series::where('slug', 'advanced-javascript')->first();
-        $designSeries = Series::where('slug', 'ui-ux-design-mastery')->first();
-        $fullstackSeries = Series::where('slug', 'full-stack-development')->first();
+        // Get admin user
+        $adminUser = User::where('email', 'admin@ana.com')->first();
+        
+        // Get art categories
+        $sculptureCategory = Category::where('slug', 'sculpture')->first();
+        $drawingCategory = Category::where('slug', 'drawing')->first();
+        $polychromyCategory = Category::where('slug', 'polychromy')->first();
+        $restorationCategory = Category::where('slug', 'restoration')->first();
+        $modelingCategory = Category::where('slug', '3d-modeling')->first();
 
         $videos = [
-            // React Fundamentals Series
+            // Sculpture Category Videos
             [
-                'title' => 'Introduction to React',
-                'slug' => 'introduction-to-react',
-                'description' => 'Get started with React by understanding its core concepts, virtual DOM, and component-based architecture.',
-                'short_description' => 'Learn the basics of React and its core concepts',
-                'series_id' => $reactSeries->id,
-                'instructor_id' => $reactSeries->instructor_id,
-                'video_url' => 'https://example.com/videos/react-intro.mp4',
-                'thumbnail' => 'react-intro-thumb.jpg',
-                'duration' => 1800, // 30 minutes
+                'title' => 'Introduction to Classical Sculpture',
+                'slug' => 'introduction-to-classical-sculpture',
+                'description' => 'Learn the fundamentals of classical sculpture techniques and form study.',
+                'short_description' => 'Master classical sculpting fundamentals',
+                'category_id' => $sculptureCategory->id,
+                'instructor_id' => $adminUser->id,
+                'video_url' => 'https://example.com/videos/sculpture-intro.mp4',
+                'thumbnail' => 'sculpture-intro-thumb.jpg',
+                'duration' => 1800,
                 'visibility' => 'freemium',
                 'status' => 'published',
                 'is_free' => true,
                 'episode_number' => 1,
                 'sort_order' => 1,
-                'tags' => ['react', 'introduction', 'components'],
+                'tags' => ['sculpture', 'classical', 'fundamentals'],
                 'published_at' => now(),
             ],
             [
-                'title' => 'Components and JSX',
-                'slug' => 'components-and-jsx',
-                'description' => 'Learn how to create and use React components with JSX syntax.',
-                'short_description' => 'Master React components and JSX syntax',
-                'series_id' => $reactSeries->id,
-                'instructor_id' => $reactSeries->instructor_id,
-                'video_url' => 'https://example.com/videos/react-components.mp4',
-                'thumbnail' => 'react-components-thumb.jpg',
-                'duration' => 2400, // 40 minutes
+                'title' => 'Clay Modeling Techniques',
+                'slug' => 'clay-modeling-techniques',
+                'description' => 'Explore various clay modeling techniques and textures.',
+                'short_description' => 'Master clay modeling methods',
+                'category_id' => $sculptureCategory->id,
+                'instructor_id' => $adminUser->id,
+                'video_url' => 'https://example.com/videos/clay-modeling.mp4',
+                'thumbnail' => 'clay-modeling-thumb.jpg',
+                'duration' => 2400,
                 'visibility' => 'freemium',
                 'status' => 'published',
                 'is_free' => true,
                 'episode_number' => 2,
                 'sort_order' => 2,
-                'tags' => ['react', 'components', 'jsx'],
+                'tags' => ['sculpture', 'clay', 'modeling'],
                 'published_at' => now(),
             ],
             [
-                'title' => 'State and Props',
-                'slug' => 'state-and-props',
-                'description' => 'Understand React state management and props system for component communication.',
-                'short_description' => 'Learn React state and props management',
-                'series_id' => $reactSeries->id,
-                'instructor_id' => $reactSeries->instructor_id,
-                'video_url' => 'https://example.com/videos/react-state-props.mp4',
-                'thumbnail' => 'react-state-thumb.jpg',
-                'duration' => 2700, // 45 minutes
-                'visibility' => 'freemium',
+                'title' => 'Marble Carving Basics',
+                'slug' => 'marble-carving-basics',
+                'description' => 'Learn the traditional art of marble carving.',
+                'short_description' => 'Traditional marble carving',
+                'category_id' => $sculptureCategory->id,
+                'instructor_id' => $adminUser->id,
+                'video_url' => 'https://example.com/videos/marble-carving.mp4',
+                'thumbnail' => 'marble-carving-thumb.jpg',
+                'duration' => 2700,
+                'visibility' => 'basic',
                 'status' => 'published',
-                'is_free' => true,
+                'is_free' => false,
+                'price' => 9.99,
                 'episode_number' => 3,
                 'sort_order' => 3,
-                'tags' => ['react', 'state', 'props'],
-                'published_at' => now(),
-            ],
-            [
-                'title' => 'React Hooks',
-                'slug' => 'react-hooks',
-                'description' => 'Master modern React with hooks including useState, useEffect, and custom hooks.',
-                'short_description' => 'Learn modern React hooks',
-                'series_id' => $reactSeries->id,
-                'instructor_id' => $reactSeries->instructor_id,
-                'video_url' => 'https://example.com/videos/react-hooks.mp4',
-                'thumbnail' => 'react-hooks-thumb.jpg',
-                'duration' => 3600, // 60 minutes
-                'visibility' => 'freemium',
-                'status' => 'published',
-                'is_free' => true,
-                'episode_number' => 4,
-                'sort_order' => 4,
-                'tags' => ['react', 'hooks', 'usestate', 'useeffect'],
+                'tags' => ['sculpture', 'marble', 'carving'],
                 'published_at' => now(),
             ],
 
-            // Advanced JavaScript Series
+            // Drawing Category Videos
             [
-                'title' => 'ES6+ Features',
-                'slug' => 'es6-features',
-                'description' => 'Explore modern JavaScript features including arrow functions, destructuring, and modules.',
-                'short_description' => 'Master ES6+ JavaScript features',
-                'series_id' => $jsSeries->id,
-                'instructor_id' => $jsSeries->instructor_id,
-                'video_url' => 'https://example.com/videos/js-es6.mp4',
-                'thumbnail' => 'js-es6-thumb.jpg',
-                'duration' => 2700, // 45 minutes
-                'visibility' => 'basic',
+                'title' => 'Fundamentals of Life Drawing',
+                'slug' => 'fundamentals-of-life-drawing',
+                'description' => 'Master the art of drawing the human figure from life.',
+                'short_description' => 'Learn life drawing techniques',
+                'category_id' => $drawingCategory->id,
+                'instructor_id' => $adminUser->id,
+                'video_url' => 'https://example.com/videos/life-drawing.mp4',
+                'thumbnail' => 'life-drawing-thumb.jpg',
+                'duration' => 1800,
+                'visibility' => 'freemium',
                 'status' => 'published',
-                'is_free' => false,
-                'price' => 9.99,
+                'is_free' => true,
                 'episode_number' => 1,
                 'sort_order' => 1,
-                'tags' => ['javascript', 'es6', 'arrow-functions'],
+                'tags' => ['drawing', 'life-drawing', 'figure'],
                 'published_at' => now(),
             ],
             [
-                'title' => 'Async Programming',
-                'slug' => 'async-programming',
-                'description' => 'Learn asynchronous JavaScript with Promises, async/await, and error handling.',
-                'short_description' => 'Master asynchronous JavaScript programming',
-                'series_id' => $jsSeries->id,
-                'instructor_id' => $jsSeries->instructor_id,
-                'video_url' => 'https://example.com/videos/js-async.mp4',
-                'thumbnail' => 'js-async-thumb.jpg',
-                'duration' => 3600, // 60 minutes
+                'title' => 'Perspective Drawing Techniques',
+                'slug' => 'perspective-drawing-techniques',
+                'description' => 'Learn one-point and two-point perspective for realistic drawings.',
+                'short_description' => 'Master perspective drawing',
+                'category_id' => $drawingCategory->id,
+                'instructor_id' => $adminUser->id,
+                'video_url' => 'https://example.com/videos/perspective.mp4',
+                'thumbnail' => 'perspective-thumb.jpg',
+                'duration' => 2400,
+                'visibility' => 'freemium',
+                'status' => 'published',
+                'is_free' => true,
+                'episode_number' => 2,
+                'sort_order' => 2,
+                'tags' => ['drawing', 'perspective', 'techniques'],
+                'published_at' => now(),
+            ],
+
+            // Polychromy Category Videos
+            [
+                'title' => 'Color Theory Fundamentals',
+                'slug' => 'color-theory-fundamentals',
+                'description' => 'Understand the science and art of color in painting.',
+                'short_description' => 'Master color theory',
+                'category_id' => $polychromyCategory->id,
+                'instructor_id' => $adminUser->id,
+                'video_url' => 'https://example.com/videos/color-theory.mp4',
+                'thumbnail' => 'color-theory-thumb.jpg',
+                'duration' => 1800,
+                'visibility' => 'freemium',
+                'status' => 'published',
+                'is_free' => true,
+                'episode_number' => 1,
+                'sort_order' => 1,
+                'tags' => ['polychromy', 'color', 'theory'],
+                'published_at' => now(),
+            ],
+            [
+                'title' => 'Oil Painting Techniques',
+                'slug' => 'oil-painting-techniques',
+                'description' => 'Learn classical and modern oil painting methods.',
+                'short_description' => 'Classical oil painting',
+                'category_id' => $polychromyCategory->id,
+                'instructor_id' => $adminUser->id,
+                'video_url' => 'https://example.com/videos/oil-painting.mp4',
+                'thumbnail' => 'oil-painting-thumb.jpg',
+                'duration' => 2700,
                 'visibility' => 'basic',
                 'status' => 'published',
                 'is_free' => false,
                 'price' => 9.99,
                 'episode_number' => 2,
                 'sort_order' => 2,
-                'tags' => ['javascript', 'async', 'promises', 'await'],
+                'tags' => ['polychromy', 'oil-painting', 'classical'],
                 'published_at' => now(),
             ],
 
-            // UI/UX Design Series
+            // Restoration Category Videos
             [
-                'title' => 'Design Principles',
-                'slug' => 'design-principles',
-                'description' => 'Learn fundamental design principles including balance, contrast, and hierarchy.',
-                'short_description' => 'Master fundamental design principles',
-                'series_id' => $designSeries->id,
-                'instructor_id' => $designSeries->instructor_id,
-                'video_url' => 'https://example.com/videos/design-principles.mp4',
-                'thumbnail' => 'design-principles-thumb.jpg',
-                'duration' => 2400, // 40 minutes
+                'title' => 'Introduction to Art Restoration',
+                'slug' => 'introduction-to-art-restoration',
+                'description' => 'Learn the principles and ethics of art conservation.',
+                'short_description' => 'Art restoration fundamentals',
+                'category_id' => $restorationCategory->id,
+                'instructor_id' => $adminUser->id,
+                'video_url' => 'https://example.com/videos/restoration-intro.mp4',
+                'thumbnail' => 'restoration-intro-thumb.jpg',
+                'duration' => 1800,
                 'visibility' => 'freemium',
                 'status' => 'published',
                 'is_free' => true,
                 'episode_number' => 1,
                 'sort_order' => 1,
-                'tags' => ['design', 'principles', 'ui', 'ux'],
+                'tags' => ['restoration', 'conservation', 'ethics'],
                 'published_at' => now(),
             ],
             [
-                'title' => 'User Research',
-                'slug' => 'user-research',
-                'description' => 'Learn how to conduct user research and gather insights for better design decisions.',
-                'short_description' => 'Conduct effective user research',
-                'series_id' => $designSeries->id,
-                'instructor_id' => $designSeries->instructor_id,
-                'video_url' => 'https://example.com/videos/user-research.mp4',
-                'thumbnail' => 'user-research-thumb.jpg',
-                'duration' => 3000, // 50 minutes
-                'visibility' => 'freemium',
-                'status' => 'published',
-                'is_free' => true,
-                'episode_number' => 2,
-                'sort_order' => 2,
-                'tags' => ['design', 'user-research', 'ux'],
-                'published_at' => now(),
-            ],
-
-            // Full Stack Development Series
-            [
-                'title' => 'Backend with Node.js',
-                'slug' => 'backend-with-nodejs',
-                'description' => 'Build robust backend APIs with Node.js, Express, and best practices.',
-                'short_description' => 'Build backend APIs with Node.js',
-                'series_id' => $fullstackSeries->id,
-                'instructor_id' => $fullstackSeries->instructor_id,
-                'video_url' => 'https://example.com/videos/nodejs-backend.mp4',
-                'thumbnail' => 'nodejs-backend-thumb.jpg',
-                'duration' => 4200, // 70 minutes
-                'visibility' => 'premium',
-                'status' => 'published',
-                'is_free' => false,
-                'price' => 19.99,
-                'episode_number' => 1,
-                'sort_order' => 1,
-                'tags' => ['nodejs', 'express', 'backend', 'api'],
-                'published_at' => now(),
-            ],
-            [
-                'title' => 'Database Integration',
-                'slug' => 'database-integration',
-                'description' => 'Connect your backend to MongoDB and implement data persistence.',
-                'short_description' => 'Integrate MongoDB with your backend',
-                'series_id' => $fullstackSeries->id,
-                'instructor_id' => $fullstackSeries->instructor_id,
-                'video_url' => 'https://example.com/videos/mongodb-integration.mp4',
-                'thumbnail' => 'mongodb-thumb.jpg',
-                'duration' => 3600, // 60 minutes
+                'title' => 'Paint Layer Analysis',
+                'slug' => 'paint-layer-analysis',
+                'description' => 'Examine historical paint layers and restoration techniques.',
+                'short_description' => 'Paint layer examination',
+                'category_id' => $restorationCategory->id,
+                'instructor_id' => $adminUser->id,
+                'video_url' => 'https://example.com/videos/paint-analysis.mp4',
+                'thumbnail' => 'paint-analysis-thumb.jpg',
+                'duration' => 2400,
                 'visibility' => 'premium',
                 'status' => 'published',
                 'is_free' => false,
                 'price' => 19.99,
                 'episode_number' => 2,
                 'sort_order' => 2,
-                'tags' => ['mongodb', 'database', 'backend'],
+                'tags' => ['restoration', 'analysis', 'techniques'],
+                'published_at' => now(),
+            ],
+
+            // 3D Modeling Category Videos
+            [
+                'title' => 'Getting Started with 3D Sculpting',
+                'slug' => 'getting-started-with-3d-sculpting',
+                'description' => 'Introduction to digital 3D sculpting tools and workflows.',
+                'short_description' => 'Digital sculpting basics',
+                'category_id' => $modelingCategory->id,
+                'instructor_id' => $adminUser->id,
+                'video_url' => 'https://example.com/videos/3d-sculpting.mp4',
+                'thumbnail' => '3d-sculpting-thumb.jpg',
+                'duration' => 1800,
+                'visibility' => 'freemium',
+                'status' => 'published',
+                'is_free' => true,
+                'episode_number' => 1,
+                'sort_order' => 1,
+                'tags' => ['3d-modeling', 'digital', 'sculpting'],
                 'published_at' => now(),
             ],
         ];
@@ -217,9 +224,9 @@ class VideoSeeder extends Seeder
             Video::create($video);
         }
 
-        // Update series statistics
-        foreach (Series::all() as $series) {
-            $series->updateStatistics();
+        // Update category statistics
+        foreach (Category::all() as $category) {
+            $category->updateStatistics();
         }
     }
 }

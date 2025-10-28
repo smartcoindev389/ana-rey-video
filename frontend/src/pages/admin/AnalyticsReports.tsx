@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,13 +16,14 @@ import {
   Filter,
   RefreshCw
 } from 'lucide-react';
+import { analyticsApi } from '@/services/analyticsApi';
+import { toast } from 'sonner';
 
 const AnalyticsReports = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('month');
   const [selectedMetric, setSelectedMetric] = useState('all');
-
-  // Mock analytics data - replace with real API calls
-  const analytics = {
+  const [loading, setLoading] = useState(true);
+  const [analytics, setAnalytics] = useState<any>({
     overview: {
       totalUsers: 1234,
       activeUsers: 892,
@@ -71,6 +72,54 @@ const AnalyticsReports = () => {
       { country: 'Germany', users: 98, percentage: 7.9 },
       { country: 'Others', users: 145, percentage: 11.7 }
     ]
+  });
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [selectedPeriod]);
+
+  const fetchAnalytics = async () => {
+    try {
+      setLoading(true);
+      
+      const [overviewRes, userGrowthRes, revenueRes, topVideosRes, subscriptionRes, contentRes] = await Promise.all([
+        analyticsApi.getOverview(),
+        analyticsApi.getUserGrowth({ period: selectedPeriod }),
+        analyticsApi.getRevenue({ period: selectedPeriod }),
+        analyticsApi.getTopVideos({ limit: 10 }),
+        analyticsApi.getSubscriptionStats(),
+        analyticsApi.getContentAnalytics(),
+      ]);
+
+      setAnalytics({
+        overview: {
+          totalUsers: overviewRes.data?.total_users || 0,
+          activeUsers: overviewRes.data?.active_subscriptions || 0,
+          totalRevenue: overviewRes.data?.total_revenue || 0,
+          totalViews: overviewRes.data?.total_views || 0,
+          averageSessionTime: '24:15', // Keep static for now
+          conversionRate: 12.5, // Keep static for now
+          churnRate: 3.2 // Keep static for now
+        },
+        userGrowth: userGrowthRes.data || [],
+        revenue: revenueRes.data || [],
+        topVideos: (topVideosRes.data || []).map((video: any) => ({
+          title: video.title,
+          views: video.total_views || 0,
+          completionRate: 85, // Keep static for now
+          rating: video.rating || 0
+        })),
+        subscriptionStats: subscriptionRes.data || analytics.subscriptionStats,
+        contentStats: contentRes.data || analytics.contentStats,
+        usersByCountry: analytics.usersByCountry // Keep static for now
+      });
+      
+    } catch (error: any) {
+      console.error('Error loading analytics:', error);
+      toast.error('Failed to load analytics data');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getGrowthIndicator = (current: number, previous: number) => {
@@ -93,6 +142,28 @@ const AnalyticsReports = () => {
     }).format(num);
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Analytics / Reports</h1>
+          <p className="text-muted-foreground">Loading analytics data...</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[...Array(8)].map((_, i) => (
+            <Card key={i} className="p-6">
+              <div className="animate-pulse">
+                <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
+                <div className="h-8 bg-muted rounded w-1/2 mb-2"></div>
+                <div className="h-3 bg-muted rounded w-1/3"></div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -102,8 +173,8 @@ const AnalyticsReports = () => {
           <p className="text-muted-foreground">Platform performance and user analytics</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline">
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <Button variant="outline" onClick={fetchAnalytics} disabled={loading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh Data
           </Button>
           <Button variant="outline">

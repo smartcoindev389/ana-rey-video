@@ -52,12 +52,14 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // Seed categories, series, videos, and settings
+        // Seed categories, videos, settings, hero backgrounds, and testimonials
+        // Note: SeriesSeeder is no longer needed as categories now serve as series
         $this->call([
             CategorySeeder::class,
-            SeriesSeeder::class,
             VideoSeeder::class,
             SettingsSeeder::class,
+            HeroBackgroundSeeder::class,
+            TestimonialSeeder::class,
         ]);
     }
 }

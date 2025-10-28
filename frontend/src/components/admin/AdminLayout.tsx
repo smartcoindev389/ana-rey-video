@@ -43,7 +43,6 @@ const AdminLayout = () => {
     { path: '/admin/multilingual', icon: Globe, label: 'Multilingual Settings' },
     { path: '/admin/support', icon: MessageSquare, label: 'Support / Tickets' },
     { path: '/admin/feedback', icon: ThumbsUp, label: 'Feedback & Suggestions' },
-    { path: '/admin/faqs', icon: HelpCircle, label: 'FAQ Management' },
     { path: '/admin/settings', icon: Settings, label: 'Settings' },
     { path: '/admin/analytics', icon: BarChart3, label: 'Analytics / Reports' },
   ];

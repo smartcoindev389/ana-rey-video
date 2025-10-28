@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Series;
 use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -14,107 +13,82 @@ use Illuminate\Support\Facades\Auth;
 class SeriesController extends Controller
 {
     /**
-     * Display a listing of series.
+     * Display a listing of series (using categories table).
      */
     public function index(Request $request): JsonResponse
     {
         $user = Auth::user();
         
-        $query = Series::with(['category', 'instructor']);
+        // Use Category model as Series
+        $query = Category::query();
 
         // Check if this is an admin request (admin routes)
         $isAdminRequest = $request->is('api/admin/*');
 
-        // Apply visibility filters based on user subscription (skip for admin)
+        // Filter by active status for non-admin requests
         if (!$isAdminRequest) {
-            if ($user) {
-                $query->visibleTo($user->subscription_type);
-            } else {
-                $query->where('visibility', 'freemium');
-            }
+            $query->where('is_active', true);
         }
 
-        // Filter by status
-        if ($request->has('status')) {
-            $query->where('status', $request->get('status'));
-        } else if (!$isAdminRequest) {
-            // Default to published for public access (admin can see all)
-            $query->published();
-        }
-
-        // Filter by category
+        // Filter by category_id for compatibility
         if ($request->has('category_id')) {
-            $query->where('category_id', $request->get('category_id'));
+            $query->where('id', $request->get('category_id'));
         }
 
-        // Filter by visibility
-        if ($request->has('visibility')) {
-            $query->where('visibility', $request->get('visibility'));
+        // Filter by active status
+        if ($request->has('status')) {
+            $query->where('is_active', $request->get('status'));
         }
 
         // Search functionality
         if ($request->has('search')) {
             $search = $request->get('search');
             $query->where(function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%")
-                  ->orWhere('short_description', 'like', "%{$search}%");
-            });
-        }
-
-        // Filter by tags
-        if ($request->has('tags')) {
-            $tags = is_array($request->get('tags')) ? $request->get('tags') : explode(',', $request->get('tags'));
-            $query->where(function ($q) use ($tags) {
-                foreach ($tags as $tag) {
-                    $q->orWhereJsonContains('tags', trim($tag));
-                }
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
             });
         }
 
         // Sorting
-        $sortBy = $request->get('sort_by', 'created_at');
-        $sortOrder = $request->get('sort_order', 'desc');
+        $sortBy = $request->get('sort_by', 'sort_order');
+        $sortOrder = $request->get('sort_order', 'asc');
         
         switch ($sortBy) {
-            case 'title':
-                $query->orderBy('title', $sortOrder);
+            case 'name':
+                $query->orderBy('name', $sortOrder);
                 break;
-            case 'rating':
-                $query->orderBy('rating', $sortOrder);
-                break;
-            case 'views':
-                $query->orderBy('total_views', $sortOrder);
-                break;
-            case 'featured':
-                $query->featured()->orderBy('published_at', $sortOrder);
+            case 'sort_order':
+                $query->orderBy('sort_order', $sortOrder);
                 break;
             default:
-                $query->orderBy('created_at', $sortOrder);
+                $query->orderBy('sort_order', 'asc');
         }
 
-        // Include video count
-        $query->withCount('publishedVideos');
-
-        $series = $query->paginate($request->get('per_page', 15));
+        $categories = $query->paginate($request->get('per_page', 15));
 
         return response()->json([
             'success' => true,
-            'data' => $series,
+            'data' => $categories,
         ]);
     }
 
     /**
-     * Store a newly created series.
+     * Store a newly created series (using category table).
      */
     public function store(Request $request): JsonResponse
     {
+        // Accept both category fields (name) and series fields (title)
         $validated = $request->validate([
-            'title' => 'required|string|max:255|unique:series,title',
-            'description' => 'required|string',
-            'short_description' => 'nullable|string|max:500',
-            'visibility' => 'required|in:freemium,basic,premium',
-            'category_id' => 'required|exists:categories,id',
+            'name' => 'nullable|string|max:255',
+            'title' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+            'short_description' => 'nullable|string',
+            'color' => 'nullable|string|max:7',
+            'icon' => 'nullable|string|max:255',
+            'is_active' => 'nullable|boolean',
+            'status' => 'nullable|in:draft,published,archived',
+            'visibility' => 'nullable|in:freemium,basic,premium',
+            'sort_order' => 'nullable|integer|min:0',
             'thumbnail' => 'nullable|string|max:255',
             'cover_image' => 'nullable|string|max:255',
             'trailer_url' => 'nullable|url|max:255',
@@ -124,101 +98,91 @@ class SeriesController extends Controller
             'price' => 'nullable|numeric|min:0',
             'is_free' => 'nullable|boolean',
             'is_featured' => 'nullable|boolean',
-            'featured_until' => 'nullable|date|after:now',
-            'tags' => 'nullable|array',
-            'tags.*' => 'string|max:50',
+            'featured_until' => 'nullable|date',
+            'tags' => 'nullable|json',
         ]);
 
-        $validated['slug'] = Str::slug($validated['title']);
-        $validated['instructor_id'] = Auth::id();
+        // Map title to name if name is not provided (for frontend compatibility)
+        if (!isset($validated['name']) && isset($validated['title'])) {
+            $validated['name'] = $validated['title'];
+        }
         
-        // Set status default
-        if (!isset($validated['status'])) {
-            $validated['status'] = 'draft';
+        // Validate that name exists
+        if (!isset($validated['name']) || empty($validated['name'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Name or title is required.',
+            ], 422);
+        }
+        
+        // Check uniqueness
+        if (Category::where('name', $validated['name'])->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A category with this name already exists.',
+            ], 422);
         }
 
-        // Set published_at if status is published
-        if ($validated['status'] === 'published') {
-            $validated['published_at'] = now();
+        $validated['slug'] = Str::slug($validated['name']);
+        
+        // Set default values
+        if (!isset($validated['is_active'])) {
+            $validated['is_active'] = true;
+        }
+        if (!isset($validated['sort_order'])) {
+            // Get max sort_order and add 1
+            $maxSortOrder = Category::max('sort_order') ?? 0;
+            $validated['sort_order'] = $maxSortOrder + 1;
         }
 
-        $series = Series::create($validated);
+        $category = Category::create($validated);
 
         return response()->json([
             'success' => true,
             'message' => 'Series created successfully.',
-            'data' => $series->load(['category', 'instructor']),
+            'data' => $category,
         ], 201);
     }
 
     /**
-     * Display the specified series.
+     * Display the specified series (using category table).
      */
-    public function show(Series $series): JsonResponse
+    public function show(Category $category): JsonResponse
     {
-        $user = Auth::user();
-
-        // Check access permissions
-        if (!$series->isAccessibleTo($user)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'You do not have access to this series.',
-            ], 403);
-        }
-
-        $series->load([
-            'category',
-            'instructor',
-            'publishedVideos' => function ($q) {
-                $q->orderBy('sort_order')->orderBy('episode_number');
-            }
-        ]);
-
-        // Get user progress if authenticated
-        $userProgress = null;
-        if ($user) {
-            $userProgress = $series->userProgress()
-                ->where('user_id', $user->id)
-                ->first();
-        }
-
         return response()->json([
             'success' => true,
-            'data' => [
-                'series' => $series,
-                'user_progress' => $userProgress,
-            ],
+            'data' => $category,
         ]);
     }
 
     /**
-     * Update the specified series.
+     * Update the specified series (using category table).
      */
     public function update(Request $request, $id): JsonResponse
     {
-        // Find series by ID instead of slug
-        $series = Series::findOrFail($id);
+        // Find category by ID
+        $category = Category::findOrFail($id);
         
-        // Check if user can edit this series
-        if (!Auth::user()->isAdmin() && $series->instructor_id !== Auth::id()) {
+        // Check if user is admin
+        if (!Auth::user()->isAdmin()) {
             return response()->json([
                 'success' => false,
                 'message' => 'You do not have permission to edit this series.',
             ], 403);
         }
 
+        // Accept both category fields (name) and series fields (title)
         $validated = $request->validate([
-            'title' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('series', 'title')->ignore($series->id),
-            ],
-            'description' => 'required|string',
-            'short_description' => 'nullable|string|max:500',
-            'visibility' => 'required|in:freemium,basic,premium',
+            'name' => 'nullable|string|max:255',
+            'title' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+            'short_description' => 'nullable|string',
+            'color' => 'nullable|string|max:7',
+            'icon' => 'nullable|string|max:255',
+            'is_active' => 'nullable|boolean',
             'status' => 'nullable|in:draft,published,archived',
-            'category_id' => 'required|exists:categories,id',
+            'visibility' => 'nullable|in:freemium,basic,premium',
+            'sort_order' => 'nullable|integer|min:0',
             'thumbnail' => 'nullable|string|max:255',
             'cover_image' => 'nullable|string|max:255',
             'trailer_url' => 'nullable|url|max:255',
@@ -228,47 +192,56 @@ class SeriesController extends Controller
             'price' => 'nullable|numeric|min:0',
             'is_free' => 'nullable|boolean',
             'is_featured' => 'nullable|boolean',
-            'featured_until' => 'nullable|date|after:now',
-            'tags' => 'nullable|array',
-            'tags.*' => 'string|max:50',
+            'featured_until' => 'nullable|date',
+            'tags' => 'nullable|json',
         ]);
-
-        // Update slug if title changed
-        if ($series->title !== $validated['title']) {
-            $validated['slug'] = Str::slug($validated['title']);
+        
+        // Map title to name if name is not provided (for frontend compatibility)
+        if (!isset($validated['name']) && isset($validated['title'])) {
+            $validated['name'] = $validated['title'];
+        }
+        
+        // Check uniqueness if name is being updated
+        if (isset($validated['name']) && $validated['name'] !== $category->name) {
+            if (Category::where('name', $validated['name'])->where('id', '!=', $category->id)->exists()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'A category with this name already exists.',
+                ], 422);
+            }
         }
 
-        // Set published_at if status is being changed to published
-        if ($request->has('status') && $request->get('status') === 'published' && $series->status !== 'published') {
-            $validated['published_at'] = now();
+        // Update slug if name changed
+        if ($category->name !== $validated['name']) {
+            $validated['slug'] = Str::slug($validated['name']);
         }
 
-        $series->update($validated);
+        $category->update($validated);
 
         return response()->json([
             'success' => true,
             'message' => 'Series updated successfully.',
-            'data' => $series->load(['category', 'instructor']),
+            'data' => $category,
         ]);
     }
 
     /**
-     * Remove the specified series.
+     * Remove the specified series (using category table).
      */
     public function destroy($id): JsonResponse
     {
-        // Find series by ID instead of slug
-        $series = Series::findOrFail($id);
+        // Find category by ID
+        $category = Category::findOrFail($id);
         
-        // Check if user can delete this series
-        if (!Auth::user()->isAdmin() && $series->instructor_id !== Auth::id()) {
+        // Check if user is admin
+        if (!Auth::user()->isAdmin()) {
             return response()->json([
                 'success' => false,
                 'message' => 'You do not have permission to delete this series.',
             ], 403);
         }
 
-        $series->delete();
+        $category->delete();
 
         return response()->json([
             'success' => true,
@@ -277,143 +250,66 @@ class SeriesController extends Controller
     }
 
     /**
-     * Get featured series.
+     * Get featured series (using category table).
      */
     public function featured(Request $request): JsonResponse
     {
-        $user = Auth::user();
-        
-        $query = Series::featured()->with(['category', 'instructor']);
-
-        // Apply visibility filters
-        if ($user) {
-            $query->visibleTo($user->subscription_type);
-        } else {
-            $query->where('visibility', 'freemium');
-        }
-
-        $query->withCount('publishedVideos');
-
-        $series = $query->limit($request->get('limit', 10))->get();
-
-        return response()->json([
-            'success' => true,
-            'data' => $series,
-        ]);
-    }
-
-    /**
-     * Get popular series.
-     */
-    public function popular(Request $request): JsonResponse
-    {
-        $user = Auth::user();
-        
-        $query = Series::published()
-            ->with(['category', 'instructor'])
-            ->orderBy('total_views', 'desc')
-            ->orderBy('rating', 'desc');
-
-        // Apply visibility filters
-        if ($user) {
-            $query->visibleTo($user->subscription_type);
-        } else {
-            $query->where('visibility', 'freemium');
-        }
-
-        $query->withCount('publishedVideos');
-
-        $series = $query->limit($request->get('limit', 10))->get();
-
-        return response()->json([
-            'success' => true,
-            'data' => $series,
-        ]);
-    }
-
-    /**
-     * Get new releases.
-     */
-    public function newReleases(Request $request): JsonResponse
-    {
-        $user = Auth::user();
-        
-        $query = Series::published()
-            ->with(['category', 'instructor'])
-            ->orderBy('published_at', 'desc');
-
-        // Apply visibility filters
-        if ($user) {
-            $query->visibleTo($user->subscription_type);
-        } else {
-            $query->where('visibility', 'freemium');
-        }
-
-        $query->withCount('publishedVideos');
-
-        $series = $query->limit($request->get('limit', 10))->get();
-
-        return response()->json([
-            'success' => true,
-            'data' => $series,
-        ]);
-    }
-
-    /**
-     * Get recommended series for user.
-     */
-    public function recommended(Request $request): JsonResponse
-    {
-        $user = Auth::user();
-        
-        if (!$user) {
-            return response()->json([
-                'success' => true,
-                'data' => [],
-            ]);
-        }
-
-        // Get series based on user's category preferences and viewing history
-        $query = Series::published()
-            ->with(['category', 'instructor'])
-            ->whereNotIn('id', function ($q) use ($user) {
-                $q->select('series_id')
-                  ->from('user_progress')
-                  ->where('user_id', $user->id)
-                  ->whereNotNull('series_id');
-            });
-
-        // Apply visibility filters
-        $query->visibleTo($user->subscription_type);
-        $query->withCount('publishedVideos');
-
-        $series = $query->orderBy('rating', 'desc')
-            ->orderBy('total_views', 'desc')
+        $categories = Category::where('is_active', true)
+            ->orderBy('sort_order')
             ->limit($request->get('limit', 10))
             ->get();
 
         return response()->json([
             'success' => true,
-            'data' => $series,
+            'data' => $categories,
         ]);
     }
 
     /**
-     * Check if series is accessible to user.
+     * Get popular series (using category table).
      */
-    public function isAccessibleTo(Request $request, Series $series): JsonResponse
+    public function popular(Request $request): JsonResponse
     {
-        $user = Auth::user();
-        $isAccessible = $series->isAccessibleTo($user);
+        $categories = Category::where('is_active', true)
+            ->orderBy('sort_order')
+            ->limit($request->get('limit', 10))
+            ->get();
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'accessible' => $isAccessible,
-                'series_id' => $series->id,
-                'visibility' => $series->visibility,
-                'user_subscription' => $user ? $user->subscription_type : 'freemium',
-            ],
+            'data' => $categories,
+        ]);
+    }
+
+    /**
+     * Get new releases (using category table).
+     */
+    public function newReleases(Request $request): JsonResponse
+    {
+        $categories = Category::where('is_active', true)
+            ->orderBy('created_at', 'desc')
+            ->limit($request->get('limit', 10))
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $categories,
+        ]);
+    }
+
+    /**
+     * Get recommended series for user (using category table).
+     */
+    public function recommended(Request $request): JsonResponse
+    {
+        $categories = Category::where('is_active', true)
+            ->orderBy('sort_order')
+            ->limit($request->get('limit', 10))
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $categories,
         ]);
     }
 }

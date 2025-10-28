@@ -32,12 +32,12 @@ import {
   Target,
   Sparkles
 } from 'lucide-react';
-import { generateMockSeries, MockSeries } from '@/services/mockData';
+import { videoApi, Video } from '@/services/videoApi';
 import { useNavigate } from 'react-router-dom';
 
 const Explore = () => {
-  const [series, setSeries] = useState<MockSeries[]>([]);
-  const [filteredSeries, setFilteredSeries] = useState<MockSeries[]>([]);
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [filteredVideos, setFilteredVideos] = useState<Video[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedVisibility, setSelectedVisibility] = useState('all');
@@ -51,35 +51,54 @@ const Explore = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Simulate API call
-    const fetchSeries = async () => {
+    // Fetch from backend API
+    const fetchVideos = async () => {
       setLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockSeries = generateMockSeries();
-      setSeries(mockSeries);
-      setFilteredSeries(mockSeries);
-      setLoading(false);
+      try {
+        // Fetch published videos
+        const response = await videoApi.getAll({ 
+          status: 'published',
+          sort_by: 'created_at',
+          sort_order: 'desc'
+        });
+        
+        const videosData = response.data?.data || [];
+        
+        setVideos(videosData);
+        setFilteredVideos(videosData);
+      } catch (error) {
+        console.error('Error fetching videos:', error);
+        setVideos([]);
+        setFilteredVideos([]);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    fetchSeries();
+    fetchVideos();
   }, []);
 
   useEffect(() => {
-    let filtered = [...series];
+    let filtered = [...videos];
 
     // Search filter
     if (searchTerm) {
       filtered = filtered.filter(item => 
         item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.category.toLowerCase().includes(searchTerm.toLowerCase())
+        (item.description && item.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (item.short_description && item.short_description.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 
     // Category filter
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter(item => item.category === selectedCategory);
+      // Filter by category name if category object exists
+      filtered = filtered.filter(item => {
+        if (item.category) {
+          return item.category.name === selectedCategory;
+        }
+        return true;
+      });
     }
 
     // Visibility filter
@@ -87,58 +106,58 @@ const Explore = () => {
       filtered = filtered.filter(item => item.visibility === selectedVisibility);
     }
 
-    // Advanced filters
-    if (selectedDifficulty !== 'all') {
-      filtered = filtered.filter(item => item.difficulty === selectedDifficulty);
-    }
+    // Advanced filters - Skip difficulty, duration, and rating as they don't exist in Category
+    // if (selectedDifficulty !== 'all') {
+    //   filtered = filtered.filter(item => item.difficulty === selectedDifficulty);
+    // }
 
-    if (selectedDuration !== 'all') {
-      filtered = filtered.filter(item => {
-        if (selectedDuration === 'short') return item.totalDuration.includes('min');
-        if (selectedDuration === 'medium') return item.totalDuration.includes('h') && !item.totalDuration.includes('day');
-        if (selectedDuration === 'long') return item.totalDuration.includes('day');
-        return true;
-      });
-    }
+    // if (selectedDuration !== 'all') {
+    //   filtered = filtered.filter(item => {
+    //     if (selectedDuration === 'short') return item.totalDuration.includes('min');
+    //     if (selectedDuration === 'medium') return item.totalDuration.includes('h') && !item.totalDuration.includes('day');
+    //     if (selectedDuration === 'long') return item.totalDuration.includes('day');
+    //     return true;
+    //   });
+    // }
 
-    if (selectedRating !== 'all') {
-      filtered = filtered.filter(item => {
-        if (selectedRating === 'high') return item.rating >= 4.5;
-        if (selectedRating === 'medium') return item.rating >= 3.5 && item.rating < 4.5;
-        if (selectedRating === 'low') return item.rating < 3.5;
-        return true;
-      });
-    }
+    // if (selectedRating !== 'all') {
+    //   filtered = filtered.filter(item => {
+    //     if (selectedRating === 'high') return item.rating >= 4.5;
+    //     if (selectedRating === 'medium') return item.rating >= 3.5 && item.rating < 4.5;
+    //     if (selectedRating === 'low') return item.rating < 3.5;
+    //     return true;
+    //   });
+    // }
 
     // Sort
     switch (selectedSort) {
       case 'newest':
-        filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         break;
       case 'oldest':
-        filtered.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        filtered.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         break;
       case 'title':
         filtered.sort((a, b) => a.title.localeCompare(b.title));
         break;
       case 'rating':
-        filtered.sort((a, b) => b.rating - a.rating);
+        filtered.sort((a, b) => {
+          const ratingA = parseFloat(a.rating || 0);
+          const ratingB = parseFloat(b.rating || 0);
+          return ratingB - ratingA;
+        });
         break;
       case 'duration':
-        filtered.sort((a, b) => {
-          const aMinutes = parseDurationToMinutes(a.totalDuration);
-          const bMinutes = parseDurationToMinutes(b.totalDuration);
-          return aMinutes - bMinutes;
-        });
+        filtered.sort((a, b) => (b.duration || 0) - (a.duration || 0));
         break;
       case 'popular':
       default:
-        filtered.sort((a, b) => b.videoCount - a.videoCount);
+        filtered.sort((a, b) => (b.total_views || 0) - (a.total_views || 0));
         break;
     }
 
-    setFilteredSeries(filtered);
-  }, [series, searchTerm, selectedCategory, selectedVisibility, selectedSort, selectedDifficulty, selectedDuration, selectedRating]);
+    setFilteredVideos(filtered);
+  }, [videos, searchTerm, selectedCategory, selectedVisibility, selectedSort, selectedDifficulty, selectedDuration, selectedRating]);
 
   // Helper function to parse duration to minutes for sorting
   const parseDurationToMinutes = (duration: string): number => {
@@ -196,8 +215,8 @@ const Explore = () => {
     { value: 'duration', label: 'Duration' }
   ];
 
-  const GridCard = ({ item }: { item: MockSeries }) => (
-    <Card className="group cursor-pointer overflow-visible streaming-card border-0 bg-transparent transform hover:scale-105 transition-all duration-300 hover:shadow-2xl hover:z-50" onClick={() => navigate(`/series/${item.id}`)}>
+  const GridCard = ({ item }: { item: Video }) => (
+    <Card className="group cursor-pointer overflow-visible streaming-card border-0 bg-transparent transform hover:scale-105 transition-all duration-300 hover:shadow-2xl hover:z-50" onClick={() => navigate(`/video/${item.id}`)}>
       <div className="aspect-video bg-gradient-to-br from-gray-900 via-gray-800 to-gray-700 relative rounded-md overflow-hidden">
         {/* Background with scale effect */}
         <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-700 to-gray-600 transition-transform duration-500"></div>
@@ -217,16 +236,20 @@ const Explore = () => {
           {getVisibilityBadge(item.visibility)}
         </div>
         <div className="absolute top-2 left-2 z-10">
-          <Badge variant="secondary" className="text-xs bg-black/60 text-white border-0">
-            {item.category}
-          </Badge>
+          {item.category && (
+            <Badge variant="secondary" className="text-xs bg-black/60 text-white border-0">
+              {item.category.name}
+            </Badge>
+          )}
         </div>
         
         {/* Rating badge */}
-        <div className="absolute bottom-2 left-2 flex items-center space-x-1 bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded text-xs z-10">
-          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-          <span className="font-semibold">{item.rating}</span>
-        </div>
+        {item.rating && parseFloat(item.rating) > 0 && (
+          <div className="absolute bottom-2 left-2 flex items-center space-x-1 bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded text-xs z-10">
+            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+            <span className="font-semibold">{parseFloat(item.rating).toFixed(1)}</span>
+          </div>
+        )}
         
         {/* Gradient overlay at bottom */}
         <div className="absolute bottom-0 left-0 right-0 h-20 thumbnail-overlay"></div>
@@ -245,27 +268,23 @@ const Explore = () => {
             </button>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{item.description}</p>
+        <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{item.short_description || item.description || 'No description'}</p>
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center">
-            <Play className="h-3 w-3 mr-1" />
-            <span>{item.videoCount} ep</span>
-          </div>
-          <div className="flex items-center">
             <Clock className="h-3 w-3 mr-1" />
-            <span>{item.totalDuration}</span>
+            <span>{item.duration ? `${Math.floor(item.duration / 60)}m` : '0m'}</span>
           </div>
           <div className="flex items-center">
             <Eye className="h-3 w-3 mr-1" />
-            <span>{Math.floor(Math.random() * 5000) + 1000}</span>
+            <span>{item.total_views || 0}</span>
           </div>
         </div>
       </div>
     </Card>
   );
 
-  const ListCard = ({ item }: { item: MockSeries }) => (
-    <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/series/${item.id}`)}>
+  const ListCard = ({ item }: { item: Video }) => (
+    <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/video/${item.id}`)}>
       <div className="flex">
         <div className="w-48 aspect-video bg-gradient-to-br from-primary/20 to-primary/5 relative">
           <div className="absolute inset-0 flex items-center justify-center">
@@ -279,24 +298,22 @@ const Explore = () => {
             <h3 className="font-semibold text-lg">{item.title}</h3>
             {getVisibilityBadge(item.visibility)}
           </div>
-          <p className="text-muted-foreground mb-4 line-clamp-2">{item.description}</p>
+          <p className="text-muted-foreground mb-4 line-clamp-2">{item.short_description || item.description || 'No description'}</p>
           <div className="flex items-center space-x-6 text-sm text-muted-foreground">
             <div className="flex items-center">
-              <Play className="h-4 w-4 mr-1" />
-              {item.videoCount} episodes
-            </div>
-            <div className="flex items-center">
               <Clock className="h-4 w-4 mr-1" />
-              {item.totalDuration}
+              {item.duration ? `${Math.floor(item.duration / 60)}m` : '0m'}
             </div>
             <div className="flex items-center">
               <Eye className="h-4 w-4 mr-1" />
-              1,234 views
+              {item.total_views || 0} views
             </div>
-            <div className="flex items-center">
-              <Star className="h-4 w-4 mr-1" />
-              4.8 rating
-            </div>
+            {item.rating && parseFloat(item.rating) > 0 && (
+              <div className="flex items-center">
+                <Star className="h-4 w-4 mr-1" />
+                {parseFloat(item.rating).toFixed(1)} rating
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -328,7 +345,7 @@ const Explore = () => {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Browse Collection</h1>
-        <p className="text-muted-foreground">Discover incredible art and sculpting series from master craftspeople</p>
+        <p className="text-muted-foreground">Discover incredible art and sculpting videos from master craftspeople</p>
       </div>
 
       {/* Quick Filter Buttons */}
@@ -340,7 +357,7 @@ const Explore = () => {
             onClick={() => setSelectedCategory('all')}
           >
             <Sparkles className="h-4 w-4 mr-1" />
-            All Series
+            All Videos
           </Button>
           <Button
             variant={selectedCategory === 'sculpting' ? 'default' : 'outline'}
@@ -383,7 +400,7 @@ const Explore = () => {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
-            placeholder="Search series, artists, or techniques..."
+            placeholder="Search videos, artists, or techniques..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -504,7 +521,7 @@ const Explore = () => {
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <p className="text-muted-foreground">
-            Showing {filteredSeries.length} of {series.length} series
+            Showing {filteredVideos.length} of {videos.length} videos
           </p>
           <div className="flex items-center space-x-2">
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -515,10 +532,10 @@ const Explore = () => {
         </div>
       </div>
 
-      {/* Series Grid/List */}
+      {/* Videos Grid/List */}
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 p-2">
-          {filteredSeries.map((item) => (
+          {filteredVideos.map((item) => (
             <div key={item.id} className="hover:z-50">
               <GridCard item={item} />
             </div>
@@ -526,19 +543,19 @@ const Explore = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredSeries.map((item) => (
+          {filteredVideos.map((item) => (
             <ListCard key={item.id} item={item} />
           ))}
         </div>
       )}
 
       {/* No Results */}
-      {filteredSeries.length === 0 && (
+      {filteredVideos.length === 0 && (
         <div className="text-center py-12">
           <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
             <Search className="h-12 w-12 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">No series found</h3>
+          <h3 className="text-lg font-semibold mb-2">No videos found</h3>
           <p className="text-muted-foreground mb-4">
             Try adjusting your search terms or filters
           </p>

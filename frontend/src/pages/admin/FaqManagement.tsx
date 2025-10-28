@@ -26,10 +26,14 @@ import {
   Eye, 
   EyeOff,
   Save,
-  X
+  X,
+  Folder,
+  List
 } from 'lucide-react';
 import { faqApi, Faq, FaqCreateRequest, FaqUpdateRequest } from '@/services/faqApi';
 import { useAuth } from '@/contexts/AuthContext';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
 
 const FaqManagement = () => {
   const { user } = useAuth();
@@ -39,6 +43,10 @@ const FaqManagement = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingFaq, setEditingFaq] = useState<Faq | null>(null);
+  const [activeTab, setActiveTab] = useState('faqs');
+  const [newCategory, setNewCategory] = useState('');
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editCategoryValue, setEditCategoryValue] = useState('');
   const [formData, setFormData] = useState<FaqCreateRequest>({
     question: '',
     answer: '',
@@ -173,7 +181,74 @@ const FaqManagement = () => {
     setIsEditDialogOpen(true);
   };
 
-  // const categories = ['account', 'billing', 'technical', 'content', 'plans', 'general'];
+  // Category Management Functions
+  const handleAddCategory = async () => {
+    if (!newCategory.trim()) {
+      toast.error('Please enter a category name');
+      return;
+    }
+    
+    const categorySlug = newCategory.toLowerCase().replace(/\s+/g, '-');
+    
+    if (categories.includes(categorySlug)) {
+      toast.error('Category already exists');
+      return;
+    }
+
+    try {
+      setCategories([...categories, categorySlug]);
+      setNewCategory('');
+      toast.success('Category added successfully');
+    } catch (error) {
+      toast.error('Failed to add category');
+    }
+  };
+
+  const handleDeleteCategory = async (category: string) => {
+    if (!window.confirm(`Are you sure you want to delete the category "${category}"?`)) {
+      return;
+    }
+
+    try {
+      setCategories(categories.filter(cat => cat !== category));
+      toast.success('Category deleted successfully');
+    } catch (error) {
+      toast.error('Failed to delete category');
+    }
+  };
+
+  const handleStartEditCategory = (category: string) => {
+    setEditingCategory(category);
+    setEditCategoryValue(category);
+  };
+
+  const handleSaveEditCategory = (oldCategory: string) => {
+    if (!editCategoryValue.trim()) {
+      toast.error('Please enter a category name');
+      return;
+    }
+
+    const newCategorySlug = editCategoryValue.toLowerCase().replace(/\s+/g, '-');
+    
+    if (categories.includes(newCategorySlug) && newCategorySlug !== oldCategory) {
+      toast.error('Category already exists');
+      return;
+    }
+
+    try {
+      setCategories(categories.map(cat => cat === oldCategory ? newCategorySlug : cat));
+      setEditingCategory(null);
+      setEditCategoryValue('');
+      toast.success('Category updated successfully');
+    } catch (error) {
+      toast.error('Failed to update category');
+    }
+  };
+
+  const handleCancelEditCategory = () => {
+    setEditingCategory(null);
+    setEditCategoryValue('');
+  };
 
   if (loading) {
     return (
@@ -189,15 +264,33 @@ const FaqManagement = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">FAQ Management</h1>
-          <p className="text-muted-foreground">Manage frequently asked questions and answers</p>
+          <p className="text-muted-foreground">Manage frequently asked questions and categories</p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => resetForm()}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add FAQ
-            </Button>
-          </DialogTrigger>
+      </div>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="faqs" className="flex items-center">
+            <List className="mr-2 h-4 w-4" />
+            FAQs
+          </TabsTrigger>
+          <TabsTrigger value="categories" className="flex items-center">
+            <Folder className="mr-2 h-4 w-4" />
+            Categories
+          </TabsTrigger>
+        </TabsList>
+
+        {/* FAQs Tab */}
+        <TabsContent value="faqs" className="space-y-6">
+          <div className="flex items-center justify-end">
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={() => resetForm()}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add FAQ
+                </Button>
+              </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Create New FAQ</DialogTitle>
@@ -337,6 +430,99 @@ const FaqManagement = () => {
           ))
         )}
       </div>
+        </TabsContent>
+
+        {/* Categories Tab */}
+        <TabsContent value="categories" className="space-y-6">
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-6">Category Management</h2>
+            <div className="space-y-6">
+              {/* Add New Category */}
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Enter new category name"
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()}
+                  className="flex-1"
+                />
+                <Button onClick={handleAddCategory}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Category
+                </Button>
+              </div>
+
+              {/* Categories List */}
+              <div className="space-y-2">
+                <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+                  Existing Categories
+                </h3>
+                <div className="space-y-2">
+                  {categories.map((category) => (
+                    <div
+                      key={category}
+                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors"
+                    >
+                      {editingCategory === category ? (
+                        <div className="flex items-center gap-2 flex-1">
+                          <Input
+                            value={editCategoryValue}
+                            onChange={(e) => setEditCategoryValue(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && handleSaveEditCategory(category)}
+                            className="flex-1"
+                            autoFocus
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSaveEditCategory(category)}
+                          >
+                            <Save className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleCancelEditCategory}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="font-medium capitalize">{category}</span>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleStartEditCategory(category)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeleteCategory(category)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {categories.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  No categories available. Add your first category above.
+                </div>
+              )}
+            </div>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>

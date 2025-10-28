@@ -17,7 +17,7 @@ class Video extends Model
         'slug',
         'description',
         'short_description',
-        'series_id',
+        'category_id',
         'instructor_id',
         'video_url',
         'video_file_path',
@@ -76,6 +76,16 @@ class Video extends Model
         'price' => 'decimal:2',
     ];
 
+    protected $appends = ['video_url_full', 'intro_image_url', 'thumbnail_url'];
+
+    /**
+     * Get the route key for the model.
+     */
+    public function getRouteKeyName()
+    {
+        return 'id';
+    }
+
     /**
      * Boot the model.
      */
@@ -96,26 +106,26 @@ class Video extends Model
         });
 
         static::saved(function ($video) {
-            // Update series statistics when video is saved
-            if ($video->series) {
-                $video->series->updateStatistics();
+            // Update category statistics when video is saved
+            if ($video->category) {
+                $video->category->updateStatistics();
             }
         });
 
         static::deleted(function ($video) {
-            // Update series statistics when video is deleted
-            if ($video->series) {
-                $video->series->updateStatistics();
+            // Update category statistics when video is deleted
+            if ($video->category) {
+                $video->category->updateStatistics();
             }
         });
     }
 
     /**
-     * Get the series that owns the video.
+     * Get the category that owns the video.
      */
-    public function series(): BelongsTo
+    public function category(): BelongsTo
     {
-        return $this->belongsTo(Series::class);
+        return $this->belongsTo(Category::class);
     }
 
     /**
@@ -132,6 +142,50 @@ class Video extends Model
     public function userProgress(): HasMany
     {
         return $this->hasMany(UserProgress::class);
+    }
+
+    /**
+     * Get the full video URL.
+     */
+    public function getVideoUrlFullAttribute(): ?string
+    {
+        if ($this->video_file_path) {
+            // If it starts with http, it's already a full URL
+            if (str_starts_with($this->video_file_path, 'http')) {
+                return $this->video_file_path;
+            }
+            // Otherwise, build the URL from storage path
+            return url('storage/' . $this->video_file_path);
+        }
+        return $this->video_url;
+    }
+
+    /**
+     * Get the full intro image URL.
+     */
+    public function getIntroImageUrlAttribute(): ?string
+    {
+        if ($this->intro_image) {
+            if (str_starts_with($this->intro_image, 'http')) {
+                return $this->intro_image;
+            }
+            return url('storage/' . $this->intro_image);
+        }
+        return null;
+    }
+
+    /**
+     * Get the full thumbnail URL.
+     */
+    public function getThumbnailUrlAttribute(): ?string
+    {
+        if ($this->thumbnail) {
+            if (str_starts_with($this->thumbnail, 'http')) {
+                return $this->thumbnail;
+            }
+            return url('storage/' . $this->thumbnail);
+        }
+        return null;
     }
 
     /**
@@ -164,14 +218,6 @@ class Video extends Model
     public function scopeInSeries($query, int $seriesId)
     {
         return $query->where('series_id', $seriesId);
-    }
-
-    /**
-     * Get the route key for the model.
-     */
-    public function getRouteKeyName()
-    {
-        return 'slug';
     }
 
     /**
@@ -216,10 +262,10 @@ class Video extends Model
     /**
      * Check if video is accessible to user.
      */
-    public function isAccessibleTo(User $user): bool
+    public function isAccessibleTo(?User $user = null): bool
     {
         // Admin can access everything
-        if ($user->role === 'admin') {
+        if ($user && $user->role === 'admin') {
             return true;
         }
 
@@ -228,9 +274,9 @@ class Video extends Model
             case 'freemium':
                 return true;
             case 'basic':
-                return in_array($user->subscription_type, ['basic', 'premium', 'admin']);
+                return $user && in_array($user->subscription_type, ['basic', 'premium', 'admin']);
             case 'premium':
-                return in_array($user->subscription_type, ['premium', 'admin']);
+                return $user && in_array($user->subscription_type, ['premium', 'admin']);
             default:
                 return false;
         }
@@ -243,18 +289,18 @@ class Video extends Model
     {
         $this->increment('views');
         
-        // Also increment series views
-        if ($this->series) {
-            $this->series->increment('total_views');
+        // Also increment category views
+        if ($this->category) {
+            $this->category->increment('total_views');
         }
     }
 
     /**
-     * Get next video in series.
+     * Get next video in category.
      */
     public function getNextVideo()
     {
-        return $this->series->videos()
+        return $this->category->videos()
             ->published()
             ->where('sort_order', '>', $this->sort_order)
             ->orderBy('sort_order')
@@ -262,11 +308,11 @@ class Video extends Model
     }
 
     /**
-     * Get previous video in series.
+     * Get previous video in category.
      */
     public function getPreviousVideo()
     {
-        return $this->series->videos()
+        return $this->category->videos()
             ->published()
             ->where('sort_order', '<', $this->sort_order)
             ->orderBy('sort_order', 'desc')

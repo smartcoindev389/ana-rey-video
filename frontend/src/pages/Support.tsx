@@ -46,26 +46,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-
-interface SupportTicket {
-  id: string;
-  subject: string;
-  description: string;
-  status: 'open' | 'in_progress' | 'resolved' | 'closed';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  category: 'technical' | 'billing' | 'account' | 'content' | 'general';
-  createdAt: string;
-  updatedAt: string;
-  messages: TicketMessage[];
-}
-
-interface TicketMessage {
-  id: string;
-  content: string;
-  sender: 'user' | 'support';
-  senderName: string;
-  createdAt: string;
-}
+import { supportTicketApi, SupportTicket as TicketType, TicketReply } from '@/services/supportTicketApi';
+import { faqApi, Faq } from '@/services/faqApi';
 
 const Support = () => {
   const { user } = useAuth();
@@ -75,146 +57,63 @@ const Support = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [isCreateTicketOpen, setIsCreateTicketOpen] = useState(false);
   const [isTicketDetailOpen, setIsTicketDetailOpen] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
+  const [selectedTicket, setSelectedTicket] = useState<TicketType | null>(null);
   const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+
+  // Updated state types
+  const [tickets, setTickets] = useState<TicketType[]>([]);
+  const [faqs, setFaqs] = useState<Faq[]>([]);
 
   // Form state for new ticket
   const [ticketForm, setTicketForm] = useState({
     subject: '',
     description: '',
-    category: 'general',
-    priority: 'medium',
+    category: 'general' as 'technical' | 'billing' | 'account' | 'content' | 'general',
+    priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
   });
 
-  // Mock data - replace with real API calls
-  const [tickets, setTickets] = useState<SupportTicket[]>([]);
-  const [faqs, setFaqs] = useState([
-    {
-      id: '1',
-      question: 'How do I reset my password?',
-      answer: 'To reset your password, go to the login page and click "Forgot Password". Enter your email address and follow the instructions sent to your email.',
-      category: 'account'
-    },
-    {
-      id: '2',
-      question: 'How can I upgrade my subscription?',
-      answer: 'You can upgrade your subscription by going to your Profile page and clicking "Upgrade Plan". Choose your desired plan and follow the payment process.',
-      category: 'billing'
-    },
-    {
-      id: '3',
-      question: 'Why is my video not playing?',
-      answer: 'If your video is not playing, try refreshing the page, clearing your browser cache, or checking your internet connection. If the problem persists, contact support.',
-      category: 'technical'
-    },
-    {
-      id: '4',
-      question: 'How do I download course materials?',
-      answer: 'Course materials can be downloaded from the video player page. Look for the "Downloadable Materials" section on the right side of the video player.',
-      category: 'content'
-    },
-    {
-      id: '5',
-      question: 'Can I cancel my subscription anytime?',
-      answer: 'Yes, you can cancel your subscription anytime from your Profile page. Your access will continue until the end of your current billing period.',
-      category: 'billing'
-    },
-    {
-      id: '6',
-      question: 'How do I change my email address?',
-      answer: 'You can change your email address from your Profile page. Click "Edit Profile" and update your email address. You will need to verify the new email.',
-      category: 'account'
-    }
-  ]);
-
   useEffect(() => {
-    // Simulate API call
+    // Fetch from backend API
     const fetchTickets = async () => {
       setLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock tickets data
-      const mockTickets: SupportTicket[] = [
-        {
-          id: 'TK-001',
-          subject: 'Video playback issues',
-          description: 'I am experiencing buffering issues when watching videos on mobile devices.',
-          status: 'in_progress',
-          priority: 'high',
-          category: 'technical',
-          createdAt: '2024-01-20T10:30:00Z',
-          updatedAt: '2024-01-21T14:15:00Z',
-          messages: [
-            {
-              id: '1',
-              content: 'I am experiencing buffering issues when watching videos on mobile devices.',
-              sender: 'user',
-              senderName: user?.name || 'User',
-              createdAt: '2024-01-20T10:30:00Z'
-            },
-            {
-              id: '2',
-              content: 'Thank you for contacting us. We are looking into this issue and will get back to you soon.',
-              sender: 'support',
-              senderName: 'Support Team',
-              createdAt: '2024-01-20T11:45:00Z'
-            }
-          ]
-        },
-        {
-          id: 'TK-002',
-          subject: 'Billing inquiry',
-          description: 'I was charged twice for my premium subscription this month.',
-          status: 'resolved',
-          priority: 'urgent',
-          category: 'billing',
-          createdAt: '2024-01-18T09:15:00Z',
-          updatedAt: '2024-01-19T16:30:00Z',
-          messages: [
-            {
-              id: '1',
-              content: 'I was charged twice for my premium subscription this month.',
-              sender: 'user',
-              senderName: user?.name || 'User',
-              createdAt: '2024-01-18T09:15:00Z'
-            },
-            {
-              id: '2',
-              content: 'We apologize for the inconvenience. We have refunded the duplicate charge to your account.',
-              sender: 'support',
-              senderName: 'Support Team',
-              createdAt: '2024-01-19T16:30:00Z'
-            }
-          ]
-        },
-        {
-          id: 'TK-003',
-          subject: 'Account access problem',
-          description: 'I cannot log into my account despite using the correct password.',
-          status: 'open',
-          priority: 'medium',
-          category: 'account',
-          createdAt: '2024-01-22T08:45:00Z',
-          updatedAt: '2024-01-22T08:45:00Z',
-          messages: [
-            {
-              id: '1',
-              content: 'I cannot log into my account despite using the correct password.',
-              sender: 'user',
-              senderName: user?.name || 'User',
-              createdAt: '2024-01-22T08:45:00Z'
-            }
-          ]
+      try {
+        const response = await supportTicketApi.getUserTickets();
+        if (response.success) {
+          const ticketsData = Array.isArray(response.data) ? response.data : response.data?.data || [];
+          setTickets(ticketsData);
         }
-      ];
-      
-      setTickets(mockTickets);
-      setLoading(false);
+      } catch (error) {
+        console.error('Error fetching tickets:', error);
+        setTickets([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const fetchFaqs = async () => {
+      try {
+        const response = await faqApi.getAll();
+        if (response.success) {
+          const faqData = Array.isArray(response.data) ? response.data : [];
+          // Flatten grouped FAQs
+          const allFaqs: Faq[] = [];
+          Object.values(faqData).forEach((categoryFaqs: any) => {
+            if (Array.isArray(categoryFaqs)) {
+              allFaqs.push(...categoryFaqs);
+            }
+          });
+          setFaqs(allFaqs);
+        }
+      } catch (error) {
+        console.error('Error fetching FAQs:', error);
+        setFaqs([]);
+      }
     };
 
     fetchTickets();
+    fetchFaqs();
   }, [user]);
 
   const getStatusIcon = (status: string) => {
@@ -289,39 +188,27 @@ const Support = () => {
   const handleCreateTicket = async () => {
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const newTicket: SupportTicket = {
-        id: `TK-${String(tickets.length + 1).padStart(3, '0')}`,
+      const response = await supportTicketApi.create({
         subject: ticketForm.subject,
         description: ticketForm.description,
-        status: 'open',
-        priority: ticketForm.priority as any,
-        category: ticketForm.category as any,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        messages: [
-          {
-            id: '1',
-            content: ticketForm.description,
-            sender: 'user',
-            senderName: user?.name || 'User',
-            createdAt: new Date().toISOString()
-          }
-        ]
-      };
-
-      setTickets(prev => [newTicket, ...prev]);
-      setIsCreateTicketOpen(false);
-      setTicketForm({
-        subject: '',
-        description: '',
-        category: 'general',
-        priority: 'medium',
+        category: ticketForm.category,
+        priority: ticketForm.priority,
       });
-      toast.success("Support ticket created successfully");
+      
+      if (response.success) {
+        const newTicket = response.data;
+        setTickets(prev => [newTicket, ...prev]);
+        setIsCreateTicketOpen(false);
+        setTicketForm({
+          subject: '',
+          description: '',
+          category: 'general',
+          priority: 'medium',
+        });
+        toast.success("Support ticket created successfully");
+      }
     } catch (error) {
+      console.error('Error creating ticket:', error);
       toast.error("Failed to create support ticket");
     } finally {
       setLoading(false);
@@ -331,28 +218,28 @@ const Support = () => {
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedTicket) return;
 
-    const newMsg: TicketMessage = {
-      id: String(selectedTicket.messages.length + 1),
-      content: newMessage,
-      sender: 'user',
-      senderName: user?.name || 'User',
-      createdAt: new Date().toISOString()
-    };
+    try {
+      const response = await supportTicketApi.addReply(selectedTicket.id, {
+        message: newMessage,
+      });
 
-    setTickets(prev => prev.map(ticket => 
-      ticket.id === selectedTicket.id 
-        ? { ...ticket, messages: [...ticket.messages, newMsg], updatedAt: new Date().toISOString() }
-        : ticket
-    ));
-
-    setSelectedTicket(prev => prev ? {
-      ...prev,
-      messages: [...prev.messages, newMsg],
-      updatedAt: new Date().toISOString()
-    } : null);
-
-    setNewMessage('');
-    toast.success("Message sent successfully");
+      if (response.success) {
+        // Refresh ticket to get updated messages
+        const ticketResponse = await supportTicketApi.get(selectedTicket.id);
+        if (ticketResponse.success) {
+          const updatedTicket = ticketResponse.data;
+          setTickets(prev => prev.map(ticket => 
+            ticket.id === selectedTicket.id ? updatedTicket : ticket
+          ));
+          setSelectedTicket(updatedTicket);
+        }
+        setNewMessage('');
+        toast.success("Message sent successfully");
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast.error("Failed to send message");
+    }
   };
 
   const formatDate = (dateString: string) => {

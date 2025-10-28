@@ -39,7 +39,8 @@ import {
   Key,
   Trash2,
   Eye,
-  EyeOff
+  EyeOff,
+  LayoutDashboard
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -384,6 +385,16 @@ const Profile = () => {
           <Card className="p-6">
             <h3 className="font-semibold mb-4">Account Actions</h3>
             <div className="space-y-3">
+              {user?.is_admin && (
+                <Button 
+                  variant="default" 
+                  className="w-full justify-start bg-primary"
+                  onClick={() => navigate('/admin')}
+                >
+                  <LayoutDashboard className="h-4 w-4 mr-2" />
+                  Admin Panel
+                </Button>
+              )}
               <Button variant="outline" className="w-full justify-start">
                 <Download className="h-4 w-4 mr-2" />
                 Download Data

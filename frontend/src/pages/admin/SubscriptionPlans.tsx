@@ -471,7 +471,7 @@ const SubscriptionPlans = () => {
       {/* Plans Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {plans.map((plan) => (
-          <Card key={plan.id} className={`p-6 relative ${plan.isActive ? '' : 'opacity-60'}`}>
+          <Card key={plan.id} className={`p-6 relative flex flex-col ${plan.isActive ? '' : 'opacity-60'}`}>
             {!plan.isActive && (
               <div className="absolute top-4 right-4">
                 <Badge variant="secondary">Inactive</Badge>
@@ -527,7 +527,7 @@ const SubscriptionPlans = () => {
               </DropdownMenu>
             </div>
 
-            <div className="mb-4">
+            <div className="mb-4 min-h-[60px]">
               <div className="flex items-baseline space-x-1">
                 <span className="text-3xl font-bold">
                   {formatCurrency(plan.price)}
@@ -594,8 +594,9 @@ const SubscriptionPlans = () => {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm">Features:</h4>
+            <div className="mt-auto pt-4">
+              <div className="border-t mb-4"></div>
+              <h4 className="font-medium text-sm mb-2">Features:</h4>
               <ul className="space-y-1">
                 {plan.features.map((feature, index) => (
                   <li key={index} className="text-sm text-muted-foreground flex items-center">

@@ -15,21 +15,38 @@ import {
   ArrowUpRight,
   ArrowDownRight
 } from 'lucide-react';
-import { generateAnalyticsData } from '@/services/mockData';
 import { useState, useEffect } from 'react';
+import { analyticsApi } from '@/services/analyticsApi';
+import { toast } from 'sonner';
 
 const AdminDashboard = () => {
-  const [analyticsData, setAnalyticsData] = useState<any>(null);
+  const [overview, setOverview] = useState<any>(null);
+  const [subscriptionStats, setSubscriptionStats] = useState<any>(null);
+  const [topVideos, setTopVideos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate API call
     const fetchAnalytics = async () => {
-      setLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const data = generateAnalyticsData();
-      setAnalyticsData(data);
-      setLoading(false);
+      try {
+        setLoading(true);
+        
+        // Fetch all analytics data in parallel
+        const [overviewRes, subscriptionRes, topVideosRes] = await Promise.all([
+          analyticsApi.getOverview(),
+          analyticsApi.getSubscriptionStats(),
+          analyticsApi.getTopVideos({ limit: 10 }),
+        ]);
+        
+        setOverview(overviewRes.success ? overviewRes.data : null);
+        setSubscriptionStats(subscriptionRes.success ? subscriptionRes.data : null);
+        setTopVideos(topVideosRes.success ? (topVideosRes.data || []) : []);
+        
+      } catch (error: any) {
+        console.error('Error loading analytics:', error);
+        toast.error('Failed to load analytics data');
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchAnalytics();
@@ -70,58 +87,56 @@ const AdminDashboard = () => {
     );
   }
 
-  if (!analyticsData) return null;
-
-  const { overview, subscriptionStats } = analyticsData;
+  if (!overview || !subscriptionStats) return null;
 
   const stats = [
     {
       title: 'Total Users',
-      value: formatNumber(overview.totalUsers),
-      change: '+12%',
-      changeType: 'positive' as const,
+      value: formatNumber(overview.total_users || 0),
+      change: overview.user_growth_percentage ? `${overview.user_growth_percentage > 0 ? '+' : ''}${overview.user_growth_percentage}%` : 'N/A',
+      changeType: (overview.user_growth_percentage || 0) >= 0 ? 'positive' as const : 'negative' as const,
       icon: Users,
       description: 'From last month'
     },
     {
       title: 'Active Subscriptions',
-      value: formatNumber(overview.activeUsers),
-      change: '+8%',
+      value: formatNumber(overview.active_subscriptions || 0),
+      change: 'N/A',
       changeType: 'positive' as const,
       icon: UserCheck,
       description: 'Currently active'
     },
     {
       title: 'Total Revenue',
-      value: formatCurrency(overview.totalRevenue),
-      change: '+23%',
-      changeType: 'positive' as const,
+      value: formatCurrency(overview.total_revenue || 0),
+      change: overview.revenue_growth_percentage ? `${overview.revenue_growth_percentage > 0 ? '+' : ''}${overview.revenue_growth_percentage}%` : 'N/A',
+      changeType: (overview.revenue_growth_percentage || 0) >= 0 ? 'positive' as const : 'negative' as const,
       icon: DollarSign,
       description: 'This month'
     },
     {
       title: 'Video Views',
-      value: formatNumber(overview.totalViews),
-      change: '+15%',
+      value: formatNumber(overview.total_views || 0),
+      change: 'N/A',
       changeType: 'positive' as const,
       icon: Eye,
-      description: 'This month'
+      description: 'All time'
     },
     {
-      title: 'Avg. Session Time',
-      value: overview.averageSessionTime,
-      change: '+2.5%',
+      title: 'Total Videos',
+      value: formatNumber(overview.total_videos || 0),
+      change: 'N/A',
       changeType: 'positive' as const,
-      icon: TrendingUp,
-      description: 'User engagement'
+      icon: Video,
+      description: 'Content library'
     },
     {
-      title: 'Conversion Rate',
-      value: `${overview.conversionRate}%`,
-      change: '+1.2%',
+      title: 'Total Categories',
+      value: formatNumber(overview.total_categories || 0),
+      change: 'N/A',
       changeType: 'positive' as const,
       icon: Star,
-      description: 'User satisfaction'
+      description: 'Content categories'
     }
   ];
 
@@ -133,13 +148,7 @@ const AdminDashboard = () => {
     { type: 'subscription_cancelled', message: 'Subscription cancelled by Sarah Wilson', time: '3 hours ago' },
   ];
 
-  const topVideos = [
-    { title: 'Introduction to React', views: 1234, rating: 4.9 },
-    { title: 'Advanced JavaScript Concepts', views: 987, rating: 4.8 },
-    { title: 'CSS Grid Mastery', views: 876, rating: 4.7 },
-    { title: 'Node.js Fundamentals', views: 765, rating: 4.6 },
-    { title: 'Database Design Principles', views: 654, rating: 4.5 },
-  ];
+  // topVideos is already loaded from API
 
   const getChangeColor = (changeType: string) => {
     switch (changeType) {
@@ -312,26 +321,30 @@ const AdminDashboard = () => {
             <Button variant="outline" size="sm">View All</Button>
           </div>
           <div className="space-y-4">
-            {topVideos.map((video, index) => (
-              <div key={index} className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{video.title}</p>
-                  <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                    <span className="flex items-center">
-                      <Eye className="h-3 w-3 mr-1" />
-                      {video.views} views
-                    </span>
-                    <span className="flex items-center">
-                      <Star className="h-3 w-3 mr-1" />
-                      {video.rating}
-                    </span>
+            {topVideos.length > 0 ? (
+              topVideos.map((video, index) => (
+                <div key={video.id || index} className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{video.title}</p>
+                    <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                      <span className="flex items-center">
+                        <Eye className="h-3 w-3 mr-1" />
+                        {formatNumber(video.total_views || 0)} views
+                      </span>
+                      <span className="flex items-center">
+                        <Star className="h-3 w-3 mr-1" />
+                        {(video.rating || 0).toFixed(1)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                    <span className="text-sm font-bold text-primary">{index + 1}</span>
                   </div>
                 </div>
-                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-bold text-primary">{index + 1}</span>
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No videos found</p>
+            )}
           </div>
         </Card>
       </div>

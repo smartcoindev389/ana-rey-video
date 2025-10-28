@@ -83,26 +83,54 @@ class FaqSeeder extends Seeder
                 'is_active' => true
             ],
 
-            // Content & Learning
+            // Content & Learning - Sculpture Video Streaming
             [
-                'question' => 'How do I download course materials?',
-                'answer' => 'Course materials can be downloaded from the video player page. Look for the "Downloadable Materials" section on the right side of the video player.',
+                'question' => 'What sculpture techniques are covered in the videos?',
+                'answer' => 'Our platform covers classical and contemporary sculpture techniques including marble carving, clay modeling, bronze casting, stone carving, 3D sculpting, restoration, and polychromy. Each category features in-depth tutorials from master artisans.',
                 'category' => 'content',
                 'sort_order' => 1,
                 'is_active' => true
             ],
             [
-                'question' => 'Can I access courses offline?',
-                'answer' => 'Yes! With our mobile app, you can download videos and course materials for offline viewing. This feature is available for all subscription plans.',
+                'question' => 'Are the sculpture videos suitable for beginners?',
+                'answer' => 'Yes! We offer content for all skill levels. Beginners can start with foundational techniques in our Sculpture and Drawing categories. Each video includes difficulty levels and prerequisites clearly marked.',
                 'category' => 'content',
                 'sort_order' => 2,
                 'is_active' => true
             ],
             [
-                'question' => 'How often is new content added?',
-                'answer' => 'We add new courses and content regularly. Premium subscribers get early access to new content and exclusive masterclasses.',
+                'question' => 'How do I download course materials?',
+                'answer' => 'Course materials including tool lists, references, and printable guides can be downloaded from the video player page. Look for the "Downloadable Materials" section on each video page.',
                 'category' => 'content',
                 'sort_order' => 3,
+                'is_active' => true
+            ],
+            [
+                'question' => 'Can I access sculpture videos offline?',
+                'answer' => 'Yes! With our mobile app, you can download videos and course materials for offline viewing. This is perfect for viewing tutorials in your studio without internet access.',
+                'category' => 'content',
+                'sort_order' => 4,
+                'is_active' => true
+            ],
+            [
+                'question' => 'How often is new sculpture content added?',
+                'answer' => 'We add new sculpture tutorials, restoration techniques, and masterclasses regularly. Premium subscribers get early access to new content and exclusive behind-the-scenes videos from world-renowned sculptors.',
+                'category' => 'content',
+                'sort_order' => 5,
+                'is_active' => true
+            ],
+            [
+                'question' => 'Do you have videos about classical sculpture techniques?',
+                'answer' => 'Absolutely! Our Sculpture category includes comprehensive tutorials on classical techniques including marble carving methods used by ancient masters, classical proportion systems, and traditional tools and materials.',
+                'category' => 'content',
+                'sort_order' => 6,
+                'is_active' => true
+            ],
+            [
+                'question' => 'Are there videos on art restoration and conservation?',
+                'answer' => 'Yes! Our Restoration category features detailed videos on sculpture repair, paint layer analysis, preventive conservation, and historical artifact preservation techniques from professional conservators.',
+                'category' => 'content',
+                'sort_order' => 7,
                 'is_active' => true
             ],
 

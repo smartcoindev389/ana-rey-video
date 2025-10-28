@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Video;
 use App\Models\Series;
+use App\Services\WebpConversionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
@@ -13,6 +14,12 @@ use Illuminate\Support\Facades\Auth;
 
 class VideoController extends Controller
 {
+    protected $webpService;
+
+    public function __construct(WebpConversionService $webpService)
+    {
+        $this->webpService = $webpService;
+    }
     /**
      * Display a listing of videos.
      */
@@ -20,7 +27,7 @@ class VideoController extends Controller
     {
         $user = Auth::user();
         
-        $query = Video::with(['series', 'instructor']);
+        $query = Video::with(['category', 'instructor']);
 
         // Check if this is an admin request (admin routes)
         $isAdminRequest = $request->is('api/admin/*');
@@ -34,9 +41,9 @@ class VideoController extends Controller
             }
         }
 
-        // Filter by series
-        if ($request->has('series_id')) {
-            $query->where('series_id', $request->get('series_id'));
+        // Filter by category (updated from series_id to category_id)
+        if ($request->has('category_id')) {
+            $query->where('category_id', $request->get('category_id'));
         }
 
         // Filter by status
@@ -100,10 +107,13 @@ class VideoController extends Controller
             'title' => 'required|string|max:255|unique:videos,title',
             'description' => 'nullable|string',
             'short_description' => 'nullable|string|max:500',
-            'series_id' => 'required|exists:series,id',
+            'category_id' => 'nullable|exists:categories,id',
+            'series_id' => 'nullable|exists:categories,id', // Accept series_id for compatibility
+            'video_file' => 'nullable|file|mimes:mp4,mov,avi,webm|max:512000', // 500MB max
             'video_url' => 'nullable|url|max:255',
             'video_file_path' => 'nullable|string|max:255',
             'thumbnail' => 'nullable|string|max:255',
+            'intro_image_file' => 'nullable|file|image|mimes:jpeg,png,jpg,webp,gif|max:10240',
             'intro_image' => 'nullable|string|max:255',
             'intro_description' => 'nullable|string',
             'duration' => 'nullable|integer|min:0',
@@ -126,9 +136,53 @@ class VideoController extends Controller
             'meta_description' => 'nullable|string|max:500',
             'meta_keywords' => 'nullable|string|max:255',
         ]);
+        
+        // Map series_id to category_id for compatibility (series = category in backend)
+        if (!isset($validated['category_id']) && isset($validated['series_id'])) {
+            $validated['category_id'] = $validated['series_id'];
+        }
+        
+        // Validate that category_id exists
+        if (!isset($validated['category_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Category ID or Series ID is required.',
+            ], 422);
+        }
 
         $validated['slug'] = Str::slug($validated['title']);
         $validated['instructor_id'] = Auth::id();
+        
+        // Handle video file upload
+        if ($request->hasFile('video_file')) {
+            try {
+                $videoUploadResult = $this->webpService->saveVideo($request->file('video_file'));
+                $validated['video_file_path'] = $videoUploadResult['path'];
+                $validated['file_size'] = $videoUploadResult['size'];
+                $validated['video_format'] = pathinfo($videoUploadResult['filename'], PATHINFO_EXTENSION);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to upload video file: ' . $e->getMessage(),
+                ], 500);
+            }
+        }
+
+        // Handle intro image file upload
+        if ($request->hasFile('intro_image_file')) {
+            try {
+                $imageUploadResult = $this->webpService->convertToWebP(
+                    $request->file('intro_image_file'),
+                    'data_section/image'
+                );
+                $validated['intro_image'] = $imageUploadResult['path'];
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to upload intro image: ' . $e->getMessage(),
+                ], 500);
+            }
+        }
         
         // Set status default
         if (!isset($validated['status'])) {
@@ -142,7 +196,7 @@ class VideoController extends Controller
 
         // Auto-generate episode number if not provided
         if (!isset($validated['episode_number'])) {
-            $lastEpisode = Video::where('series_id', $validated['series_id'])
+            $lastEpisode = Video::where('category_id', $validated['category_id'])
                 ->orderBy('episode_number', 'desc')
                 ->first();
             $validated['episode_number'] = $lastEpisode ? $lastEpisode->episode_number + 1 : 1;
@@ -150,7 +204,7 @@ class VideoController extends Controller
 
         // Set sort order if not provided
         if (!isset($validated['sort_order'])) {
-            $lastSortOrder = Video::where('series_id', $validated['series_id'])
+            $lastSortOrder = Video::where('category_id', $validated['category_id'])
                 ->orderBy('sort_order', 'desc')
                 ->first();
             $validated['sort_order'] = $lastSortOrder ? $lastSortOrder->sort_order + 1 : 1;
@@ -161,7 +215,7 @@ class VideoController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Video created successfully.',
-            'data' => $video->load(['series', 'instructor']),
+            'data' => $video->load(['category', 'instructor']),
         ], 201);
     }
 
@@ -180,7 +234,7 @@ class VideoController extends Controller
             ], 403);
         }
 
-        $video->load(['series', 'instructor']);
+        $video->load(['category', 'instructor']);
 
         // Get user progress if authenticated
         $userProgress = null;
@@ -226,6 +280,7 @@ class VideoController extends Controller
 
         $validated = $request->validate([
             'title' => [
+                'sometimes',
                 'required',
                 'string',
                 'max:255',
@@ -233,10 +288,13 @@ class VideoController extends Controller
             ],
             'description' => 'nullable|string',
             'short_description' => 'nullable|string|max:500',
-            'series_id' => 'required|exists:series,id',
+            'category_id' => 'nullable|exists:categories,id',
+            'series_id' => 'nullable|exists:categories,id', // Accept series_id for compatibility
+            'video_file' => 'nullable|file|mimes:mp4,mov,avi,webm|max:512000', // 500MB max
             'video_url' => 'nullable|url|max:255',
             'video_file_path' => 'nullable|string|max:255',
             'thumbnail' => 'nullable|string|max:255',
+            'intro_image_file' => 'nullable|file|image|mimes:jpeg,png,jpg,webp,gif|max:10240',
             'intro_image' => 'nullable|string|max:255',
             'intro_description' => 'nullable|string',
             'duration' => 'nullable|integer|min:0',
@@ -246,7 +304,7 @@ class VideoController extends Controller
             'hls_url' => 'nullable|url|max:255',
             'dash_url' => 'nullable|url|max:255',
             'streaming_urls' => 'nullable|array',
-            'visibility' => 'required|in:freemium,basic,premium',
+            'visibility' => 'sometimes|required|in:freemium,basic,premium',
             'status' => 'nullable|in:draft,published,archived',
             'is_free' => 'nullable|boolean',
             'price' => 'nullable|numeric|min:0',
@@ -262,6 +320,52 @@ class VideoController extends Controller
             'processing_status' => 'nullable|in:pending,processing,completed,failed',
             'processing_error' => 'nullable|string',
         ]);
+        
+        // Map series_id to category_id for compatibility (series = category in backend)
+        if (!isset($validated['category_id']) && isset($validated['series_id'])) {
+            $validated['category_id'] = $validated['series_id'];
+        }
+
+        // Handle video file upload
+        if ($request->hasFile('video_file')) {
+            try {
+                // Delete old video file if exists
+                if ($video->video_file_path) {
+                    $this->webpService->deleteFile($video->video_file_path);
+                }
+
+                $videoUploadResult = $this->webpService->saveVideo($request->file('video_file'));
+                $validated['video_file_path'] = $videoUploadResult['path'];
+                $validated['file_size'] = $videoUploadResult['size'];
+                $validated['video_format'] = pathinfo($videoUploadResult['filename'], PATHINFO_EXTENSION);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to upload video file: ' . $e->getMessage(),
+                ], 500);
+            }
+        }
+
+        // Handle intro image file upload
+        if ($request->hasFile('intro_image_file')) {
+            try {
+                // Delete old intro image if exists
+                if ($video->intro_image) {
+                    $this->webpService->deleteFile($video->intro_image);
+                }
+
+                $imageUploadResult = $this->webpService->convertToWebP(
+                    $request->file('intro_image_file'),
+                    'data_section/image'
+                );
+                $validated['intro_image'] = $imageUploadResult['path'];
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to upload intro image: ' . $e->getMessage(),
+                ], 500);
+            }
+        }
 
         // Update slug if title changed
         if ($video->title !== $validated['title']) {
@@ -283,7 +387,7 @@ class VideoController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Video updated successfully.',
-            'data' => $video->load(['series', 'instructor']),
+            'data' => $video->load(['category', 'instructor']),
         ]);
     }
 

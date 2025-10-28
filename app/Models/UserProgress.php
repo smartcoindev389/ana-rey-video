@@ -12,7 +12,7 @@ class UserProgress extends Model
 
     protected $fillable = [
         'user_id',
-        'series_id',
+        'category_id',
         'video_id',
         'progress_percentage',
         'time_watched',
@@ -49,7 +49,7 @@ class UserProgress extends Model
         'watch_count' => 'integer',
         'videos_completed' => 'integer',
         'total_videos' => 'integer',
-        'series_progress' => 'decimal:2',
+        'category_progress' => 'decimal:2',
         'rating' => 'integer',
         'total_watch_time' => 'integer',
     ];
@@ -63,11 +63,11 @@ class UserProgress extends Model
     }
 
     /**
-     * Get the series that owns the progress.
+     * Get the category that owns the progress.
      */
-    public function series(): BelongsTo
+    public function category(): BelongsTo
     {
-        return $this->belongsTo(Series::class);
+        return $this->belongsTo(Category::class);
     }
 
     /**
@@ -116,7 +116,7 @@ class UserProgress extends Model
                 'video_id' => $video->id,
             ],
             [
-                'series_id' => $video->series_id,
+                'category_id' => $video->category_id,
                 'progress_percentage' => $progressPercentage,
                 'time_watched' => $timeWatched,
                 'last_position' => $timeWatched,
@@ -130,37 +130,37 @@ class UserProgress extends Model
             ]
         );
 
-        // Update series progress
-        if ($video->series_id) {
-            $progress->updateSeriesProgress($user, $video->series);
+        // Update category progress
+        if ($video->category_id) {
+            $progress->updateCategoryProgress($user, $video->category);
         }
 
         return $progress;
     }
 
     /**
-     * Update series progress.
+     * Update category progress.
      */
-    public function updateSeriesProgress(User $user, Series $series)
+    public function updateCategoryProgress(User $user, Category $category)
     {
-        $seriesProgress = static::where('user_id', $user->id)
-            ->where('series_id', $series->id);
+        $categoryProgress = static::where('user_id', $user->id)
+            ->where('category_id', $category->id);
 
-        $totalVideos = $series->publishedVideos()->count();
-        $completedVideos = $seriesProgress->completed()->count();
+        $totalVideos = $category->publishedVideos()->count();
+        $completedVideos = $categoryProgress->completed()->count();
 
-        $seriesProgressPercentage = $totalVideos > 0 ? round(($completedVideos / $totalVideos) * 100, 2) : 0;
+        $categoryProgressPercentage = $totalVideos > 0 ? round(($completedVideos / $totalVideos) * 100, 2) : 0;
 
-        // Update or create series progress
+        // Update or create category progress
         static::updateOrCreate(
             [
                 'user_id' => $user->id,
-                'series_id' => $series->id,
+                'category_id' => $category->id,
             ],
             [
                 'videos_completed' => $completedVideos,
                 'total_videos' => $totalVideos,
-                'series_progress' => $seriesProgressPercentage,
+                'category_progress' => $categoryProgressPercentage,
             ]
         );
     }
@@ -171,14 +171,14 @@ class UserProgress extends Model
     public static function getUserStats(User $user)
     {
         $totalVideosWatched = static::forUser($user->id)->count();
-        $totalSeriesStarted = static::forUser($user->id)->whereNotNull('series_id')->distinct('series_id')->count();
-        $totalSeriesCompleted = static::forUser($user->id)->where('series_progress', '>=', 100)->distinct('series_id')->count();
+        $totalCategoriesStarted = static::forUser($user->id)->whereNotNull('category_id')->distinct('category_id')->count();
+        $totalCategoriesCompleted = static::forUser($user->id)->where('category_progress', '>=', 100)->distinct('category_id')->count();
         $totalWatchTime = static::forUser($user->id)->sum('total_watch_time');
 
         return [
             'total_videos_watched' => $totalVideosWatched,
-            'total_series_started' => $totalSeriesStarted,
-            'total_series_completed' => $totalSeriesCompleted,
+            'total_categories_started' => $totalCategoriesStarted,
+            'total_categories_completed' => $totalCategoriesCompleted,
             'total_watch_time' => $totalWatchTime,
             'formatted_watch_time' => static::formatDuration($totalWatchTime),
         ];

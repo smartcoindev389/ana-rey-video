@@ -247,6 +247,15 @@ class SettingsSeeder extends Seeder
                 'description' => 'Image for third testimonial',
                 'sort_order' => 14,
             ],
+            [
+                'key' => 'homepage_testimonial_ids',
+                'value' => '[]',
+                'type' => 'text',
+                'group' => 'testimonial',
+                'label' => 'Homepage Testimonial IDs',
+                'description' => 'Array of testimonial IDs to display on homepage (JSON format)',
+                'sort_order' => 15,
+            ],
         ];
 
         // Create or update settings

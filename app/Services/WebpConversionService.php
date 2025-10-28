@@ -19,9 +19,12 @@ class WebpConversionService
      */
     public function convertToWebP(UploadedFile $file, string $directory = 'images', ?string $filename = null): array
     {
-        // Validate file type
-        if (!in_array($file->getMimeType(), ['image/jpeg', 'image/png', 'image/webp'])) {
-            throw new \InvalidArgumentException('Only JPEG, PNG, and WebP images are supported.');
+        // Validate file type - support both 'image/jpeg' and 'image/jpg'
+        $allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+        $fileMimeType = $file->getMimeType();
+        
+        if (!in_array($fileMimeType, $allowedMimes)) {
+            throw new \InvalidArgumentException("Unsupported image type: {$fileMimeType}. Only JPEG, JPG, PNG, GIF, and WebP images are supported.");
         }
 
         // Generate filename if not provided
@@ -46,7 +49,7 @@ class WebpConversionService
             return [
                 'success' => true,
                 'path' => $fullPath,
-                'url' => Storage::url($fullPath),
+                'url' => 'http://localhost:8000/data_section/image/' . $filename,
                 'filename' => $filename,
                 'size' => $file->getSize(),
                 'mime_type' => 'image/webp'
@@ -54,26 +57,95 @@ class WebpConversionService
         }
 
         // Convert to WebP
+        $tempPath = null;
+        $tempFullPath = null;
         try {
-            $tempPath = $file->store('temp');
-            $tempFullPath = storage_path('app/' . $tempPath);
+            // Ensure temp directory exists
+            $tempDir = storage_path('app/temp');
+            if (!is_dir($tempDir)) {
+                if (!mkdir($tempDir, 0777, true)) {
+                    throw new \Exception('Failed to create temp directory: ' . $tempDir);
+                }
+            }
+            
+            // Make directory writable
+            if (!is_writable($tempDir)) {
+                @chmod($tempDir, 0777);
+            }
+            
+            // Create temporary file directly
+            $tempFilename = uniqid('upload_', true) . '.' . $file->getClientOriginalExtension();
+            $tempFullPath = $tempDir . DIRECTORY_SEPARATOR . $tempFilename;
+            
+            // Copy uploaded file to temp location (preserve original for Laravel)
+            try {
+                $uploadedFilePath = $file->getRealPath();
+                if (!$uploadedFilePath || !file_exists($uploadedFilePath)) {
+                    throw new \Exception('Uploaded file path is invalid');
+                }
+                
+                if (!copy($uploadedFilePath, $tempFullPath)) {
+                    throw new \Exception('Failed to copy uploaded file to temporary directory');
+                }
+            } catch (\Exception $copyError) {
+                throw new \Exception('Error copying file: ' . $copyError->getMessage());
+            }
 
-            // Convert using WebPConvert
-            WebPConvert::convert($tempFullPath, $storagePath, [
-                'quality' => 85,
-                'max-width' => 1920,
-                'max-height' => 1080,
-                'auto-filter' => true,
-                'metadata' => 'none'
-            ]);
+            // Check if temp file was created
+            if (!file_exists($tempFullPath)) {
+                throw new \Exception('Temporary file does not exist after copy: ' . $tempFullPath);
+            }
+            
+            // Verify file size
+            if (filesize($tempFullPath) === 0) {
+                @unlink($tempFullPath);
+                throw new \Exception('Temporary file is empty after copy');
+            }
+
+            // Ensure storage directory exists with proper permissions
+            if (!file_exists($storageDir)) {
+                mkdir($storageDir, 0755, true);
+            }
+
+            // Check if directory is writable
+            if (!is_writable($storageDir)) {
+                throw new \Exception("Storage directory is not writable: {$storageDir}");
+            }
+
+            // Convert using WebPConvert with better error handling
+            try {
+                WebPConvert::convert($tempFullPath, $storagePath, [
+                    'quality' => 85,
+                    'max-width' => 1920,
+                    'max-height' => 1080,
+                    'auto-filter' => true,
+                    'metadata' => 'none',
+                    'log-call-arguments' => false,
+                    'converters' => ['cwebp', 'gd', 'imagick', 'gmagick'],
+                ]);
+            } catch (\Exception $convertError) {
+                // If WebPConvert fails, try fallback with GD library
+                if (extension_loaded('gd')) {
+                    $this->convertWithGD($tempFullPath, $storagePath, $file->getMimeType());
+                } else {
+                    throw new \Exception('WebP conversion failed and GD extension is not available: ' . $convertError->getMessage());
+                }
+            }
+
+            // Verify conversion was successful
+            if (!file_exists($storagePath) || filesize($storagePath) === 0) {
+                throw new \Exception('WebP conversion produced invalid file');
+            }
 
             // Clean up temp file
-            unlink($tempFullPath);
+            if (file_exists($tempFullPath)) {
+                unlink($tempFullPath);
+            }
 
             return [
                 'success' => true,
                 'path' => $fullPath,
-                'url' => Storage::url($fullPath),
+                'url' => 'http://localhost:8000/data_section/image/' . $filename,
                 'filename' => $filename,
                 'size' => filesize($storagePath),
                 'mime_type' => 'image/webp'
@@ -81,11 +153,8 @@ class WebpConversionService
 
         } catch (\Exception $e) {
             // Clean up temp file if it exists
-            if (isset($tempPath)) {
-                $tempFullPath = storage_path('app/' . $tempPath);
-                if (file_exists($tempFullPath)) {
-                    unlink($tempFullPath);
-                }
+            if ($tempFullPath && file_exists($tempFullPath)) {
+                @unlink($tempFullPath);
             }
 
             throw new \Exception('Failed to convert image to WebP: ' . $e->getMessage());
@@ -128,9 +197,11 @@ class WebpConversionService
     public function saveVideo(UploadedFile $file, ?string $filename = null): array
     {
         // Validate file type
-        $allowedMimes = ['video/mp4', 'video/mov', 'video/avi', 'video/quicktime'];
-        if (!in_array($file->getMimeType(), $allowedMimes)) {
-            throw new \InvalidArgumentException('Only MP4, MOV, and AVI videos are supported.');
+        $allowedMimes = ['video/mp4', 'video/mov', 'video/avi', 'video/quicktime', 'video/x-msvideo'];
+        $fileMimeType = $file->getMimeType();
+        
+        if (!in_array($fileMimeType, $allowedMimes)) {
+            throw new \InvalidArgumentException("Unsupported video type: {$fileMimeType}. Only MP4, MOV, and AVI videos are supported.");
         }
 
         // Generate filename if not provided
@@ -139,24 +210,57 @@ class WebpConversionService
             $filename = Str::uuid() . '.' . $extension;
         }
 
-        // Save to data_section/movie/
+        // Save to storage/app/public/data_section/movie/
         $directory = 'data_section/movie';
         $fullPath = $directory . '/' . $filename;
         $storagePath = storage_path('app/public/' . $fullPath);
         $storageDir = dirname($storagePath);
         
+        // Ensure directory exists with proper permissions
         if (!is_dir($storageDir)) {
-            mkdir($storageDir, 0755, true);
+            if (!mkdir($storageDir, 0777, true)) {
+                throw new \Exception('Failed to create video directory: ' . $storageDir);
+            }
+        }
+        
+        // Make directory writable
+        if (!is_writable($storageDir)) {
+            @chmod($storageDir, 0777);
         }
 
-        $file->storeAs('public/' . $directory, $filename);
+        try {
+            // Move the uploaded file
+            $uploadedFilePath = $file->getRealPath();
+            if (!$uploadedFilePath || !file_exists($uploadedFilePath)) {
+                throw new \Exception('Uploaded video file path is invalid');
+            }
+            
+            // Copy file to destination
+            if (!copy($uploadedFilePath, $storagePath)) {
+                throw new \Exception('Failed to copy video file to storage');
+            }
+            
+            // Verify file was saved
+            if (!file_exists($storagePath)) {
+                throw new \Exception('Video file does not exist after save');
+            }
+            
+            // Verify file size
+            if (filesize($storagePath) === 0) {
+                @unlink($storagePath);
+                throw new \Exception('Video file is empty after save');
+            }
+            
+        } catch (\Exception $e) {
+            throw new \Exception('Failed to save video file: ' . $e->getMessage());
+        }
 
         return [
             'success' => true,
             'path' => $fullPath,
-            'url' => Storage::url($fullPath),
+            'url' => url('storage/' . $fullPath),
             'filename' => $filename,
-            'size' => $file->getSize(),
+            'size' => filesize($storagePath),
             'mime_type' => $file->getMimeType()
         ];
     }
@@ -232,5 +336,44 @@ class WebpConversionService
         }
 
         return false;
+    }
+
+    /**
+     * Fallback conversion using GD library
+     *
+     * @param string $sourcePath
+     * @param string $destinationPath
+     * @param string $mimeType
+     * @return void
+     */
+    private function convertWithGD(string $sourcePath, string $destinationPath, string $mimeType): void
+    {
+        // Load image based on type
+        switch ($mimeType) {
+            case 'image/jpeg':
+            case 'image/jpg':
+                $image = @imagecreatefromjpeg($sourcePath);
+                break;
+            case 'image/png':
+                $image = @imagecreatefrompng($sourcePath);
+                break;
+            case 'image/gif':
+                $image = @imagecreatefromgif($sourcePath);
+                break;
+            default:
+                throw new \Exception("Unsupported image type for GD conversion: {$mimeType}");
+        }
+
+        if ($image === false) {
+            throw new \Exception('Failed to load image with GD library');
+        }
+
+        // Convert to WebP
+        $result = @imagewebp($image, $destinationPath, 85);
+        imagedestroy($image);
+
+        if (!$result) {
+            throw new \Exception('GD library failed to convert image to WebP');
+        }
     }
 }

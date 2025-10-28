@@ -25,15 +25,17 @@ import { useAuth } from '@/contexts/AuthContext';
 import CourseHeroSection from '@/components/CourseHeroSection';
 import { faqApi, Faq } from '@/services/faqApi';
 import { settingsApi } from '@/services/settingsApi';
+import { categoryApi, Category, seriesApi, videoApi } from '@/services/videoApi';
+import { testimonialApi, Testimonial } from '@/services/testimonialApi';
 import cover1 from '@/assets/cover1.webp';
 import cover2 from '@/assets/cover2.webp';
 import cover3 from '@/assets/cover3.webp';
 import cover4 from '@/assets/cover4.webp';
-import logoSA from '@/assets/logoSA-negro.png';
 import cover5 from '@/assets/cover5.webp';
 import cover6 from '@/assets/cover6.webp';
 import cover7 from '@/assets/cover7.webp';
 import cover8 from '@/assets/cover8.webp';
+import logoSA from '@/assets/logoSA-negro.png';
 
 const Home = () => {
   const [popularSeries, setPopularSeries] = useState<MockSeries[]>([]);
@@ -42,12 +44,18 @@ const Home = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState(5); // Start at 3rd real category tab (0-2 are blank tabs on left)
   const [faqs, setFaqs] = useState<Record<string, Faq[]>>({});
   const [faqLoading, setFaqLoading] = useState(false);
   const [heroSettings, setHeroSettings] = useState<Record<string, string>>({});
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | undefined>(undefined);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [seriesByCategory, setSeriesByCategory] = useState<Record<number, any[]>>({});
+  const [seriesLoading, setSeriesLoading] = useState(false);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [testimonialsLoading, setTestimonialsLoading] = useState(false);
   const tabContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -187,12 +195,12 @@ const Home = () => {
     navigate(`/explore?category=${categoryId}`);
   };
 
-  const centerActiveTab = (tabIndex: number) => {
+  const centerActiveTab = (tabIndex: number, instant: boolean = false) => {
     if (tabContainerRef.current) {
       const container = tabContainerRef.current;
       const activeButton = container.querySelector(`[data-tab-index="${tabIndex}"]`) as HTMLElement;
       
-      if (activeButton) {
+      if (activeButton && activeButton.offsetWidth > 0) {
         // Get container dimensions
         const containerWidth = container.clientWidth;
         const containerRect = container.getBoundingClientRect();
@@ -209,34 +217,77 @@ const Home = () => {
         const maxScroll = container.scrollWidth - containerWidth;
         const finalScrollLeft = Math.max(0, Math.min(scrollLeft, maxScroll));
         
-        // Smooth scroll to center the active tab
+        // Scroll to center the active tab (instant on first load, smooth on interactions)
         container.scrollTo({
           left: finalScrollLeft,
-          behavior: 'smooth'
+          behavior: instant ? 'auto' : 'smooth'
         });
+        
+        return true; // Successfully centered
       }
+      return false; // Tab not ready yet
     }
+    return false;
   };
 
   const handleTabClick = (index: number) => {
+    // Skip clicking on blank tabs (first and last)
+    const currentTab = tabData[index];
+    if (!currentTab || currentTab.title === '') {
+      return;
+    }
     setActiveTab(index);
-    // Use setTimeout to ensure the DOM has updated
-    setTimeout(() => centerActiveTab(index), 100);
+    // Use setTimeout to ensure the DOM has updated, with smooth scrolling
+    setTimeout(() => centerActiveTab(index, false), 50);
   };
 
-  // Center the active tab when component mounts or activeTab changes
+  // Center the active tab when it changes
   useEffect(() => {
-    if (tabContainerRef.current) {
-      // Use a longer timeout to ensure all content is loaded
-      setTimeout(() => centerActiveTab(activeTab), 200);
+    if (tabContainerRef.current && categories.length > 0) {
+      // Use requestAnimationFrame to ensure all layout calculations are complete
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // Additional delay to ensure tabs are fully rendered and have their widths calculated
+          setTimeout(() => {
+            centerActiveTab(activeTab, true);
+          }, 150);
+        });
+      });
     }
   }, [activeTab]);
+
+  // Center the active tab when categories first load
+  useEffect(() => {
+    if (tabContainerRef.current && categories.length > 0) {
+      let attempts = 0;
+      const maxAttempts = 20; // Try up to 20 times
+      
+      const tryCenter = () => {
+        attempts++;
+        const centered = centerActiveTab(activeTab, true);
+        
+        if (!centered && attempts < maxAttempts) {
+          // Tab not ready yet, try again
+          requestAnimationFrame(tryCenter);
+        }
+      };
+      
+      // Start trying after a small initial delay
+      const initialTimer = setTimeout(() => {
+        requestAnimationFrame(tryCenter);
+      }, 50);
+
+      return () => {
+        clearTimeout(initialTimer);
+      };
+    }
+  }, [categories]);
 
   // Center active tab on window resize
   useEffect(() => {
     const handleResize = () => {
       if (tabContainerRef.current) {
-        setTimeout(() => centerActiveTab(activeTab), 100);
+        centerActiveTab(activeTab, true);
       }
     };
 
@@ -370,6 +421,126 @@ const Home = () => {
     fetchHeroSettings();
   }, []);
 
+  // Fetch Categories and Series from backend
+  useEffect(() => {
+    const fetchCategories = async () => {
+      setCategoriesLoading(true);
+      try {
+        const response = await categoryApi.getPublic();
+        if (response.success) {
+          const cats = response.data || [];
+          setCategories(cats);
+          // Set activeTab to 3rd real category (index 5, since 0-2 are blank tabs on left)
+          if (cats.length > 0) {
+            setActiveTab(5);
+          }
+          
+          // Fetch series for each category
+          if (cats.length > 0) {
+            await fetchSeriesForCategories(cats);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  // Fetch videos for all categories
+  const fetchSeriesForCategories = async (cats: Category[]) => {
+    setSeriesLoading(true);
+    try {
+      const videosPromises = cats.map(async (category) => {
+        try {
+          const response = await videoApi.getAll({
+            category_id: category.id,
+            status: 'published',
+            per_page: 10
+          });
+          // Handle both paginated and non-paginated responses
+          const videosData = response.data?.data || response.data;
+          const videos = Array.isArray(videosData) ? videosData : [];
+          
+          // Transform videos to match the expected series format
+          const series = videos.map((video: any) => ({
+            id: video.id,
+            title: video.title,
+            subtitle: video.short_description || video.description || '',
+            image: video.thumbnail || video.intro_image || cover1,
+            videoCount: 1, // Each video is a single item
+            duration: `${Math.floor((video.duration || 0) / 60)}m`,
+            viewers: video.views || 0,
+            rating: parseFloat(video.rating || '0'),
+            visibility: video.visibility || 'freemium'
+          }));
+          
+          return { categoryId: category.id, series };
+        } catch (error) {
+          console.error(`Error fetching videos for category ${category.id}:`, error);
+          return { categoryId: category.id, series: [] };
+        }
+      });
+
+      const results = await Promise.all(videosPromises);
+      const seriesMap: Record<number, any[]> = {};
+      results.forEach(({ categoryId, series }) => {
+        seriesMap[categoryId] = series;
+      });
+      setSeriesByCategory(seriesMap);
+    } catch (error) {
+      console.error('Error fetching videos:', error);
+    } finally {
+      setSeriesLoading(false);
+    }
+  };
+
+  // Fetch Testimonials
+  useEffect(() => {
+    const fetchTestimonials = async () => {
+      setTestimonialsLoading(true);
+      try {
+        // Get selected testimonials from settings
+        const selectedIds = heroSettings.homepage_testimonial_ids;
+        let testimonialIds: number[] = [];
+        
+        if (selectedIds) {
+          try {
+            testimonialIds = JSON.parse(selectedIds);
+          } catch (e) {
+            console.error('Error parsing homepage_testimonial_ids:', e);
+          }
+        }
+
+        // Fetch all approved testimonials
+        const response = await testimonialApi.getPublic({ featured: false });
+        if (response.success) {
+          let allTestimonials = response.data || [];
+          
+          // Filter to show only selected testimonials if any are selected
+          if (testimonialIds.length > 0) {
+            allTestimonials = allTestimonials.filter((t: Testimonial) => testimonialIds.includes(t.id));
+          }
+          
+          setTestimonials(allTestimonials);
+        }
+      } catch (error) {
+        console.error('Error fetching testimonials:', error);
+        setTestimonials([]);
+      } finally {
+        setTestimonialsLoading(false);
+      }
+    };
+
+    // Only fetch when heroSettings is loaded
+    if (Object.keys(heroSettings).length > 0) {
+      fetchTestimonials();
+    }
+  }, [heroSettings]);
+
   const getVisibilityIcon = (visibility: string) => {
     switch (visibility) {
       case 'premium':
@@ -494,62 +665,54 @@ const Home = () => {
     { id: 50, title: "ANIMATION PRINCIPLES", subtitle: "Movement Mastery", image: cover2, videoCount: 14, duration: "6h 15m", viewers: 2234, rating: 4.8, visibility: "premium" }
   ];
 
-  // Tabbed Carousel Data
-  const tabData = [
-    {
-      id: 0,
-      title: "SCULPTURE",
+  // Generate tab data from database categories with blank tabs for centering
+  const generateTabData = () => {
+    const blankTab = {
+      id: -1,
+      title: "",
       icon: TrendingUp,
-      summary: "Discover what's capturing the attention of art enthusiasts worldwide.",
-      description: "These popular series feature the most engaging sculpting techniques and restoration processes that are currently trending in our community.",
-      features: ["Most Watched", "Community Favorites", "Expert Recommended"],
+      summary: "",
+      description: "",
+      features: [],
       backgroundImage: cover1,
-      series: sculptureSeries
-    },
-    {
-      id: 1,
-      title: "DRAWING",
-      icon: Calendar,
-      summary: "Stay ahead with our latest content releases.",
-      description: "Fresh masterclasses, cutting-edge techniques, and new perspectives from renowned artists are added regularly to keep your learning journey exciting and current.",
-      features: ["Fresh Content", "Latest Techniques", "New Instructors"],
-      backgroundImage: cover2,
-      series: drawingSeries
-    },
-    {
-      id: 2,
-      title: "POLYCHROMY",
-      icon: Award,
-      summary: "Go beyond the finished artwork with exclusive behind-the-scenes content.",
-      description: "Discover the creative process, artistic decisions, and intimate moments that bring masterpieces to life from concept to completion.",
-      features: ["Creative Process", "Artist Insights", "Work in Progress"],
-      backgroundImage: cover3,
-      series: polychromySeries
-    },
-    {
-      id: 3,
-      title: "RESTORATION",
-      icon: TrendingUp,
-      summary: "Master the art of restoration with expert techniques.",
-      description: "Learn professional restoration methods and preservation techniques from industry experts.",
-      features: ["Expert Techniques", "Preservation Methods", "Professional Skills"],
-      backgroundImage: cover4,
-      series: restorationSeries
-    },
-    {
-      id: 4,
-      title: "3D MODELING",
-      icon: Calendar,
-      summary: "Explore the digital frontier of 3D art creation.",
-      description: "Modern 3D modeling techniques and digital sculpting for contemporary artists.",
-      features: ["Digital Tools", "Modern Techniques", "Contemporary Art"],
-      backgroundImage: cover5,
-      series: modelingSeries
-    }
-  ];
+      series: []
+    };
+
+    const categoryTabs = categories.map((category, index) => {
+      // Get series data from backend for this category
+      const seriesData = seriesByCategory[category.id] || [];
+
+      return {
+        id: category.id,
+        title: category.name.toUpperCase(),
+        icon: TrendingUp,
+        summary: category.description || "Discover amazing content in this category.",
+        description: category.description || "Explore our curated collection of content in this category.",
+        features: ["Expert Content", "Professional Techniques", "Quality Learning"],
+        backgroundImage: cover1,
+        series: seriesData
+      };
+    });
+
+    // Add 3 blank tabs on the left and 3 on the right for centering
+    return [blankTab, blankTab, blankTab, ...categoryTabs, blankTab, blankTab, blankTab];
+  };
+
+  const tabData = generateTabData();
 
   const TabbedCarousel = () => {
     const currentTab = tabData[activeTab];
+    
+    // Show loading state if categories are still loading
+    if (categoriesLoading || categories.length === 0) {
+      return (
+        <section className="mb-16 lg:mb-20">
+          <div className="flex items-center justify-center py-20">
+            <div className="text-gray-400 text-xl">Loading categories...</div>
+          </div>
+        </section>
+      );
+    }
     
     return (
       <section className="mb-16 lg:mb-20">
@@ -560,7 +723,16 @@ const Home = () => {
         <div className="flex items-center justify-between mb-8 lg:mb-12 w-full max-w-6xl mx-auto">
           {/* Left Arrow - Aligned to content left */}
           <button 
-            onClick={() => handleTabClick(Math.max(0, activeTab - 1))}
+            onClick={() => {
+              let newIndex = activeTab - 1;
+              // Skip blank tabs by checking if title is empty
+              while (newIndex >= 0 && tabData[newIndex]?.title === '') {
+                newIndex--;
+              }
+              if (newIndex >= 0) {
+                handleTabClick(newIndex);
+              }
+            }}
             className="text-gray-400 hover:text-white transition-colors duration-300 p-4 flex-shrink-0"
           >
             <ChevronRight className="h-8 w-8 rotate-180" />
@@ -570,7 +742,6 @@ const Home = () => {
           <div 
             ref={tabContainerRef}
             className="flex items-center space-x-6 lg:space-x-8 overflow-x-auto hide-scrollbar w-full"
-            style={{ scrollBehavior: 'smooth' }}
           >
             {tabData.map((tab, index) => (
               <button
@@ -581,16 +752,29 @@ const Home = () => {
                   index === activeTab
                     ? 'text-white'
                     : 'text-gray-400 hover:text-gray-300'
-                }`}
+                } ${tab.title === '' ? 'invisible' : ''}`}
+                style={{
+                  width: tab.title === '' ? '8rem' : 'auto', // Fixed width for blank tabs to match real tabs
+                  minWidth: tab.title === '' ? '8rem' : 'auto'
+                }}
               >
-                {tab.title}
+                {tab.title === '' ? '\u00A0' : tab.title}
               </button>
             ))}
           </div>
           
           {/* Right Arrow - Aligned to content right */}
           <button 
-            onClick={() => handleTabClick(Math.min(tabData.length - 1, activeTab + 1))}
+            onClick={() => {
+              let newIndex = activeTab + 1;
+              // Skip blank tabs by checking if title is empty
+              while (newIndex < tabData.length && tabData[newIndex]?.title === '') {
+                newIndex++;
+              }
+              if (newIndex < tabData.length) {
+                handleTabClick(newIndex);
+              }
+            }}
             className="text-gray-400 hover:text-white transition-colors duration-300 p-4 flex-shrink-0"
           >
             <ChevronRight className="h-8 w-8" />
@@ -764,10 +948,10 @@ const Home = () => {
          selectedCategoryId={selectedCategoryId}
        />
 
-       {/* Content Sections - HBO Max Style */}
-       <div className="w-full px-4 md:px-8 lg:px-16 xl:px-24 2xl:px-32 pt-16 lg:pt-20 pb-12 lg:pb-20">
-         <TabbedCarousel />
-      </div>
+      {/* Content Sections - HBO Max Style */}
+      <div className="w-full px-4 md:px-8 lg:px-16 xl:px-24 2xl:px-32 pt-16 lg:pt-20 pb-12 lg:pb-20">
+          <TabbedCarousel />
+        </div>
 
       {/* About Section */}
       <section className="py-16 lg:py-24 bg-gradient-to-br from-gray-900 via-black to-gray-800">
@@ -792,11 +976,14 @@ const Home = () => {
               </div>
             </div>
             <div className="relative">
-              <div className="aspect-[4/3] rounded-xl overflow-hidden shadow-2xl">
-                <img
-                  src={heroSettings.about_image || cover1}
-                  alt="About SACRART"
-                  className="w-full h-full object-cover"
+              <div className="aspect-[16/9] rounded-xl overflow-hidden shadow-2xl">
+                <iframe
+                  src="https://www.youtube.com/embed/aHR2IFjhOwg"
+                  title="About SACRART"
+                  className="w-full h-full"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
                 />
               </div>
             </div>
@@ -804,7 +991,7 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Testimonial Section */}
+      {/* Testimonial Section - Single Row Carousel with Auto Slide */}
       <section className="py-16 lg:py-24 bg-gradient-to-br from-black via-gray-900 to-black">
         <div className="container mx-auto px-4 lg:px-8">
           <div className="text-center mb-12 lg:mb-16">
@@ -816,52 +1003,75 @@ const Home = () => {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-12">
-            {[
-              {
-                name: heroSettings.testimonial_1_name || 'María González',
-                role: heroSettings.testimonial_1_role || 'Professional Sculptor',
-                content: heroSettings.testimonial_1_content || 'SACRART has revolutionized my understanding of classical techniques. The quality of instruction and attention to detail is unmatched.',
-                image: heroSettings.testimonial_1_image || cover2
-              },
-              {
-                name: heroSettings.testimonial_2_name || 'James Wilson',
-                role: heroSettings.testimonial_2_role || 'Art Restoration Specialist',
-                content: heroSettings.testimonial_2_content || 'The restoration courses are incredibly comprehensive. I\'ve been able to apply these techniques directly to my professional work.',
-                image: heroSettings.testimonial_2_image || cover3
-              },
-              {
-                name: heroSettings.testimonial_3_name || 'Elena Rossi',
-                role: heroSettings.testimonial_3_role || 'Contemporary Artist',
-                content: heroSettings.testimonial_3_content || 'The blend of traditional and modern approaches has opened new creative possibilities I never knew existed.',
-                image: heroSettings.testimonial_3_image || cover4
-              }
-            ].map((testimonial, index) => (
-              <div key={index} className="bg-gray-900/50 rounded-xl p-8 lg:p-10 border border-white/10 hover:border-primary/50 transition-all duration-300 backdrop-blur-sm">
-                <div className="flex items-center mb-6">
-                  <img
-                    src={testimonial.image}
-                    alt={testimonial.name}
-                    className="w-12 h-12 rounded-full object-cover mr-4"
-                  />
-                  <div>
-                    <h4 className="text-white font-semibold font-montserrat">{testimonial.name}</h4>
-                    <p className="text-gray-400 text-sm font-montserrat">{testimonial.role}</p>
+          {testimonialsLoading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-gray-400">Loading testimonials...</p>
+            </div>
+          ) : testimonials.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-400">No testimonials available yet.</p>
+            </div>
+          ) : (
+            <div className="overflow-hidden">
+              <div 
+                className="flex gap-6 lg:gap-8 animate-scroll"
+                style={{
+                  animation: `scroll ${testimonials.length * 10}s linear infinite`,
+                  width: `calc(${testimonials.length * 400}px + ${(testimonials.length - 1) * 24}px)`
+                }}
+              >
+                {/* Render testimonials twice for seamless loop */}
+                {[...testimonials, ...testimonials].map((testimonial, index) => (
+                  <div 
+                    key={`${testimonial.id}-${index}`} 
+                    className="flex-shrink-0 w-96 lg:w-[420px] bg-gray-900/50 rounded-xl p-8 lg:p-10 border border-white/10 hover:border-primary/50 transition-all duration-300 backdrop-blur-sm"
+                  >
+                    <div className="flex items-center mb-6">
+                      {testimonial.avatar ? (
+                        <img
+                          src={testimonial.avatar}
+                          alt={testimonial.name}
+                          className="w-12 h-12 rounded-full object-cover mr-4"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mr-4">
+                          <span className="text-primary font-semibold">{testimonial.name.charAt(0)}</span>
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="text-white font-semibold font-montserrat">{testimonial.name}</h4>
+                        <p className="text-gray-400 text-sm font-montserrat">
+                          {testimonial.role}{testimonial.company ? ` at ${testimonial.company}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-gray-300 leading-relaxed font-montserrat mb-4">
+                      "{testimonial.content}"
+                    </p>
+                    <div className="flex">
+                      {[...Array(testimonial.rating || 5)].map((_, i) => (
+                        <Star key={i} className="h-4 w-4 text-yellow-400 fill-current" />
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <p className="text-gray-300 leading-relaxed font-montserrat">
-                  "{testimonial.content}"
-                </p>
-                <div className="flex mt-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="h-4 w-4 text-yellow-400 fill-current" />
-                  ))}
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
       </section>
+
+      <style>{`
+        @keyframes scroll {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(calc(-50% - ${24 * (testimonials.length - 1)}px));
+          }
+        }
+      `}</style>
 
       {/* Subscription Plans Section */}
       <section className="py-16 lg:py-24 bg-gradient-to-b from-transparent to-black/50">

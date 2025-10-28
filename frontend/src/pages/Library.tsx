@@ -21,14 +21,16 @@ import {
   Eye,
   Download
 } from 'lucide-react';
-import { generateMockSeries, generateMockVideos, MockSeries, MockVideo } from '@/services/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { userProgressApi, UserProgress } from '@/services/userProgressApi';
+import { categoryApi } from '@/services/videoApi';
+import { toast } from 'sonner';
 
 const Library = () => {
-  const [mySeries, setMySeries] = useState<MockSeries[]>([]);
-  const [continueWatching, setContinueWatching] = useState<any[]>([]);
-  const [watchHistory, setWatchHistory] = useState<any[]>([]);
+  const [myCategories, setMyCategories] = useState<any[]>([]);
+  const [continueWatching, setContinueWatching] = useState<UserProgress[]>([]);
+  const [watchHistory, setWatchHistory] = useState<UserProgress[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -37,79 +39,46 @@ const Library = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Simulate API call
     const fetchLibraryData = async () => {
-      setLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockSeries = generateMockSeries();
-      const mockVideos = generateMockVideos();
-      
-      // Mock user's enrolled series (based on subscription)
-      const enrolledSeries = mockSeries.slice(0, 6);
-      setMySeries(enrolledSeries);
-      
-      // Mock continue watching data
-      const continueData = [
-        {
-          id: 1,
-          title: 'Clay Preparation Techniques',
-          series: 'Sculpting Mastery',
-          thumbnail: '/api/placeholder/300/200',
-          progress: 65,
-          duration: '15:30',
-          watchedTime: '10:12',
-          lastWatched: '2 hours ago'
-        },
-        {
-          id: 2,
-          title: 'Advanced Carving Methods',
-          series: 'Stone Carving Fundamentals',
-          thumbnail: '/api/placeholder/300/200',
-          progress: 30,
-          duration: '22:45',
-          watchedTime: '6:45',
-          lastWatched: '1 day ago'
-        },
-        {
-          id: 3,
-          title: 'Restoration Best Practices',
-          series: 'Art Restoration Process',
-          thumbnail: '/api/placeholder/300/200',
-          progress: 80,
-          duration: '18:20',
-          watchedTime: '14:36',
-          lastWatched: '3 days ago'
-        }
-      ];
-      setContinueWatching(continueData);
-      
-      // Mock watch history
-      const historyData = [
-        {
-          id: 4,
-          title: 'Bronze Casting Techniques',
-          series: 'Metal Sculpting Series',
-          duration: '25:10',
-          completedAt: '1 week ago',
-          completed: true
-        },
-        {
-          id: 5,
-          title: 'Ancient Sculpture Analysis',
-          series: 'Art History & Techniques',
-          duration: '32:45',
-          completedAt: '2 weeks ago',
-          completed: true
-        }
-      ];
-      setWatchHistory(historyData);
-      
-      setLoading(false);
+      try {
+        setLoading(true);
+        
+        // Fetch categories (user's enrolled categories)
+        const categoriesResponse = await categoryApi.getAll();
+        const categoriesData = Array.isArray(categoriesResponse.data) 
+          ? categoriesResponse.data 
+          : categoriesResponse.data?.data || [];
+        setMyCategories(categoriesData);
+        
+        // Fetch continue watching
+        const continueResponse = await userProgressApi.continueWatching(10);
+        const continueData = continueResponse.success && continueResponse.data 
+          ? continueResponse.data 
+          : [];
+        setContinueWatching(continueData);
+        
+        // Fetch watch history (completed videos)
+        const historyResponse = await userProgressApi.getCompleted(20);
+        const historyData = historyResponse.success && historyResponse.data 
+          ? (Array.isArray(historyResponse.data) ? historyResponse.data : historyResponse.data?.data || [])
+          : [];
+        setWatchHistory(historyData);
+        
+      } catch (error: any) {
+        console.error('Error loading library data:', error);
+        toast.error('Failed to load library data');
+        setMyCategories([]);
+        setContinueWatching([]);
+        setWatchHistory([]);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    fetchLibraryData();
-  }, []);
+    if (user) {
+      fetchLibraryData();
+    }
+  }, [user]);
 
   const getVisibilityIcon = (visibility: string) => {
     switch (visibility) {
@@ -139,66 +108,104 @@ const Library = () => {
     );
   };
 
-  const filteredSeries = mySeries.filter(series => {
-    const matchesSearch = series.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         series.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = selectedFilter === 'all' || series.visibility === selectedFilter;
+  const filteredCategories = myCategories.filter(category => {
+    const matchesSearch = category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (category.description && category.description.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesFilter = selectedFilter === 'all' || category.visibility === selectedFilter;
     return matchesSearch && matchesFilter;
   });
 
-  const SeriesCard = ({ series }: { series: MockSeries }) => (
-    <Card className="group cursor-pointer overflow-hidden hover:shadow-lg transition-all duration-300" onClick={() => navigate(`/series/${series.id}`)}>
-      <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/5 relative">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-16 h-16 bg-primary/90 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-            <Play className="h-6 w-6 text-primary-foreground ml-1" />
-          </div>
-        </div>
-        <div className="absolute top-2 right-2">
-          {getVisibilityBadge(series.visibility)}
-        </div>
-      </div>
-      <div className="p-4">
-        <h3 className="font-semibold text-sm mb-2 line-clamp-2">{series.title}</h3>
-        <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{series.description}</p>
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <div className="flex items-center">
-            <Play className="h-3 w-3 mr-1" />
-            {series.videoCount} episodes
-          </div>
-          <div className="flex items-center">
-            <Clock className="h-3 w-3 mr-1" />
-            {series.totalDuration}
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
+  const CategoryCard = ({ category }: { category: any }) => {
+    const formatDuration = (seconds: number) => {
+      const hours = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      if (hours > 0) return `${hours}h ${mins}m`;
+      return `${mins}m`;
+    };
 
-  const ContinueWatchingCard = ({ item }: { item: any }) => (
-    <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/video/${item.id}`)}>
-      <div className="flex">
-        <div className="w-32 aspect-video bg-gradient-to-br from-primary/20 to-primary/5 relative">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-8 h-8 bg-primary/90 rounded-full flex items-center justify-center">
-              <Play className="h-4 w-4 text-primary-foreground ml-0.5" />
+    return (
+      <Card className="group cursor-pointer overflow-hidden hover:shadow-lg transition-all duration-300" onClick={() => navigate(`/category/${category.id}`)}>
+        <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/5 relative">
+          {category.cover_image ? (
+            <img src={category.cover_image} alt={category.name} className="w-full h-full object-cover" />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-16 h-16 bg-primary/90 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Play className="h-6 w-6 text-primary-foreground ml-1" />
+              </div>
+            </div>
+          )}
+          <div className="absolute top-2 right-2">
+            {category.visibility && getVisibilityBadge(category.visibility)}
+          </div>
+        </div>
+        <div className="p-4">
+          <h3 className="font-semibold text-sm mb-2 line-clamp-2">{category.name}</h3>
+          <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{category.description}</p>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div className="flex items-center">
+              <Play className="h-3 w-3 mr-1" />
+              {category.video_count || 0} episodes
+            </div>
+            <div className="flex items-center">
+              <Clock className="h-3 w-3 mr-1" />
+              {formatDuration(category.total_duration || 0)}
             </div>
           </div>
-          <div className="absolute bottom-0 left-0 right-0 bg-black/50 p-1">
-            <Progress value={item.progress} className="h-1" />
+        </div>
+      </Card>
+    );
+  };
+
+  const ContinueWatchingCard = ({ item }: { item: UserProgress }) => {
+    const formatTime = (seconds: number) => {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    const getTimeAgo = (dateString: string) => {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
+      
+      if (diffMins < 60) return `${diffMins} minutes ago`;
+      if (diffHours < 24) return `${diffHours} hours ago`;
+      return `${diffDays} days ago`;
+    };
+
+    return (
+      <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/video/${item.video_id}`)}>
+        <div className="flex">
+          <div className="w-32 aspect-video bg-gradient-to-br from-primary/20 to-primary/5 relative">
+            {item.video?.intro_image ? (
+              <img src={item.video.intro_image} alt={item.video?.title} className="w-full h-full object-cover" />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-8 h-8 bg-primary/90 rounded-full flex items-center justify-center">
+                  <Play className="h-4 w-4 text-primary-foreground ml-0.5" />
+                </div>
+              </div>
+            )}
+            <div className="absolute bottom-0 left-0 right-0 bg-black/50 p-1">
+              <Progress value={item.progress_percentage} className="h-1" />
+            </div>
+          </div>
+          <div className="flex-1 p-4">
+            <h3 className="font-medium text-sm mb-1">{item.video?.title || 'Untitled Video'}</h3>
+            <p className="text-xs text-muted-foreground mb-2">{item.category?.name || item.video?.category?.name || 'Category'}</p>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{formatTime(item.time_watched)} / {formatTime(item.video?.duration || 0)}</span>
+              <span>{getTimeAgo(item.last_watched_at)}</span>
+            </div>
           </div>
         </div>
-        <div className="flex-1 p-4">
-          <h3 className="font-medium text-sm mb-1">{item.title}</h3>
-          <p className="text-xs text-muted-foreground mb-2">{item.series}</p>
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{item.watchedTime} / {item.duration}</span>
-            <span>{item.lastWatched}</span>
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
+      </Card>
+    );
+  };
 
   if (loading) {
     return (
@@ -339,14 +346,14 @@ const Library = () => {
           </div>
         </div>
 
-        {/* Series Grid */}
+        {/* Categories Grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {filteredSeries.map((series) => (
-            <SeriesCard key={series.id} series={series} />
+          {filteredCategories.map((category) => (
+            <CategoryCard key={category.id} category={category} />
           ))}
         </div>
 
-        {filteredSeries.length === 0 && (
+        {filteredCategories.length === 0 && (
           <div className="text-center py-12">
             <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
               <BookOpen className="h-12 w-12 text-muted-foreground" />
@@ -375,21 +382,23 @@ const Library = () => {
             </Button>
           </div>
           <div className="space-y-3">
-            {watchHistory.map((item) => (
-              <Card key={item.id} className="p-4">
+            {watchHistory.map((item: UserProgress) => (
+              <Card key={item.id} className="p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/video/${item.video_id}`)}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                       <CheckCircle className="h-6 w-6 text-green-500" />
                     </div>
                     <div>
-                      <h3 className="font-medium">{item.title}</h3>
-                      <p className="text-sm text-muted-foreground">{item.series}</p>
+                      <h3 className="font-medium">{item.video?.title || 'Untitled Video'}</h3>
+                      <p className="text-sm text-muted-foreground">{item.category?.name || item.video?.category?.name || 'Category'}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm text-muted-foreground">{item.duration}</div>
-                    <div className="text-xs text-muted-foreground">{item.completedAt}</div>
+                    <div className="text-sm text-muted-foreground">{Math.floor((item.video?.duration || 0) / 60)}m</div>
+                    <div className="text-xs text-muted-foreground">
+                      {item.completed_at ? new Date(item.completed_at).toLocaleDateString() : 'Recently'}
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -404,7 +413,7 @@ const Library = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Total Series</p>
-              <p className="text-2xl font-bold">{mySeries.length}</p>
+              <p className="text-2xl font-bold">{myCategories.length}</p>
             </div>
             <Play className="h-8 w-8 text-primary" />
           </div>

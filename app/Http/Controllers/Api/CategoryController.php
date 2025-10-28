@@ -36,13 +36,13 @@ class CategoryController extends Controller
             });
         }
 
-        // Include series count
+        // Include videos count
         if ($request->boolean('with_counts')) {
-            $query->withCount(['series' => function ($q) use ($isAdminRequest) {
+            $query->withCount(['videos' => function ($q) use ($isAdminRequest) {
                 if (!$isAdminRequest) {
-                    $q->published();
+                    $q->where('status', 'published');
                 }
-                // Admin can see all series counts
+                // Admin can see all video counts
             }]);
         }
 
@@ -84,8 +84,8 @@ class CategoryController extends Controller
      */
     public function show(Category $category): JsonResponse
     {
-        $category->load(['series' => function ($q) {
-            $q->published()->withCount('publishedVideos');
+        $category->load(['videos' => function ($q) {
+            $q->where('status', 'published');
         }]);
 
         return response()->json([
@@ -138,11 +138,11 @@ class CategoryController extends Controller
         // Find category by ID instead of slug
         $category = Category::findOrFail($id);
         
-        // Check if category has series
-        if ($category->series()->count() > 0) {
+        // Check if category has videos
+        if ($category->videos()->count() > 0) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cannot delete category that contains series.',
+                'message' => 'Cannot delete category that contains videos.',
             ], 422);
         }
 
@@ -161,10 +161,9 @@ class CategoryController extends Controller
     {
         $categories = Category::active()
             ->ordered()
-            ->withCount(['series' => function ($q) {
-                $q->published();
+            ->withCount(['videos' => function ($q) {
+                $q->where('status', 'published');
             }])
-            ->having('series_count', '>', 0)
             ->get();
 
         return response()->json([

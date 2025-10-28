@@ -64,6 +64,7 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { seriesApi, videoApi, categoryApi, Series, Video, Category } from '@/services/videoApi';
+import FileUpload from '@/components/admin/FileUpload';
 
 // Using types from videoApi
 
@@ -89,6 +90,8 @@ const ContentManagement = () => {
   const [uploadedVideos, setUploadedVideos] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [selectedVideoFile, setSelectedVideoFile] = useState<File | null>(null);
+  const [selectedIntroImageFile, setSelectedIntroImageFile] = useState<File | null>(null);
 
   useEffect(() => {
     fetchContent();
@@ -112,17 +115,21 @@ const ContentManagement = () => {
         videos: videosResponse.status
       });
 
+      let categoriesData: any[] = [];
+
       // Handle categories
       if (categoriesResponse.status === 'fulfilled') {
         const response = categoriesResponse.value;
-        const categoriesData = Array.isArray(response.data) ? response.data : response.data?.data || [];
+        console.log('Categories API response:', response);
+        categoriesData = Array.isArray(response.data) ? response.data : response.data?.data || [];
+        console.log('Extracted categories data:', categoriesData);
         setCategories(categoriesData);
       } else {
         console.error('Failed to fetch categories:', categoriesResponse.reason);
         setCategories([]);
       }
 
-      // Handle series
+      // Handle series (Note: series = category in backend)
       if (seriesResponse.status === 'fulfilled') {
         const response = seriesResponse.value;
         console.log('Series API response:', response);
@@ -138,9 +145,17 @@ const ContentManagement = () => {
           seriesData = [];
         }
         
-        console.log('Processed series data:', seriesData);
+        console.log('Extracted series data:', seriesData);
+        console.log('First series item:', seriesData[0]);
+        
         setSeries(seriesData);
         setFilteredSeries(seriesData);
+        
+        // Since series = category, also populate categories from series data if categories is empty
+        if (categoriesResponse.status !== 'fulfilled' || categoriesData.length === 0) {
+          console.log('Using series data as categories (series = category)');
+          setCategories(seriesData);
+        }
       } else {
         console.error('Failed to fetch series:', seriesResponse.reason);
         setSeries([]);
@@ -249,6 +264,7 @@ const ContentManagement = () => {
   const handleAddSeries = () => {
     setSelectedSeries({
       id: 0,
+      name: '', // Category name (since series = category)
       title: '',
       slug: '',
       description: '',
@@ -363,11 +379,14 @@ const ContentManagement = () => {
       slug: '',
       description: '',
       short_description: null,
+      category_id: series.length > 0 ? series[0].category_id : 1,
       series_id: series.length > 0 ? series[0].id : 1,
       instructor_id: null,
       video_url: null,
       video_file_path: null,
       thumbnail: null,
+      intro_image: null,
+      intro_description: null,
       duration: 0,
       file_size: null,
       video_format: null,
@@ -419,38 +438,137 @@ const ContentManagement = () => {
 
     try {
       setIsSubmitting(true);
+      setUploadProgress(0);
       
+      // Prepare form data for file uploads
+      const formData = new FormData();
+      
+      // Add all video data to form data with proper type handling
+      Object.keys(selectedVideo).forEach(key => {
+        const value = selectedVideo[key];
+        
+        // Skip null and undefined values
+        if (value === null || value === undefined) {
+          return;
+        }
+        
+        // Handle boolean values - convert to "1" or "0" for Laravel
+        if (typeof value === 'boolean') {
+          formData.append(key, value ? '1' : '0');
+        }
+        // Handle arrays and objects
+        else if (typeof value === 'object') {
+          formData.append(key, JSON.stringify(value));
+        }
+        // Handle all other types (string, number)
+        else {
+          formData.append(key, value.toString());
+        }
+      });
+
+      // Add files if selected
+      if (selectedVideoFile) {
+        formData.append('video_file', selectedVideoFile);
+      }
+      
+      if (selectedIntroImageFile) {
+        formData.append('intro_image_file', selectedIntroImageFile);
+      }
+      
+      // For updates, use POST with _method spoofing (Laravel requirement for FormData with PUT)
       if (selectedVideo.id) {
-        // Update existing video
-        const response = await videoApi.update(selectedVideo.id, selectedVideo);
-        if (response.success) {
-          setVideos(prev => prev.map(v => v.id === selectedVideo.id ? response.data : v));
-          setFilteredVideos(prev => prev.map(v => v.id === selectedVideo.id ? response.data : v));
+        formData.append('_method', 'PUT');
+      }
+      
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+      
+      // Use XMLHttpRequest for upload progress tracking
+      const xhr = new XMLHttpRequest();
+      
+      // Track upload progress
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(percentComplete);
+        }
+      });
+      
+      // Handle response
+      const uploadPromise = new Promise((resolve, reject) => {
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const result = JSON.parse(xhr.responseText);
+              resolve(result);
+            } catch (e) {
+              reject(new Error('Failed to parse response'));
+            }
+          } else {
+            try {
+              const error = JSON.parse(xhr.responseText);
+              // Extract validation errors if available
+              const errorMessage = error.message || 'Upload failed';
+              const validationErrors = error.errors ? 
+                Object.entries(error.errors).map(([field, msgs]: [string, any]) => 
+                  `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`
+                ).join('; ') : '';
+              
+              reject(new Error(validationErrors || errorMessage));
+            } catch (e) {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
+            }
+          }
+        });
+        
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error occurred'));
+        });
+        
+        xhr.addEventListener('abort', () => {
+          reject(new Error('Upload cancelled'));
+        });
+      });
+      
+      // Set up request - Always use POST (with _method for updates)
+      const url = selectedVideo.id 
+        ? `${API_BASE_URL}/admin/videos/${selectedVideo.id}`
+        : `${API_BASE_URL}/admin/videos`;
+      
+      xhr.open('POST', url);
+      xhr.setRequestHeader('Authorization', `Bearer ${localStorage.getItem('auth_token')}`);
+      xhr.setRequestHeader('Accept', 'application/json');
+      
+      // Send request
+      xhr.send(formData);
+      
+      // Wait for response
+      const result: any = await uploadPromise;
+      
+      if (result.success) {
+        if (selectedVideo.id) {
+          setVideos(prev => prev.map(v => v.id === selectedVideo.id ? result.data : v));
+          setFilteredVideos(prev => prev.map(v => v.id === selectedVideo.id ? result.data : v));
           toast.success("Video updated successfully");
-          setIsVideoDialogOpen(false);
-          setSelectedVideo(null);
         } else {
-          toast.error(response.message || "Failed to update video");
-        }
-      } else {
-        // Create new video
-        const response = await videoApi.create(selectedVideo);
-        if (response.success) {
-          setVideos(prev => [response.data, ...prev]);
-          setFilteredVideos(prev => [response.data, ...prev]);
+          setVideos(prev => [result.data, ...prev]);
+          setFilteredVideos(prev => [result.data, ...prev]);
           toast.success("Video created successfully");
-          setIsVideoDialogOpen(false);
-          setSelectedVideo(null);
-        } else {
-          toast.error(response.message || "Failed to create video");
         }
+        setIsVideoDialogOpen(false);
+        setSelectedVideo(null);
+        setSelectedVideoFile(null);
+        setSelectedIntroImageFile(null);
+        setUploadProgress(0);
+      } else {
+        toast.error(result.message || "Failed to save video");
       }
     } catch (error: any) {
       console.error('Error saving video:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to save video';
+      const errorMessage = error.message || 'Failed to save video';
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
+      setUploadProgress(0);
     }
   };
 
@@ -674,7 +792,8 @@ const ContentManagement = () => {
                             <Folder className="h-6 w-6" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="font-medium truncate">{serie.title}</div>
+                            <div className="font-medium truncate">{serie.name || 'Category'}</div>
+                            <div className="text-sm text-muted-foreground truncate">{serie.title}</div>
                             <div className="text-sm text-muted-foreground line-clamp-2">{serie.description}</div>
                           </div>
                         </div>
@@ -772,7 +891,8 @@ const ContentManagement = () => {
                       <Folder className="h-6 w-6" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-lg mb-1 line-clamp-1">{serie.title}</h3>
+                      <h3 className="font-medium text-lg mb-1 line-clamp-1">{serie.name || 'Category'}</h3>
+                      <p className="text-sm text-muted-foreground mb-1 line-clamp-1">{serie.title}</p>
                       <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{serie.description}</p>
                       
                       <div className="flex flex-wrap gap-2 mb-3">
@@ -1314,26 +1434,6 @@ const ContentManagement = () => {
                 </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="category" className="text-right">
-                  Category
-                </Label>
-                <Select
-                  value={selectedSeries.category_id?.toString() || ''}
-                  onValueChange={(value) => setSelectedSeries({...selectedSeries, category_id: parseInt(value)})}
-                >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select a category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id.toString()}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="status" className="text-right">
                   Status
                 </Label>
@@ -1366,7 +1466,7 @@ const ContentManagement = () => {
 
       {/* Edit Video Dialog */}
       <Dialog open={isVideoDialogOpen} onOpenChange={setIsVideoDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[800px] max-h-[95vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selectedVideo?.id ? 'Edit Episode' : 'Add New Episode'}</DialogTitle>
             <DialogDescription>
@@ -1399,15 +1499,17 @@ const ContentManagement = () => {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="introImage" className="text-right">
-                  Intro Image URL
+                  Intro Image
                 </Label>
-                <Input
-                  id="introImage"
-                  value={selectedVideo.intro_image || ''}
-                  onChange={(e) => setSelectedVideo({...selectedVideo, intro_image: e.target.value})}
-                  className="col-span-3"
-                  placeholder="https://example.com/intro-image.webp"
-                />
+                <div className="col-span-3">
+                  <FileUpload
+                    type="image"
+                    label=""
+                    onFileSelect={setSelectedIntroImageFile}
+                    currentFile={selectedVideo.intro_image}
+                    disabled={isSubmitting}
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="introDescription" className="text-right">
@@ -1420,6 +1522,21 @@ const ContentManagement = () => {
                   className="col-span-3"
                   placeholder="Brief intro text for the video"
                 />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="videoFile" className="text-right">
+                  Video File
+                </Label>
+                <div className="col-span-3">
+                  <FileUpload
+                    type="video"
+                    label=""
+                    onFileSelect={setSelectedVideoFile}
+                    currentFile={selectedVideo.video_file_path}
+                    disabled={isSubmitting}
+                    maxSize={500}
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="videoDuration" className="text-right">
@@ -1465,7 +1582,10 @@ const ContentManagement = () => {
                   <SelectContent>
                     {series.map((serie) => (
                       <SelectItem key={serie.id} value={serie.id.toString()}>
-                        {serie.title}
+                        <div className="flex flex-col">
+                          <span className="font-medium">{serie.name || 'Category'}</span>
+                          <span className="text-sm text-muted-foreground">{serie.title}</span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1495,8 +1615,18 @@ const ContentManagement = () => {
             <Button variant="outline" onClick={() => setIsVideoDialogOpen(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button onClick={handleSaveVideo} disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : (selectedVideo?.id ? 'Save Changes' : 'Create Episode')}
+            <Button onClick={handleSaveVideo} disabled={isSubmitting} className="min-w-[140px]">
+              {isSubmitting ? (
+                uploadProgress > 0 ? (
+                  <span className="flex items-center gap-2">
+                    <span>Uploading {uploadProgress}%</span>
+                  </span>
+                ) : (
+                  'Saving...'
+                )
+              ) : (
+                selectedVideo?.id ? 'Save Changes' : 'Create Episode'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

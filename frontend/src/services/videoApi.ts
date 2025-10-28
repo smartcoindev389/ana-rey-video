@@ -38,48 +38,70 @@ export interface Category {
   name: string;
   slug: string;
   description: string;
+  short_description?: string | null;
   color: string;
   icon: string;
   is_active: boolean;
   sort_order: number;
+  // Series fields (merged from series table)
+  visibility?: 'freemium' | 'basic' | 'premium';
+  status?: 'draft' | 'published' | 'archived';
+  instructor_id?: number | null;
+  thumbnail?: string | null;
+  cover_image?: string | null;
+  trailer_url?: string | null;
+  meta_title?: string | null;
+  meta_description?: string | null;
+  meta_keywords?: string | null;
+  video_count?: number;
+  total_duration?: number;
+  total_views?: number;
+  rating?: string;
+  rating_count?: number;
+  price?: string;
+  is_free?: boolean;
+  published_at?: string | null;
+  featured_until?: string | null;
+  is_featured?: boolean;
+  tags?: string[] | null;
   series_count?: number;
   created_at: string;
   updated_at: string;
 }
 
+// Series interface (keeping for backward compatibility, used for content management)
+// Note: In the backend, series = category, so this includes category fields
 export interface Series {
   id: number;
+  name: string; // Category name (since series = category)
   title: string;
   slug: string;
   description: string;
-  short_description: string;
+  short_description?: string | null;
   visibility: 'freemium' | 'basic' | 'premium';
   status: 'draft' | 'published' | 'archived';
   category_id: number;
-  instructor_id: number;
-  thumbnail: string | null;
-  cover_image: string | null;
-  trailer_url: string | null;
-  meta_title: string | null;
-  meta_description: string | null;
-  meta_keywords: string | null;
+  instructor_id?: number | null;
+  thumbnail?: string | null;
+  cover_image?: string | null;
+  trailer_url?: string | null;
+  meta_title?: string | null;
+  meta_description?: string | null;
+  meta_keywords?: string | null;
   video_count: number;
   total_duration: number;
-  total_views: number;
-  rating: string;
-  rating_count: number;
-  price: string;
-  is_free: boolean;
-  published_at: string | null;
-  featured_until: string | null;
-  is_featured: boolean;
-  sort_order: number;
-  tags: string[] | null;
+  total_views?: number;
+  rating?: string;
+  rating_count?: number;
+  price?: string;
+  is_free?: boolean;
+  published_at?: string | null;
+  featured_until?: string | null;
+  is_featured?: boolean;
+  sort_order?: number;
+  tags?: string[] | null;
   created_at: string;
   updated_at: string;
-  category?: Category;
-  instructor?: any;
-  published_videos_count?: number;
 }
 
 export interface Video {
@@ -88,12 +110,16 @@ export interface Video {
   slug: string;
   description: string | null;
   short_description: string | null;
-  series_id: number;
+  category_id: number;
+  series_id?: number;
   instructor_id: number | null;
   video_url: string | null;
   video_file_path: string | null;
+  video_url_full?: string | null;
   thumbnail: string | null;
+  thumbnail_url?: string | null;
   intro_image: string | null;
+  intro_image_url?: string | null;
   intro_description: string | null;
   duration: number;
   file_size: number | null;
@@ -126,7 +152,7 @@ export interface Video {
   processed_at: string | null;
   created_at: string;
   updated_at: string;
-  series?: Series;
+  category?: Category;
   instructor?: any;
 }
 
@@ -271,7 +297,7 @@ export const seriesApi = {
 export const videoApi = {
   async getAll(params?: { 
     search?: string; 
-    series_id?: number; 
+    category_id?: number; 
     status?: string;
     visibility?: string;
     sort_by?: string;
@@ -280,7 +306,7 @@ export const videoApi = {
   }) {
     const queryParams = new URLSearchParams();
     if (params?.search) queryParams.append('search', params.search);
-    if (params?.series_id) queryParams.append('series_id', params.series_id.toString());
+    if (params?.category_id) queryParams.append('category_id', params.category_id.toString());
     if (params?.status) queryParams.append('status', params.status);
     if (params?.visibility) queryParams.append('visibility', params.visibility);
     if (params?.sort_by) queryParams.append('sort_by', params.sort_by);
@@ -298,6 +324,13 @@ export const videoApi = {
       headers: getAuthHeaders(),
     });
     return handleResponse<{ success: boolean; data: { video: Video; user_progress?: any; next_video?: Video; previous_video?: Video } }>(response);
+  },
+
+  async get(id: number) {
+    const response = await fetch(`${API_BASE_URL}/videos/${id}`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<{ success: boolean; data: Video }>(response);
   },
 
   async create(data: Partial<Video>) {
@@ -326,11 +359,11 @@ export const videoApi = {
     return handleResponse<{ success: boolean; message: string }>(response);
   },
 
-  async getSeriesVideos(seriesId: number) {
-    const response = await fetch(`${API_BASE_URL}/series/${seriesId}/videos`, {
+  async getCategoryVideos(categoryId: number) {
+    const response = await fetch(`${API_BASE_URL}/categories/${categoryId}/videos`, {
       headers: getAuthHeaders(),
     });
-    return handleResponse<{ success: boolean; data: { videos: Video[]; user_progress?: any; series: Series } }>(response);
+    return handleResponse<{ success: boolean; data: { videos: Video[]; user_progress?: any; category: Category } }>(response);
   },
 };
 

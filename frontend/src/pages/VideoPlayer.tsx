@@ -28,15 +28,17 @@ import {
   ThumbsUp,
   ThumbsDown
 } from 'lucide-react';
-import { generateMockVideos, generateMockSeries, MockVideo, MockSeries } from '@/services/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { videoApi, categoryApi } from '@/services/videoApi';
+import { userProgressApi } from '@/services/userProgressApi';
+import { toast } from 'sonner';
 
 const VideoPlayer = () => {
   const { id } = useParams<{ id: string }>();
-  const [video, setVideo] = useState<MockVideo | null>(null);
-  const [series, setSeries] = useState<MockSeries | null>(null);
-  const [relatedVideos, setRelatedVideos] = useState<MockVideo[]>([]);
+  const [video, setVideo] = useState<any | null>(null);
+  const [category, setCategory] = useState<any | null>(null);
+  const [relatedVideos, setRelatedVideos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -48,64 +50,171 @@ const VideoPlayer = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [quality, setQuality] = useState('1080p');
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [progress, setProgress] = useState(45); // Mock progress
+  const [progress, setProgress] = useState(0);
+  const [userProgress, setUserProgress] = useState<any>(null);
   const [isLiked, setIsLiked] = useState(false);
   const [isDisliked, setIsDisliked] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
   const [question, setQuestion] = useState('');
-  const [questions, setQuestions] = useState([
-    { id: 1, user: 'John Doe', question: 'How does this work with React hooks?', time: '5:23', likes: 12 },
-    { id: 2, user: 'Jane Smith', question: 'Can you explain the useEffect dependency array?', time: '12:45', likes: 8 },
-  ]);
+  const [questions, setQuestions] = useState<any[]>([]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Simulate API call
     const fetchVideoData = async () => {
-      setLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockVideos = generateMockVideos();
-      const mockSeries = generateMockSeries();
-      
-      const foundVideo = mockVideos.find(v => v.id === parseInt(id || '1'));
-      const foundSeries = mockSeries.find(s => s.title.toLowerCase().includes(foundVideo?.series.toLowerCase() || ''));
-      const related = mockVideos.filter(v => v.id !== foundVideo?.id).slice(0, 4);
-      
-      setVideo(foundVideo || mockVideos[0]);
-      setSeries(foundSeries || mockSeries[0]);
-      setRelatedVideos(related);
-      setDuration(1800); // 30 minutes mock duration
-      setLoading(false);
+      try {
+        setLoading(true);
+        
+        // Fetch video details
+        const videoResponse = await videoApi.get(parseInt(id || '1'));
+        const videoData = videoResponse.success ? videoResponse.data : null;
+        setVideo(videoData);
+        
+        if (videoData) {
+          // Fetch category details
+          if (videoData.category_id) {
+            const categoryResponse = await categoryApi.get(videoData.category_id);
+            const categoryData = categoryResponse.success ? categoryResponse.data : null;
+            setCategory(categoryData);
+          }
+          
+          // Fetch related videos from the same category
+          if (videoData.category_id) {
+            const relatedResponse = await videoApi.getAll({ 
+              category_id: videoData.category_id, 
+              per_page: 5 
+            });
+            const relatedData = Array.isArray(relatedResponse.data) 
+              ? relatedResponse.data 
+              : relatedResponse.data?.data || [];
+            setRelatedVideos(relatedData.filter((v: any) => v.id !== videoData.id).slice(0, 4));
+          }
+          
+          // Fetch user progress if authenticated
+          if (user) {
+            try {
+              const progressResponse = await userProgressApi.getVideoProgress(videoData.id);
+              if (progressResponse.success && progressResponse.data) {
+                setUserProgress(progressResponse.data);
+                setProgress(progressResponse.data.progress_percentage || 0);
+                setCurrentTime(progressResponse.data.time_watched || 0);
+                setIsFavorite(progressResponse.data.is_favorite || false);
+              }
+            } catch (error) {
+              console.log('No progress found for this video');
+            }
+          }
+          
+          setDuration(videoData.duration || 0);
+        }
+        
+      } catch (error: any) {
+        console.error('Error loading video data:', error);
+        toast.error('Failed to load video');
+        setVideo(null);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    fetchVideoData();
-  }, [id]);
+    if (id) {
+      fetchVideoData();
+    }
+  }, [id, user]);
 
   const handlePlayPause = () => {
-    if (isPlaying) {
-      setIsPlaying(false);
-    } else {
-      setIsPlaying(true);
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play();
+      }
     }
   };
 
   const handleSeek = (time: number) => {
     setCurrentTime(time);
+    if (videoRef.current) {
+      videoRef.current.currentTime = time;
+    }
+  };
+
+  // Save progress periodically
+  useEffect(() => {
+    if (!user || !video || !isPlaying) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
+        const isCompleted = progressPercentage >= 90;
+        
+        await userProgressApi.updateVideoProgress(video.id, {
+          time_watched: Math.floor(currentTime),
+          video_duration: Math.floor(duration),
+          progress_percentage: Math.floor(progressPercentage),
+          is_completed: isCompleted,
+        });
+      } catch (error) {
+        console.error('Failed to save progress:', error);
+      }
+    }, 10000); // Save every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [user, video, isPlaying, currentTime, duration]);
+
+  // Update progress bar based on current time
+  useEffect(() => {
+    if (duration > 0) {
+      setProgress((currentTime / duration) * 100);
+    }
+  }, [currentTime, duration]);
+
+  const handleToggleFavorite = async () => {
+    if (!user || !video) {
+      toast.error('Please sign in to add favorites');
+      return;
+    }
+
+    try {
+      await userProgressApi.toggleFavorite(video.id);
+      setIsFavorite(!isFavorite);
+      toast.success(isFavorite ? 'Removed from favorites' : 'Added to favorites');
+    } catch (error) {
+      toast.error('Failed to update favorites');
+    }
   };
 
   const handleVolumeChange = (vol: number) => {
     setVolume(vol);
     setIsMuted(vol === 0);
+    if (videoRef.current) {
+      videoRef.current.volume = vol;
+    }
   };
 
   const toggleMute = () => {
-    setIsMuted(!isMuted);
+    const newMuted = !isMuted;
+    setIsMuted(newMuted);
+    if (videoRef.current) {
+      videoRef.current.muted = newMuted;
+    }
   };
 
   const toggleFullscreen = () => {
+    const videoContainer = videoRef.current?.parentElement;
+    if (!videoContainer) return;
+
+    if (!isFullscreen) {
+      if (videoContainer.requestFullscreen) {
+        videoContainer.requestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
     setIsFullscreen(!isFullscreen);
   };
 
@@ -219,20 +328,39 @@ const VideoPlayer = () => {
               </div>
             ) : (
               <>
-                {/* Mock Video Player */}
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-                  <Button
-                    size="lg"
-                    className="w-20 h-20 rounded-full"
-                    onClick={handlePlayPause}
-                  >
-                    {isPlaying ? (
-                      <Pause className="h-8 w-8" />
-                    ) : (
+                {/* Video Player */}
+                {(video.video_url_full || video.video_file_path || video.video_url) ? (
+                  <video
+                    ref={videoRef}
+                    src={video.video_url_full || video.video_url || video.video_file_path}
+                    className="w-full h-full"
+                    onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                    onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    poster={video.intro_image_url || video.intro_image || undefined}
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
+                    <div className="text-center">
+                      <Play className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">Video file not available</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Play/Pause Overlay */}
+                {!isPlaying && (video.video_url_full || video.video_file_path || video.video_url) && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                    <Button
+                      size="lg"
+                      className="w-20 h-20 rounded-full"
+                      onClick={handlePlayPause}
+                    >
                       <Play className="h-8 w-8 ml-1" />
-                    )}
-                  </Button>
-                </div>
+                    </Button>
+                  </div>
+                )}
 
                 {/* Video Controls */}
                 {showControls && (
@@ -356,9 +484,15 @@ const VideoPlayer = () => {
               <div>
                 <h1 className="text-2xl font-bold mb-2">{video.title}</h1>
                 <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                  <span>{video.views.toLocaleString()} views</span>
-                  <span>{video.duration}</span>
-                  <span>{new Date(video.uploadedAt).toLocaleDateString()}</span>
+                  <span>{(video.total_views || 0).toLocaleString()} views</span>
+                  <span>{formatTime(video.duration || 0)}</span>
+                  <span>{video.created_at ? new Date(video.created_at).toLocaleDateString() : 'N/A'}</span>
+                  {category && (
+                    <span className="flex items-center">
+                      <BookOpen className="h-3 w-3 mr-1" />
+                      {category.name}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="flex items-center space-x-2">
@@ -382,6 +516,14 @@ const VideoPlayer = () => {
                   }}
                 >
                   <ThumbsDown className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={isFavorite ? "default" : "outline"}
+                  size="sm"
+                  onClick={handleToggleFavorite}
+                >
+                  <Heart className={`h-4 w-4 mr-1 ${isFavorite ? 'fill-current' : ''}`} />
+                  {isFavorite ? 'Saved' : 'Save'}
                 </Button>
                 <Button variant="outline" size="sm">
                   <Share2 className="h-4 w-4 mr-1" />
@@ -474,9 +616,9 @@ const VideoPlayer = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{relatedVideo.title}</p>
-                    <p className="text-xs text-muted-foreground">{relatedVideo.duration}</p>
+                    <p className="text-xs text-muted-foreground">{formatTime(relatedVideo.duration || 0)}</p>
                   </div>
-                  {getVisibilityBadge(relatedVideo.visibility)}
+                  {relatedVideo.visibility && getVisibilityBadge(relatedVideo.visibility)}
                 </div>
               ))}
             </div>
