@@ -28,7 +28,7 @@ class AnalyticsController extends Controller
                 ->count();
             
             $totalRevenue = PaymentTransaction::where('status', 'completed')->sum('amount') ?? 0;
-            $totalViews = Video::sum('total_views') ?? 0;
+            $totalViews = Video::sum('views') ?? 0;
             $totalVideos = Video::count();
             $totalCategories = Category::count();
             
@@ -165,29 +165,26 @@ class AnalyticsController extends Controller
     {
         $limit = $request->get('limit', 10);
 
-        $topVideos = Video::select('videos.*')
-            ->with(['series'])
-            ->leftJoin('user_progress', 'videos.id', '=', 'user_progress.video_id')
-            ->selectRaw('
-                videos.*,
-                COALESCE(SUM(user_progress.views), 0) as total_views,
-                COALESCE(AVG(user_progress.completion_rate), 0) as avg_completion_rate,
-                COALESCE(AVG(user_progress.rating), 0) as avg_rating
-            ')
-            ->where('videos.status', 'published')
-            ->groupBy('videos.id')
-            ->orderBy('total_views', 'desc')
+        $topVideos = Video::with(['category'])
+            ->where('status', 'published')
+            ->orderBy('views', 'desc')
             ->limit($limit)
             ->get();
 
         $topVideosData = $topVideos->map(function ($video) {
+            // Calculate average completion rate and rating from user progress
+            $avgCompletionRate = UserProgress::where('video_id', $video->id)
+                ->avg('progress_percentage') ?? 0;
+            $avgRating = UserProgress::where('video_id', $video->id)
+                ->avg('rating') ?? 0;
+                
             return [
                 'id' => $video->id,
                 'title' => $video->title,
-                'series_title' => $video->series->title ?? 'N/A',
-                'views' => $video->total_views,
-                'completion_rate' => round($video->avg_completion_rate, 1),
-                'rating' => round($video->avg_rating, 1),
+                'category_title' => $video->category->name ?? 'N/A',
+                'views' => $video->views,
+                'completion_rate' => round($avgCompletionRate, 1),
+                'rating' => round($avgRating, 1),
                 'duration' => $video->duration,
             ];
         });
@@ -240,7 +237,10 @@ class AnalyticsController extends Controller
 
         // Top performing categories
         $topCategories = Category::withCount(['videos'])
-            ->orderBy('total_views', 'desc')
+            ->leftJoin('videos', 'categories.id', '=', 'videos.category_id')
+            ->selectRaw('categories.*, COALESCE(SUM(videos.views), 0) as total_category_views')
+            ->groupBy('categories.id')
+            ->orderBy('total_category_views', 'desc')
             ->limit(5)
             ->get();
 
@@ -248,9 +248,9 @@ class AnalyticsController extends Controller
             return [
                 'id' => $category->id,
                 'name' => $category->name,
-                'views' => $category->total_views ?? 0,
-                'video_count' => $category->videos()->count(),
-                'rating' => $category->rating ?? 0,
+                'views' => $category->total_category_views ?? 0,
+                'video_count' => $category->videos_count ?? 0,
+                'rating' => 0, // Can be calculated from video ratings if needed
             ];
         });
 
@@ -266,8 +266,8 @@ class AnalyticsController extends Controller
     public function engagementAnalytics(): JsonResponse
     {
         $engagement = [
-            'average_completion_rate' => UserProgress::avg('completion_rate'),
-            'total_watch_time' => UserProgress::sum(DB::raw('duration * completion_rate / 100')),
+            'average_completion_rate' => UserProgress::avg('progress_percentage'),
+            'total_watch_time' => UserProgress::sum('total_watch_time'),
             'average_session_duration' => $this->calculateAverageSessionTime(),
             'favorite_videos_count' => UserProgress::where('is_favorite', true)->count(),
             'completion_rate_by_category' => $this->getCompletionRateByCategory(),
@@ -284,7 +284,8 @@ class AnalyticsController extends Controller
      */
     private function calculateAverageSessionTime(): string
     {
-        $avgMinutes = UserProgress::avg(DB::raw('duration * completion_rate / 100')) / 60;
+        $avgSeconds = UserProgress::avg('time_watched') ?? 0;
+        $avgMinutes = $avgSeconds / 60;
         $hours = floor($avgMinutes / 60);
         $minutes = floor($avgMinutes % 60);
         
@@ -353,12 +354,11 @@ class AnalyticsController extends Controller
      */
     private function getCompletionRateByCategory(): array
     {
-        return UserProgress::join('videos', 'user_progress.video_id', '=', 'videos.id')
-            ->join('series', 'videos.series_id', '=', 'series.id')
-            ->join('categories', 'series.category_id', '=', 'categories.id')
+        $result = UserProgress::join('videos', 'user_progress.video_id', '=', 'videos.id')
+            ->join('categories', 'videos.category_id', '=', 'categories.id')
             ->select(
                 'categories.name as category_name',
-                DB::raw('AVG(user_progress.completion_rate) as avg_completion_rate'),
+                DB::raw('AVG(user_progress.progress_percentage) as avg_completion_rate'),
                 DB::raw('COUNT(*) as total_views')
             )
             ->groupBy('categories.id', 'categories.name')
@@ -372,5 +372,8 @@ class AnalyticsController extends Controller
                 ];
             })
             ->toArray();
+            
+        // Return empty array if no data
+        return $result ?: [];
     }
 }

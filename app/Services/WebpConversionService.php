@@ -45,11 +45,12 @@ class WebpConversionService
 
         // If file is already WebP, just move it
         if ($file->getMimeType() === 'image/webp') {
-            $file->storeAs('public/' . $directory, $filename);
+            // Use Storage facade with 'public' disk to save to storage/app/public
+            \Storage::disk('public')->putFileAs($directory, $file, $filename);
             return [
                 'success' => true,
                 'path' => $fullPath,
-                'url' => 'http://localhost:8000/data_section/image/' . $filename,
+                'url' => url('storage/' . $fullPath),
                 'filename' => $filename,
                 'size' => $file->getSize(),
                 'mime_type' => 'image/webp'

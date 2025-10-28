@@ -110,12 +110,32 @@ class UserProgress extends Model
         $progressPercentage = $videoDuration > 0 ? min(100, round(($timeWatched / $videoDuration) * 100)) : 0;
         $isCompleted = $progressPercentage >= 90; // Consider 90% as completed
 
-        $progress = static::updateOrCreate(
-            [
+        // Find existing progress
+        $progress = static::where('user_id', $user->id)
+            ->where('video_id', $video->id)
+            ->first();
+
+        if ($progress) {
+            // Update existing progress with DB::raw for increments
+            $progress->update([
+                'category_id' => $video->category_id,
+                'progress_percentage' => $progressPercentage,
+                'time_watched' => $timeWatched,
+                'last_position' => $timeWatched,
+                'is_completed' => $isCompleted,
+                'completed_at' => $isCompleted ? now() : $progress->completed_at,
+                'video_duration' => $videoDuration,
+                'last_watched_at' => now(),
+            ]);
+            
+            // Use raw SQL for incrementing watch_count and total_watch_time
+            $progress->increment('watch_count');
+            $progress->increment('total_watch_time', $timeWatched);
+        } else {
+            // Create new progress record
+            $progress = static::create([
                 'user_id' => $user->id,
                 'video_id' => $video->id,
-            ],
-            [
                 'category_id' => $video->category_id,
                 'progress_percentage' => $progressPercentage,
                 'time_watched' => $timeWatched,
@@ -123,19 +143,19 @@ class UserProgress extends Model
                 'is_completed' => $isCompleted,
                 'completed_at' => $isCompleted ? now() : null,
                 'video_duration' => $videoDuration,
-                'watch_count' => \DB::raw('watch_count + 1'),
+                'watch_count' => 1,
                 'last_watched_at' => now(),
-                'total_watch_time' => \DB::raw('total_watch_time + ' . $timeWatched),
-                'first_watched_at' => \DB::raw('COALESCE(first_watched_at, NOW())'),
-            ]
-        );
+                'total_watch_time' => $timeWatched,
+                'first_watched_at' => now(),
+            ]);
+        }
 
         // Update category progress
         if ($video->category_id) {
             $progress->updateCategoryProgress($user, $video->category);
         }
 
-        return $progress;
+        return $progress->fresh();
     }
 
     /**

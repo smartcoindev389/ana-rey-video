@@ -1014,7 +1014,7 @@ const ContentManagement = () => {
                       </TableCell>
                       <TableCell>
                         <span className="text-sm truncate block">
-                          {series.find(s => s.id === video.series_id)?.title || `Series #${video.series_id}`}
+                          {series.find(s => s.id === video.series_id)?.name || series.find(s => s.id === video.series_id)?.title || `Series #${video.series_id}`}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -1111,7 +1111,7 @@ const ContentManagement = () => {
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium text-lg mb-1 line-clamp-1">{video.title}</h3>
                       <p className="text-sm text-muted-foreground mb-3">
-                        Series: {series.find(s => s.id === video.series_id)?.title || `Series #${video.series_id}`}
+                        Series: {series.find(s => s.id === video.series_id)?.name || series.find(s => s.id === video.series_id)?.title || `Series #${video.series_id}`}
                       </p>
                       
                       <div className="flex flex-wrap gap-2 mb-3">

@@ -7,39 +7,46 @@ return [
     | Cross-Origin Resource Sharing (CORS) Configuration
     |--------------------------------------------------------------------------
     |
-    | Here you may configure your settings for cross-origin resource sharing
-    | or "CORS". This determines what cross-origin operations may execute
-    | in web browsers. You are free to adjust these settings as needed.
+    | This configuration allows your React frontend to make authenticated
+    | requests (including Range requests for video streaming) to your
+    | Laravel backend during local development.
     |
-    | To learn more: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+    | DO NOT use '*' when supports_credentials = true — browsers will block it.
     |
     */
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
-
-    'allowed_methods' => ['*'],
-
-    'allowed_origins' => [
-        'http://localhost:5173',
-        'http://localhost:3000',
-        'http://localhost:8080',
-        'http://localhost:8081',
-        'http://127.0.0.1:5173',
-        'http://127.0.0.1:3000',
-        'http://127.0.0.1:8080',
-        'http://127.0.0.1:8081',
-        '*', // Allow all origins for development
+    // All API routes and Sanctum cookie route
+    'paths' => [
+        'api/*',
+        'sanctum/csrf-cookie',
+        'storage/*'
     ],
 
+    // Allow all HTTP verbs (GET, POST, PUT, DELETE, OPTIONS, etc.)
+    'allowed_methods' => ['*'],
+
+    // ✅ List your exact frontend origins (no wildcard!)
+    'allowed_origins' => [
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+    ],
+
+    // Optional regex patterns for origins
     'allowed_origins_patterns' => [],
 
+    // Allow all headers so Range and Authorization are included
     'allowed_headers' => ['*'],
 
-    'exposed_headers' => [],
+    // Expose headers needed for video playback
+    'exposed_headers' => [
+        'Content-Length',
+        'Content-Range',
+        'Accept-Ranges',
+    ],
 
-    'max_age' => 0,
+    // Cache preflight response for 1 hour
+    'max_age' => 3600,
 
+    // ✅ Required when using Sanctum / use-credentials
     'supports_credentials' => true,
-
 ];
-

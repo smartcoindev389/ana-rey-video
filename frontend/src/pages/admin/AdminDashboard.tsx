@@ -37,13 +37,17 @@ const AdminDashboard = () => {
           analyticsApi.getTopVideos({ limit: 10 }),
         ]);
         
+        console.log('Overview Response:', overviewRes);
+        console.log('Subscription Response:', subscriptionRes);
+        console.log('Top Videos Response:', topVideosRes);
+        
         setOverview(overviewRes.success ? overviewRes.data : null);
         setSubscriptionStats(subscriptionRes.success ? subscriptionRes.data : null);
         setTopVideos(topVideosRes.success ? (topVideosRes.data || []) : []);
         
       } catch (error: any) {
         console.error('Error loading analytics:', error);
-        toast.error('Failed to load analytics data');
+        toast.error('Failed to load analytics data: ' + error.message);
       } finally {
         setLoading(false);
       }
@@ -210,36 +214,50 @@ const AdminDashboard = () => {
             <h3 className="text-lg font-semibold">Subscription Distribution</h3>
           </div>
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
-                <span className="text-sm">Freemium</span>
-              </div>
-              <div className="text-right">
-                <div className="text-sm font-medium">{subscriptionStats.freemium.count}</div>
-                <div className="text-xs text-muted-foreground">{subscriptionStats.freemium.percentage}%</div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-                <span className="text-sm">Basic</span>
-              </div>
-              <div className="text-right">
-                <div className="text-sm font-medium">{subscriptionStats.basic.count}</div>
-                <div className="text-xs text-muted-foreground">{subscriptionStats.basic.percentage}%</div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
-                <span className="text-sm">Premium</span>
-              </div>
-              <div className="text-right">
-                <div className="text-sm font-medium">{subscriptionStats.premium.count}</div>
-                <div className="text-xs text-muted-foreground">{subscriptionStats.premium.percentage}%</div>
-              </div>
-            </div>
+            {subscriptionStats?.subscription_breakdown && (() => {
+              const { freemium = 0, basic = 0, premium = 0 } = subscriptionStats.subscription_breakdown;
+              const total = freemium + basic + premium;
+              return (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                      <span className="text-sm">Freemium</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium">{freemium}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {total > 0 ? ((freemium / total) * 100).toFixed(1) : 0}%
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                      <span className="text-sm">Basic</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium">{basic}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {total > 0 ? ((basic / total) * 100).toFixed(1) : 0}%
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
+                      <span className="text-sm">Premium</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium">{premium}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {total > 0 ? ((premium / total) * 100).toFixed(1) : 0}%
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </Card>
 
@@ -251,23 +269,23 @@ const AdminDashboard = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <TrendingUp className="h-4 w-4 text-muted-foreground mr-2" />
-                <span className="text-sm">Conversion Rate</span>
+                <span className="text-sm">Total Subscriptions</span>
               </div>
-              <Badge variant="secondary">{overview.conversionRate}%</Badge>
+              <Badge variant="secondary">{subscriptionStats?.total_subscriptions || 0}</Badge>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <Activity className="h-4 w-4 text-muted-foreground mr-2" />
-                <span className="text-sm">Churn Rate</span>
+                <span className="text-sm">Active Subs</span>
               </div>
-              <Badge variant="secondary">{overview.churnRate}%</Badge>
+              <Badge variant="secondary">{subscriptionStats?.active_subscriptions || 0}</Badge>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <Star className="h-4 w-4 text-muted-foreground mr-2" />
-                <span className="text-sm">Avg. Session</span>
+                <span className="text-sm">MRR</span>
               </div>
-              <Badge variant="secondary">{overview.averageSessionTime}</Badge>
+              <Badge variant="secondary">{formatCurrency(subscriptionStats?.monthly_recurring_revenue || 0)}</Badge>
             </div>
           </div>
         </Card>
@@ -279,15 +297,15 @@ const AdminDashboard = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Total Revenue</span>
-              <span className="text-sm font-medium">{formatCurrency(overview.totalRevenue)}</span>
+              <span className="text-sm font-medium">{formatCurrency(overview?.total_revenue || 0)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Active Users</span>
-              <span className="text-sm font-medium">{formatNumber(overview.activeUsers)}</span>
+              <span className="text-sm text-muted-foreground">Avg Revenue/User</span>
+              <span className="text-sm font-medium">{formatCurrency(subscriptionStats?.average_revenue_per_user || 0)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Video Views</span>
-              <span className="text-sm font-medium">{formatNumber(overview.totalViews)}</span>
+              <span className="text-sm font-medium">{formatNumber(overview?.total_views || 0)}</span>
             </div>
           </div>
         </Card>
@@ -329,11 +347,14 @@ const AdminDashboard = () => {
                     <div className="flex items-center space-x-4 text-xs text-muted-foreground">
                       <span className="flex items-center">
                         <Eye className="h-3 w-3 mr-1" />
-                        {formatNumber(video.total_views || 0)} views
+                        {formatNumber(video.views || 0)} views
                       </span>
                       <span className="flex items-center">
                         <Star className="h-3 w-3 mr-1" />
                         {(video.rating || 0).toFixed(1)}
+                      </span>
+                      <span className="text-xs">
+                        {video.completion_rate || 0}% completion
                       </span>
                     </div>
                   </div>

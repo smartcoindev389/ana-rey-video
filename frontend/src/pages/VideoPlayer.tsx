@@ -69,19 +69,38 @@ const VideoPlayer = () => {
         
         // Fetch video details
         const videoResponse = await videoApi.get(parseInt(id || '1'));
-        const videoData = videoResponse.success ? videoResponse.data : null;
+        
+        if (!videoResponse || !videoResponse.success) {
+          throw new Error('Failed to fetch video data');
+        }
+        
+        // Backend returns { success, data: { video, user_progress, next_video, previous_video } }
+        const videoData = videoResponse.data.video;
+        const existingProgress = videoResponse.data.user_progress;
+        
+        if (!videoData) {
+          throw new Error('No video data received');
+        }
+        
         setVideo(videoData);
         
-        if (videoData) {
-          // Fetch category details
-          if (videoData.category_id) {
-            const categoryResponse = await categoryApi.get(videoData.category_id);
-            const categoryData = categoryResponse.success ? categoryResponse.data : null;
-            setCategory(categoryData);
-          }
-          
-          // Fetch related videos from the same category
-          if (videoData.category_id) {
+        // Debug: Log video URLs
+        console.log('Video data loaded:', {
+          id: videoData.id,
+          title: videoData.title,
+          video_url_full: videoData.video_url_full,
+          video_url: videoData.video_url,
+          video_file_path: videoData.video_file_path,
+        });
+        
+        // Check if category is already loaded in the video object
+        if (videoData.category) {
+          setCategory(videoData.category);
+        }
+        
+        // Fetch related videos from the same category
+        if (videoData.category_id) {
+          try {
             const relatedResponse = await videoApi.getAll({ 
               category_id: videoData.category_id, 
               per_page: 5 
@@ -90,29 +109,24 @@ const VideoPlayer = () => {
               ? relatedResponse.data 
               : relatedResponse.data?.data || [];
             setRelatedVideos(relatedData.filter((v: any) => v.id !== videoData.id).slice(0, 4));
+          } catch (error) {
+            console.error('Failed to fetch related videos:', error);
           }
-          
-          // Fetch user progress if authenticated
-          if (user) {
-            try {
-              const progressResponse = await userProgressApi.getVideoProgress(videoData.id);
-              if (progressResponse.success && progressResponse.data) {
-                setUserProgress(progressResponse.data);
-                setProgress(progressResponse.data.progress_percentage || 0);
-                setCurrentTime(progressResponse.data.time_watched || 0);
-                setIsFavorite(progressResponse.data.is_favorite || false);
-              }
-            } catch (error) {
-              console.log('No progress found for this video');
-            }
-          }
-          
-          setDuration(videoData.duration || 0);
         }
+        
+        // Use progress data that was included in the initial response
+        if (existingProgress) {
+          setUserProgress(existingProgress);
+          setProgress(existingProgress.progress_percentage || 0);
+          setCurrentTime(existingProgress.time_watched || 0);
+          setIsFavorite(existingProgress.is_favorite || false);
+        }
+        
+        setDuration(videoData.duration || 0);
         
       } catch (error: any) {
         console.error('Error loading video data:', error);
-        toast.error('Failed to load video');
+        toast.error(error.message || 'Failed to load video');
         setVideo(null);
       } finally {
         setLoading(false);
@@ -239,6 +253,10 @@ const VideoPlayer = () => {
   };
 
   const canAccessVideo = (videoVisibility: string) => {
+    // Admin can access all content
+    if (user && (user.role === 'admin' || user.subscription_type === 'admin' || user.is_admin)) {
+      return true;
+    }
     if (!user) return videoVisibility === 'freemium';
     if (videoVisibility === 'freemium') return true;
     if (videoVisibility === 'basic') return ['basic', 'premium'].includes(user.subscription_type);
@@ -331,15 +349,61 @@ const VideoPlayer = () => {
                 {/* Video Player */}
                 {(video.video_url_full || video.video_file_path || video.video_url) ? (
                   <video
+                    key={video.id}
                     ref={videoRef}
                     src={video.video_url_full || video.video_url || video.video_file_path}
                     className="w-full h-full"
-                    onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-                    onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
+                    controls
+                    playsInline
+                    preload="auto"
+                    crossOrigin="use-credentials"
                     poster={video.intro_image_url || video.intro_image || undefined}
-                  />
+                    onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                    onLoadedMetadata={(e) => {
+                      const duration = e.currentTarget.duration;
+                      setDuration(duration);
+                      console.log('✅ Video metadata loaded');
+                      console.log('Duration:', duration, 'seconds');
+                      console.log('Video URL:', e.currentTarget.src);
+                    }}
+                    onCanPlay={() => {
+                      console.log('✅ Video ready to play');
+                    }}
+                    onPlay={() => {
+                      setIsPlaying(true);
+                      console.log('▶️ Video playing');
+                    }}
+                    onPause={() => {
+                      setIsPlaying(false);
+                      console.log('⏸️ Video paused');
+                    }}
+                    onError={(e) => {
+                      const error = e.currentTarget.error;
+                      console.error('❌ Video error:', {
+                        code: error?.code,
+                        message: error?.message,
+                        src: e.currentTarget.src
+                      });
+                      
+                      if (error?.code === 3) {
+                        // Code 3 = MEDIA_ERR_DECODE (audio/video codec issue)
+                        // Often an audio codec problem - try to continue playing without audio
+                        console.warn('⚠️ Audio codec not supported, attempting to play video without audio');
+                        
+                        // Don't show error toast for audio codec issues
+                        // The video might still play with video track only
+                        return;
+                      }
+                      
+                      if (error?.code === 4) {
+                        toast.error('Video format not supported');
+                      } else if (error?.code === 2) {
+                        toast.error('Network error loading video');
+                      }
+                    }}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
                     <div className="text-center">
@@ -349,21 +413,10 @@ const VideoPlayer = () => {
                   </div>
                 )}
 
-                {/* Play/Pause Overlay */}
-                {!isPlaying && (video.video_url_full || video.video_file_path || video.video_url) && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                    <Button
-                      size="lg"
-                      className="w-20 h-20 rounded-full"
-                      onClick={handlePlayPause}
-                    >
-                      <Play className="h-8 w-8 ml-1" />
-                    </Button>
-                  </div>
-                )}
+                {/* Play/Pause Overlay - Removed to avoid interfering with native controls */}
 
-                {/* Video Controls */}
-                {showControls && (
+                {/* Video Controls - Hidden, using native browser controls instead */}
+                {false && showControls && (
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
                     {/* Progress Bar */}
                     <div className="mb-4">
@@ -542,8 +595,8 @@ const VideoPlayer = () => {
             </div>
           </div>
 
-          {/* Q&A Section (Premium Users) */}
-          {user?.subscription_type === 'premium' && (
+          {/* Q&A Section (Premium Users and Admins) */}
+          {(user?.subscription_type === 'premium' || user?.role === 'admin' || user?.subscription_type === 'admin' || user?.is_admin) && (
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">Ask a Question</h3>
               <div className="space-y-4">
@@ -586,12 +639,14 @@ const VideoPlayer = () => {
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span>Overall Progress</span>
-                <span>3 of 8 videos</span>
+                <span>{relatedVideos.length > 0 ? `1 of ${relatedVideos.length + 1}` : '1 of 1'} videos</span>
               </div>
-              <Progress value={37.5} className="h-2" />
-              <div className="text-xs text-muted-foreground">
-                {series?.totalDuration} remaining
-              </div>
+              <Progress value={relatedVideos.length > 0 ? (1 / (relatedVideos.length + 1)) * 100 : 100} className="h-2" />
+              {relatedVideos.length > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  {relatedVideos.length} more video{relatedVideos.length !== 1 ? 's' : ''} in this category
+                </div>
+              )}
             </div>
           </Card>
 

@@ -97,6 +97,10 @@ const SeriesDetail = () => {
   };
 
   const canAccessVideo = (videoVisibility: string) => {
+    // Admin can access all content
+    if (user && (user.role === 'admin' || user.subscription_type === 'admin' || user.is_admin)) {
+      return true;
+    }
     if (!user) return videoVisibility === 'freemium';
     if (videoVisibility === 'freemium') return true;
     if (videoVisibility === 'basic') return ['basic', 'premium'].includes(user.subscription_type);

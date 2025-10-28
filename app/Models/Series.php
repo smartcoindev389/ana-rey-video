@@ -143,10 +143,15 @@ class Series extends Model
      */
     public function scopeVisibleTo($query, string $subscriptionType)
     {
+        // Admin can see all content
+        if ($subscriptionType === 'admin') {
+            return $query;
+        }
+        
         return $query->where(function ($q) use ($subscriptionType) {
             $q->where('visibility', 'freemium')
               ->orWhere('visibility', 'basic')
-              ->when($subscriptionType === 'premium' || $subscriptionType === 'admin', function ($qq) {
+              ->when($subscriptionType === 'premium', function ($qq) {
                   $qq->orWhere('visibility', 'premium');
               });
         });

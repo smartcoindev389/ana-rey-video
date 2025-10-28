@@ -44,6 +44,8 @@ Route::get('/series', [SeriesController::class, 'index']);
 Route::get('/series/{series}', [SeriesController::class, 'show']);
 Route::get('/videos', [VideoController::class, 'index']);
 Route::get('/videos/{video}', [VideoController::class, 'show']);
+// Public video streaming (checks permissions internally)
+Route::get('/videos/{video}/stream', [VideoController::class, 'stream']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -187,7 +189,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/series/{series}/accessible', [SeriesController::class, 'isAccessibleTo']);
 
     // Videos (additional authenticated routes)
-    Route::get('/videos/{video}/stream', [VideoController::class, 'stream']);
     Route::get('/videos/{video}/accessible', [VideoController::class, 'isAccessibleTo']);
 
     // User support and feedback routes

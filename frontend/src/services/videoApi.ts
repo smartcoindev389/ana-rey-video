@@ -330,7 +330,7 @@ export const videoApi = {
     const response = await fetch(`${API_BASE_URL}/videos/${id}`, {
       headers: getAuthHeaders(),
     });
-    return handleResponse<{ success: boolean; data: Video }>(response);
+    return handleResponse<{ success: boolean; data: { video: Video; user_progress?: any; next_video?: Video; previous_video?: Video } }>(response);
   },
 
   async create(data: Partial<Video>) {

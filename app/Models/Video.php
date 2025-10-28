@@ -76,7 +76,7 @@ class Video extends Model
         'price' => 'decimal:2',
     ];
 
-    protected $appends = ['video_url_full', 'intro_image_url', 'thumbnail_url'];
+    protected $appends = ['video_url_full', 'intro_image_url', 'thumbnail_url', 'series_id'];
 
     /**
      * Get the route key for the model.
@@ -154,8 +154,8 @@ class Video extends Model
             if (str_starts_with($this->video_file_path, 'http')) {
                 return $this->video_file_path;
             }
-            // Otherwise, build the URL from storage path
-            return url('storage/' . $this->video_file_path);
+            // Use streaming endpoint - it properly handles Range requests which are required for video playback
+            return url("api/videos/{$this->id}/stream");
         }
         return $this->video_url;
     }
@@ -189,6 +189,14 @@ class Video extends Model
     }
 
     /**
+     * Get series_id (alias for category_id for frontend compatibility).
+     */
+    public function getSeriesIdAttribute(): ?int
+    {
+        return $this->category_id;
+    }
+
+    /**
      * Scope a query to only include published videos.
      */
     public function scopePublished($query)
@@ -203,10 +211,15 @@ class Video extends Model
      */
     public function scopeVisibleTo($query, string $subscriptionType)
     {
+        // Admin can see all content
+        if ($subscriptionType === 'admin') {
+            return $query;
+        }
+        
         return $query->where(function ($q) use ($subscriptionType) {
             $q->where('visibility', 'freemium')
               ->orWhere('visibility', 'basic')
-              ->when($subscriptionType === 'premium' || $subscriptionType === 'admin', function ($qq) {
+              ->when($subscriptionType === 'premium', function ($qq) {
                   $qq->orWhere('visibility', 'premium');
               });
         });

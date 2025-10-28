@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Video;
 use App\Models\Series;
 use App\Services\WebpConversionService;
+use App\Services\VideoTranscodingService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
@@ -15,10 +16,14 @@ use Illuminate\Support\Facades\Auth;
 class VideoController extends Controller
 {
     protected $webpService;
+    protected $transcodingService;
 
-    public function __construct(WebpConversionService $webpService)
-    {
+    public function __construct(
+        WebpConversionService $webpService,
+        VideoTranscodingService $transcodingService
+    ) {
         $this->webpService = $webpService;
+        $this->transcodingService = $transcodingService;
     }
     /**
      * Display a listing of videos.
@@ -103,6 +108,8 @@ class VideoController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+
+        // var_dump($request->all());
         $validated = $request->validate([
             'title' => 'required|string|max:255|unique:videos,title',
             'description' => 'nullable|string',
@@ -156,16 +163,83 @@ class VideoController extends Controller
         // Handle video file upload
         if ($request->hasFile('video_file')) {
             try {
+                \Log::info('Video file upload started', [
+                    'filename' => $request->file('video_file')->getClientOriginalName(),
+                    'size' => $request->file('video_file')->getSize(),
+                    'mime' => $request->file('video_file')->getMimeType(),
+                ]);
+                
                 $videoUploadResult = $this->webpService->saveVideo($request->file('video_file'));
-                $validated['video_file_path'] = $videoUploadResult['path'];
-                $validated['file_size'] = $videoUploadResult['size'];
-                $validated['video_format'] = pathinfo($videoUploadResult['filename'], PATHINFO_EXTENSION);
+                $originalPath = $videoUploadResult['path'];
+                
+                \Log::info('Video file uploaded successfully', [
+                    'path' => $originalPath,
+                    'size' => $videoUploadResult['size'],
+                ]);
+                
+                // Re-encode video with web-compatible codecs (H.264 + AAC)
+                // This fixes audio codec issues that prevent playback in browsers
+                try {
+                    \Log::info('Starting video re-encoding for web compatibility');
+                    
+                    $reencodeResult = $this->transcodingService->reencodeStorageVideo(
+                        $originalPath,
+                        [
+                            'audio_bitrate' => 128,      // 128kbps AAC audio (good quality)
+                            'video_quality' => 23,       // CRF 23 (good quality, smaller file)
+                            'preset' => 'medium',        // Encoding speed preset
+                            'delete_original' => true,   // Delete original to save space
+                        ]
+                    );
+                    
+                    if ($reencodeResult['success']) {
+                        \Log::info('Video re-encoded successfully', [
+                            'original_path' => $originalPath,
+                            'new_path' => $reencodeResult['relative_path'],
+                            'original_size' => $reencodeResult['original_size'],
+                            'new_size' => $reencodeResult['new_size'],
+                            'size_saved' => $reencodeResult['original_size'] - $reencodeResult['new_size'],
+                        ]);
+                        
+                        // Use re-encoded video
+                        $validated['video_file_path'] = $reencodeResult['relative_path'];
+                        $validated['file_size'] = $reencodeResult['new_size'];
+                    } else {
+                        \Log::warning('Video re-encoding failed, using original', [
+                            'error' => $reencodeResult['message'],
+                        ]);
+                        
+                        // Fall back to original video
+                        $validated['video_file_path'] = $originalPath;
+                        $validated['file_size'] = $videoUploadResult['size'];
+                    }
+                } catch (\Exception $e) {
+                    \Log::error('Video re-encoding error', [
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+                    
+                    // Fall back to original video if re-encoding fails
+                    $validated['video_file_path'] = $originalPath;
+                    $validated['file_size'] = $videoUploadResult['size'];
+                }
+                
+                $validated['video_format'] = pathinfo($validated['video_file_path'], PATHINFO_EXTENSION);
             } catch (\Exception $e) {
+                \Log::error('Video file upload failed', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
                 return response()->json([
                     'success' => false,
                     'message' => 'Failed to upload video file: ' . $e->getMessage(),
                 ], 500);
             }
+        } else {
+            \Log::warning('No video file in request', [
+                'has_video_file' => $request->hasFile('video_file'),
+                'all_files' => array_keys($request->allFiles()),
+            ]);
         }
 
         // Handle intro image file upload
@@ -329,6 +403,12 @@ class VideoController extends Controller
         // Handle video file upload
         if ($request->hasFile('video_file')) {
             try {
+                \Log::info('Video file update started', [
+                    'video_id' => $video->id,
+                    'filename' => $request->file('video_file')->getClientOriginalName(),
+                    'size' => $request->file('video_file')->getSize(),
+                ]);
+                
                 // Delete old video file if exists
                 if ($video->video_file_path) {
                     $this->webpService->deleteFile($video->video_file_path);
@@ -338,12 +418,23 @@ class VideoController extends Controller
                 $validated['video_file_path'] = $videoUploadResult['path'];
                 $validated['file_size'] = $videoUploadResult['size'];
                 $validated['video_format'] = pathinfo($videoUploadResult['filename'], PATHINFO_EXTENSION);
+                
+                \Log::info('Video file updated successfully', [
+                    'path' => $videoUploadResult['path'],
+                ]);
             } catch (\Exception $e) {
+                \Log::error('Video file update failed', [
+                    'error' => $e->getMessage(),
+                ]);
                 return response()->json([
                     'success' => false,
                     'message' => 'Failed to upload video file: ' . $e->getMessage(),
                 ], 500);
             }
+        } else {
+            \Log::info('No new video file in update request', [
+                'video_id' => $video->id,
+            ]);
         }
 
         // Handle intro image file upload
@@ -471,7 +562,7 @@ class VideoController extends Controller
     /**
      * Get video streaming URL.
      */
-    public function stream(Request $request, Video $video): JsonResponse
+    public function stream(Request $request, Video $video)
     {
         $user = Auth::user();
 
@@ -483,15 +574,70 @@ class VideoController extends Controller
             ], 403);
         }
 
+        // If video_file_path exists, stream the actual file with proper headers
+        if ($video->video_file_path) {
+            $path = storage_path('app/public/' . $video->video_file_path);
+            
+            if (!file_exists($path)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Video file not found.',
+                ], 404);
+            }
+
+            $fileSize = filesize($path);
+            $mimeType = mime_content_type($path);
+            
+            // Handle Range requests for video seeking
+            $headers = [
+                'Content-Type' => $mimeType,
+                'Content-Length' => $fileSize,
+                'Accept-Ranges' => 'bytes',
+                'Cache-Control' => 'public, max-age=31536000',
+                'Access-Control-Allow-Origin' => '*',
+                'Access-Control-Allow-Methods' => 'GET, HEAD, OPTIONS',
+                'Access-Control-Allow-Headers' => 'Range',
+                'Access-Control-Expose-Headers' => 'Content-Length, Content-Range',
+            ];
+
+            // Check if this is a range request
+            if ($request->header('Range')) {
+                $range = $request->header('Range');
+                $range = str_replace('bytes=', '', $range);
+                $rangeParts = explode('-', $range);
+                $start = intval($rangeParts[0]);
+                $end = isset($rangeParts[1]) && $rangeParts[1] !== '' ? intval($rangeParts[1]) : $fileSize - 1;
+                
+                $length = $end - $start + 1;
+                
+                $headers['Content-Range'] = "bytes {$start}-{$end}/{$fileSize}";
+                $headers['Content-Length'] = $length;
+                
+                return response()->stream(function () use ($path, $start, $length) {
+                    $stream = fopen($path, 'rb');
+                    fseek($stream, $start);
+                    echo fread($stream, $length);
+                    fclose($stream);
+                }, 206, $headers);
+            }
+
+            // Full file response
+            return response()->stream(function () use ($path) {
+                $stream = fopen($path, 'rb');
+                fpassthru($stream);
+                fclose($stream);
+            }, 200, $headers);
+        }
+
+        // Fallback to JSON response with URLs
         $quality = $request->get('quality', 'auto');
         $streamingUrls = [];
 
-        // Get appropriate streaming URL based on quality
         if ($quality === 'auto') {
             $streamingUrls = [
                 'hls' => $video->hls_url,
                 'dash' => $video->dash_url,
-                'direct' => $video->video_url,
+                'direct' => $video->video_url_full,
             ];
         } else {
             $streamingUrls = $video->streaming_urls;
