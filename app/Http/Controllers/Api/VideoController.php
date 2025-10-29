@@ -594,10 +594,7 @@ class VideoController extends Controller
                 'Content-Length' => $fileSize,
                 'Accept-Ranges' => 'bytes',
                 'Cache-Control' => 'public, max-age=31536000',
-                'Access-Control-Allow-Origin' => '*',
-                'Access-Control-Allow-Methods' => 'GET, HEAD, OPTIONS',
-                'Access-Control-Allow-Headers' => 'Range',
-                'Access-Control-Expose-Headers' => 'Content-Length, Content-Range',
+                // CORS headers are handled globally by HandleCors middleware
             ];
 
             // Check if this is a range request

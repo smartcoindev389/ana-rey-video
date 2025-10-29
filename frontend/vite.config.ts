@@ -8,10 +8,6 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "0.0.0.0",
     port: 3000,
-    hmr: {
-      host: "192.168.126.103",  // Use server's IP instead of localhost
-      port: 3000,
-    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
