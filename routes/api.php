@@ -90,6 +90,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/admin/videos', [VideoController::class, 'store']);
         Route::put('/admin/videos/{id}', [VideoController::class, 'update']);
         Route::delete('/admin/videos/{id}', [VideoController::class, 'destroy']);
+        Route::post('/admin/videos/{id}/reencode', [VideoController::class, 'reencode']);
         
         // Admin read access to series and videos (for admin panel)
         Route::get('/admin/series', [SeriesController::class, 'index']);

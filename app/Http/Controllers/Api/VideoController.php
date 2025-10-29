@@ -671,4 +671,75 @@ class VideoController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Re-encode video with web-compatible codecs (admin only)
+     */
+    public function reencode(Request $request, $id): JsonResponse
+    {
+        $video = Video::findOrFail($id);
+
+        if (!$video->video_file_path) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Video has no file path to re-encode',
+            ], 400);
+        }
+
+        $fullPath = storage_path('app/public/' . $video->video_file_path);
+        
+        if (!file_exists($fullPath)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Video file not found: ' . $video->video_file_path,
+            ], 404);
+        }
+
+        try {
+            $options = [
+                'audio_bitrate' => 128,
+                'video_quality' => 23,
+                'preset' => 'medium',
+                'delete_original' => true,
+            ];
+
+            $result = $this->transcodingService->reencodeStorageVideo(
+                $video->video_file_path,
+                $options
+            );
+
+            if ($result['success']) {
+                $video->video_file_path = $result['relative_path'];
+                $video->file_size = $result['new_size'];
+                $video->save();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Video re-encoded successfully',
+                    'data' => [
+                        'video' => $video,
+                        'original_size' => $result['original_size'],
+                        'new_size' => $result['new_size'],
+                        'size_saved' => $result['original_size'] - $result['new_size'],
+                    ],
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Re-encoding failed: ' . $result['message'],
+                ], 500);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Video re-encoding failed', [
+                'video_id' => $video->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Re-encoding failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 }
