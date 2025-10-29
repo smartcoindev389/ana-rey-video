@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => ({
     host: "0.0.0.0",
     port: 3000,
     hmr: {
-      host: "localhost",
+      host: "192.168.126.103",  // Use server's IP instead of localhost
       port: 3000,
     },
   },

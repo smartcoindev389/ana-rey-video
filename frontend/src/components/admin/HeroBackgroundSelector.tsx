@@ -67,7 +67,11 @@ const HeroBackgroundSelector: React.FC<HeroBackgroundSelectorProps> = ({
       setLoading(true);
       const response = await heroBackgroundApi.getAll();
       if (response.success) {
-        setBackgrounds(response.data?.data || response.data || []);
+        // Handle both response formats: { data: HeroBackground[] } or HeroBackground[]
+        const dataArray = Array.isArray(response.data) 
+          ? response.data 
+          : (response.data as any)?.data || [];
+        setBackgrounds(dataArray);
       } else {
         throw new Error('Failed to fetch backgrounds');
       }
@@ -103,7 +107,9 @@ const HeroBackgroundSelector: React.FC<HeroBackgroundSelectorProps> = ({
       const response = await heroBackgroundApi.create(formData);
       
       if (response.success) {
-        setBackgrounds(prev => [response.data, ...prev]);
+        // Ensure we're adding a single HeroBackground object, not an array
+        const newBg = Array.isArray(response.data) ? response.data[0] : response.data;
+        setBackgrounds(prev => [newBg, ...prev]);
         toast.success("Hero background uploaded successfully");
         setShowUpload(false);
         setNewBackground({ name: '', description: '', sort_order: 0 });
@@ -124,7 +130,9 @@ const HeroBackgroundSelector: React.FC<HeroBackgroundSelectorProps> = ({
       const response = await heroBackgroundApi.toggleStatus(id);
       
       if (response.success) {
-        setBackgrounds(prev => prev.map(bg => bg.id === id ? response.data : bg));
+        // Ensure we're using a single HeroBackground object
+        const updatedBg = Array.isArray(response.data) ? response.data[0] : response.data;
+        setBackgrounds(prev => prev.map(bg => bg.id === id ? updatedBg : bg));
         toast.success("Background status updated successfully");
       } else {
         toast.error("Failed to update status");
@@ -287,7 +295,7 @@ const HeroBackgroundSelector: React.FC<HeroBackgroundSelectorProps> = ({
               <div 
                 className="aspect-square bg-gray-100 overflow-hidden cursor-pointer"
                 onDoubleClick={() => {
-                  setSelectedBackgrounds([background.id]);
+                  onBackgroundsChange([background]);
                   setShowPreview(true);
                 }}
               >
@@ -329,15 +337,11 @@ const HeroBackgroundSelector: React.FC<HeroBackgroundSelectorProps> = ({
               <h4 className="font-medium text-xs truncate">{background.name}</h4>
               
               <div className="flex items-center justify-between mt-2">
-                <span className="text-xs text-gray-500">
-                  #{background.sort_order}
-                </span>
-                
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    setSelectedBackgrounds([background.id]);
+                    onBackgroundsChange([background]);
                     setShowPreview(true);
                   }}
                   className="h-5 w-5 p-0"
