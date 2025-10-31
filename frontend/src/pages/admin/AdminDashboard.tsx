@@ -16,6 +16,7 @@ import {
   ArrowDownRight
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { analyticsApi } from '@/services/analyticsApi';
 import { toast } from 'sonner';
 
@@ -24,6 +25,7 @@ const AdminDashboard = () => {
   const [subscriptionStats, setSubscriptionStats] = useState<any>(null);
   const [topVideos, setTopVideos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchAnalytics = async () => {
@@ -351,7 +353,7 @@ const AdminDashboard = () => {
                       </span>
                       <span className="flex items-center">
                         <Star className="h-3 w-3 mr-1" />
-                        {(video.rating || 0).toFixed(1)}
+                        {(() => { const r = typeof video.rating === 'number' ? video.rating : parseFloat(video.rating || '0'); return isNaN(r) ? '0.0' : r.toFixed(1); })()}
                       </span>
                       <span className="text-xs">
                         {video.completion_rate || 0}% completion
@@ -374,19 +376,19 @@ const AdminDashboard = () => {
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Button variant="outline" className="h-20 flex-col">
+          <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/admin/users')}>
             <Users className="h-6 w-6 mb-2" />
             <span className="text-sm">Add User</span>
           </Button>
-          <Button variant="outline" className="h-20 flex-col">
+          <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/admin/content')}>
             <Video className="h-6 w-6 mb-2" />
             <span className="text-sm">Upload Video</span>
           </Button>
-          <Button variant="outline" className="h-20 flex-col">
+          <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/admin/plans')}>
             <CreditCard className="h-6 w-6 mb-2" />
             <span className="text-sm">Create Plan</span>
           </Button>
-          <Button variant="outline" className="h-20 flex-col">
+          <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/admin/coupons')}>
             <Gift className="h-6 w-6 mb-2" />
             <span className="text-sm">Add Coupon</span>
           </Button>

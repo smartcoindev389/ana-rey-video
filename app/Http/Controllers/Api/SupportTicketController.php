@@ -170,6 +170,30 @@ class SupportTicketController extends Controller
      */
     public function destroy(SupportTicket $ticket): JsonResponse
     {
+        $user = Auth::user();
+
+        // Allow admins to delete any ticket
+        if (!$user->isAdmin()) {
+            // Normal users can delete ONLY their own closed/resolved tickets
+            if ($ticket->user_id !== $user->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You do not have permission to delete this ticket.',
+                ], 403);
+            }
+            if (!$ticket->isClosed()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Only closed tickets can be deleted.',
+                ], 403);
+            }
+        }
+
+        // Optionally delete snapshot file
+        try {
+            Storage::disk('public')->delete('support_tickets/' . $ticket->id . '.json');
+        } catch (\Throwable $e) {}
+
         $ticket->delete();
 
         return response()->json([

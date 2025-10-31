@@ -87,8 +87,8 @@ const Explore = () => {
               const favoritesData = Array.isArray(favoritesResponse.data) 
                 ? favoritesResponse.data 
                 : favoritesResponse.data?.data || favoritesResponse.data || [];
-              const favoriteVideoIds = new Set(
-                favoritesData.map((fav: any) => fav.video_id)
+              const favoriteVideoIds = new Set<number>(
+                favoritesData.map((fav: any) => Number(fav.video_id))
               );
               setFavorites(favoriteVideoIds);
             }
@@ -172,8 +172,8 @@ const Explore = () => {
         break;
       case 'rating':
         filtered.sort((a, b) => {
-          const ratingA = parseFloat(a.rating || 0);
-          const ratingB = parseFloat(b.rating || 0);
+          const ratingA = parseFloat(String(a.rating || '0'));
+          const ratingB = parseFloat(String(b.rating || '0'));
           return ratingB - ratingA;
         });
         break;
@@ -182,7 +182,7 @@ const Explore = () => {
         break;
       case 'popular':
       default:
-        filtered.sort((a, b) => (b.total_views || 0) - (a.total_views || 0));
+        filtered.sort((a, b) => (b.views || 0) - (a.views || 0));
         break;
     }
 
@@ -328,7 +328,7 @@ const Explore = () => {
           </div>
           <div className="flex items-center">
             <Eye className="h-3 w-3 mr-1" />
-            <span>{item.total_views || 0}</span>
+            <span>{item.views || 0}</span>
           </div>
         </div>
       </div>
@@ -358,7 +358,7 @@ const Explore = () => {
             </div>
             <div className="flex items-center">
               <Eye className="h-4 w-4 mr-1" />
-              {item.total_views || 0} views
+              {item.views || 0} views
             </div>
             {item.rating && parseFloat(item.rating) > 0 && (
               <div className="flex items-center">

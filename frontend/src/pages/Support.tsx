@@ -516,7 +516,7 @@ const Support = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
-                <Select value={ticketForm.category} onValueChange={(value) => setTicketForm(prev => ({ ...prev, category: value }))}>
+                <Select value={ticketForm.category} onValueChange={(value) => setTicketForm(prev => ({ ...prev, category: value as 'technical' | 'billing' | 'account' | 'content' | 'general' }))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -531,7 +531,7 @@ const Support = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="priority">Priority</Label>
-                <Select value={ticketForm.priority} onValueChange={(value) => setTicketForm(prev => ({ ...prev, priority: value }))}>
+                <Select value={ticketForm.priority} onValueChange={(value) => setTicketForm(prev => ({ ...prev, priority: value as 'low' | 'medium' | 'high' | 'urgent' }))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -634,6 +634,28 @@ const Support = () => {
           )}
           
           <DialogFooter>
+            {selectedTicket && (selectedTicket.status === 'closed' || selectedTicket.status === 'resolved') && (
+              <Button 
+                variant="destructive" 
+                onClick={async () => {
+                  if (!selectedTicket) return;
+                  if (!confirm('Delete this ticket? This action cannot be undone.')) return;
+                  try {
+                    const res = await supportTicketApi.delete(selectedTicket.id);
+                    if (res.success) {
+                      setTickets(prev => prev.filter(t => t.id !== selectedTicket.id));
+                      setIsTicketDetailOpen(false);
+                      setSelectedTicket(null);
+                      toast.success('Ticket deleted');
+                    }
+                  } catch (err: any) {
+                    toast.error(err.message || 'Failed to delete ticket');
+                  }
+                }}
+              >
+                Delete Ticket
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setIsTicketDetailOpen(false)}>
               Close
             </Button>
