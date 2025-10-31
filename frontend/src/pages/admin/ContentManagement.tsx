@@ -56,10 +56,7 @@ import {
   TrendingUp,
   PlayCircle,
   RefreshCw,
-  Image as ImageIcon,
-  Upload,
-  FileImage,
-  FileVideo
+  
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -379,8 +376,8 @@ const ContentManagement = () => {
       slug: '',
       description: '',
       short_description: null,
-      category_id: series.length > 0 ? series[0].category_id : 1,
-      series_id: series.length > 0 ? series[0].id : 1,
+      category_id: series.length > 0 ? series[0].category_id : null,
+      series_id: series.length > 0 ? series[0].id : null,
       instructor_id: null,
       video_url: null,
       video_file_path: null,
@@ -732,24 +729,7 @@ const ContentManagement = () => {
           <VideoIcon className="mr-2 h-4 w-4" />
           <span className="hidden sm:inline">Episodes</span>
         </Button>
-        <Button
-          variant={activeTab === 'images' ? 'default' : 'ghost'}
-          onClick={() => setActiveTab('images')}
-          className="flex items-center"
-          size="sm"
-        >
-          <ImageIcon className="mr-2 h-4 w-4" />
-          <span className="hidden sm:inline">Images</span>
-        </Button>
-        <Button
-          variant={activeTab === 'media' ? 'default' : 'ghost'}
-          onClick={() => setActiveTab('media')}
-          className="flex items-center"
-          size="sm"
-        >
-          <Upload className="mr-2 h-4 w-4" />
-          <span className="hidden sm:inline">Media Upload</span>
-        </Button>
+        
       </div>
 
       {/* Search */}
@@ -1055,7 +1035,10 @@ const ContentManagement = () => {
                               <Edit className="mr-2 h-4 w-4" />
                               Edit Episode
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 cursor-pointer">
+                            <DropdownMenuItem 
+                              onClick={() => window.open(`/video/${video.id}`, '_blank')}
+                              className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 cursor-pointer"
+                            >
                               <PlayCircle className="mr-2 h-4 w-4" />
                               Play Episode
                             </DropdownMenuItem>
@@ -1150,7 +1133,10 @@ const ContentManagement = () => {
                         <Edit className="mr-2 h-4 w-4" />
                         Edit Episode
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 cursor-pointer">
+                      <DropdownMenuItem 
+                        onClick={() => window.open(`/video/${video.id}`, '_blank')}
+                        className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 cursor-pointer"
+                      >
                         <PlayCircle className="mr-2 h-4 w-4" />
                         Play Episode
                       </DropdownMenuItem>
@@ -1234,153 +1220,7 @@ const ContentManagement = () => {
         </Card>
       </div>
 
-      {/* Images Tab */}
-      {activeTab === 'images' && (
-        <Card className="p-6">
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Image Gallery</h3>
-              <Button onClick={() => {/* TODO: Add image upload */}}>
-                <Plus className="mr-2 h-4 w-4" />
-                Upload Images
-              </Button>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {uploadedImages.length === 0 ? (
-                <div className="col-span-full text-center py-12 text-muted-foreground">
-                  <FileImage className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No images uploaded yet</p>
-                  <p className="text-sm">Upload images to get started</p>
-                </div>
-              ) : (
-                uploadedImages.map((image, index) => (
-                  <div key={index} className="relative group">
-                    <div className="aspect-square bg-muted rounded-lg overflow-hidden">
-                      <img
-                        src={image.url || image}
-                        alt={`Uploaded image ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
-                      <div className="flex space-x-2">
-                        <Button size="sm" variant="secondary">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button size="sm" variant="destructive">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Media Upload Tab */}
-      {activeTab === 'media' && (
-        <Card className="p-6">
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Media Upload</h3>
-            </div>
-            
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Image Upload */}
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <FileImage className="h-5 w-5" />
-                  <h4 className="font-medium">Upload Images</h4>
-                </div>
-                
-                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
-                  <Upload className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Drag and drop images here, or click to select
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Supports JPG, PNG, WebP (will be converted to WebP)
-                  </p>
-                  <Button className="mt-4" variant="outline">
-                    Select Images
-                  </Button>
-                </div>
-                
-                {uploadProgress > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Uploading...</span>
-                      <span>{uploadProgress}%</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div 
-                        className="bg-primary h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${uploadProgress}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              {/* Video Upload */}
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <FileVideo className="h-5 w-5" />
-                  <h4 className="font-medium">Upload Videos</h4>
-                </div>
-                
-                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
-                  <Upload className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Drag and drop videos here, or click to select
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Supports MP4, MOV, AVI (will be saved to data_section/movie/)
-                  </p>
-                  <Button className="mt-4" variant="outline">
-                    Select Videos
-                  </Button>
-                </div>
-                
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <p>• Videos will be saved to: <code>data_section/movie/</code></p>
-                  <p>• Images will be saved to: <code>data_section/image/</code></p>
-                  <p>• Images will be automatically converted to WebP format</p>
-                </div>
-              </div>
-            </div>
-            
-            {/* Uploaded Media List */}
-            {(uploadedImages.length > 0 || uploadedVideos.length > 0) && (
-              <div className="space-y-4">
-                <h4 className="font-medium">Recently Uploaded</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {uploadedImages.map((image, index) => (
-                    <div key={`img-${index}`} className="text-center">
-                      <div className="aspect-square bg-muted rounded-lg mb-2 overflow-hidden">
-                        <img src={image.url || image} alt={`Image ${index + 1}`} className="w-full h-full object-cover" />
-                      </div>
-                      <p className="text-xs text-muted-foreground">Image {index + 1}</p>
-                    </div>
-                  ))}
-                  {uploadedVideos.map((video, index) => (
-                    <div key={`vid-${index}`} className="text-center">
-                      <div className="aspect-square bg-muted rounded-lg mb-2 flex items-center justify-center">
-                        <FileVideo className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                      <p className="text-xs text-muted-foreground">Video {index + 1}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </Card>
-      )}
+      
 
       {/* Edit Series Dialog */}
       <Dialog open={isSeriesDialogOpen} onOpenChange={setIsSeriesDialogOpen}>
@@ -1538,18 +1378,7 @@ const ContentManagement = () => {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="videoDuration" className="text-right">
-                  Duration (minutes)
-                </Label>
-                <Input
-                  id="videoDuration"
-                  type="number"
-                  value={Math.floor(selectedVideo.duration / 60)}
-                  onChange={(e) => setSelectedVideo({...selectedVideo, duration: parseInt(e.target.value) * 60})}
-                  className="col-span-3"
-                />
-              </div>
+              {/* Duration input removed — duration is now auto-calculated on backend */}
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="videoVisibility" className="text-right">
                   Visibility

@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class SupportTicketController extends Controller
 {
@@ -101,6 +102,9 @@ class SupportTicketController extends Controller
         $ticket = SupportTicket::create($validated);
         $ticket->load(['user']);
 
+        // Persist snapshot to public storage
+        $this->saveTicketSnapshot($ticket);
+
         return response()->json([
             'success' => true,
             'message' => 'Support ticket created successfully.',
@@ -151,6 +155,9 @@ class SupportTicketController extends Controller
 
         $ticket->update($validated);
 
+        // Persist snapshot to public storage
+        $this->saveTicketSnapshot($ticket);
+
         return response()->json([
             'success' => true,
             'message' => 'Support ticket updated successfully.',
@@ -185,6 +192,9 @@ class SupportTicketController extends Controller
             'status' => 'in_progress',
         ]);
 
+        // Persist snapshot to public storage
+        $this->saveTicketSnapshot($ticket);
+
         return response()->json([
             'success' => true,
             'message' => 'Ticket assigned successfully.',
@@ -198,6 +208,9 @@ class SupportTicketController extends Controller
     public function resolve(SupportTicket $ticket): JsonResponse
     {
         $ticket->markAsResolved();
+
+        // Persist snapshot to public storage
+        $this->saveTicketSnapshot($ticket);
 
         return response()->json([
             'success' => true,
@@ -213,6 +226,9 @@ class SupportTicketController extends Controller
     {
         $ticket->markAsClosed();
 
+        // Persist snapshot to public storage
+        $this->saveTicketSnapshot($ticket);
+
         return response()->json([
             'success' => true,
             'message' => 'Ticket closed successfully.',
@@ -227,6 +243,9 @@ class SupportTicketController extends Controller
     {
         $ticket->reopen();
 
+        // Persist snapshot to public storage
+        $this->saveTicketSnapshot($ticket);
+
         return response()->json([
             'success' => true,
             'message' => 'Ticket reopened successfully.',
@@ -239,6 +258,14 @@ class SupportTicketController extends Controller
      */
     public function addReply(Request $request, SupportTicket $ticket): JsonResponse
     {
+        // Disallow replies on closed/resolved tickets
+        if ($ticket->isClosed()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot add a reply to a closed ticket.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'message' => 'required|string',
             'attachments' => 'nullable|array',
@@ -256,6 +283,9 @@ class SupportTicketController extends Controller
         }
 
         $reply->load('user');
+
+        // Persist snapshot to public storage
+        $this->saveTicketSnapshot($ticket);
 
         return response()->json([
             'success' => true,
@@ -336,5 +366,22 @@ class SupportTicketController extends Controller
         });
 
         return round($totalHours / $resolvedTickets->count(), 2);
+    }
+
+    /**
+     * Save current ticket snapshot (with relations) to public storage as JSON.
+     */
+    private function saveTicketSnapshot(SupportTicket $ticket): void
+    {
+        try {
+            $ticket->load(['user', 'assignedTo', 'replies.user']);
+            $payload = $ticket->toArray();
+            Storage::disk('public')->put(
+                'support_tickets/' . $ticket->id . '.json',
+                json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+            );
+        } catch (\Throwable $e) {
+            // Silently ignore snapshot failures to avoid impacting API behavior
+        }
     }
 }

@@ -12,12 +12,18 @@ use App\Http\Controllers\Api\FaqController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\SubscriptionPlanController;
 use App\Http\Controllers\Api\PaymentTransactionController;
+use App\Http\Controllers\Api\StripeController;
 use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\CouponController;
 use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\FeedbackController;
 use App\Http\Controllers\Api\HeroBackgroundController;
 use App\Http\Controllers\Api\TestimonialController;
+
+// Preflight CORS for all API routes (avoid auth/csrf on OPTIONS)
+Route::options('/{any}', function () {
+    return response()->noContent();
+})->where('any', '.*');
 
 // Public routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -44,11 +50,15 @@ Route::get('/series', [SeriesController::class, 'index']);
 Route::get('/series/{series}', [SeriesController::class, 'show']);
 Route::get('/videos', [VideoController::class, 'index']);
 Route::get('/videos/{video}', [VideoController::class, 'show']);
-// Public video streaming (checks permissions internally)
 Route::get('/videos/{video}/stream', [VideoController::class, 'stream']);
+
+// Video Comments (public access to read, authenticated to write)
+Route::get('/videos/{video}/comments', [\App\Http\Controllers\Api\VideoCommentController::class, 'index']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
+    // Payments (Stripe)
+    Route::post('/payments/checkout', [StripeController::class, 'createCheckoutSession']);
     // Auth routes
     Route::get('/user', [AuthController::class, 'user']);
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -65,7 +75,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/series/{series}', [UserProgressController::class, 'getSeriesProgress']);
         Route::put('/video/{video}', [UserProgressController::class, 'updateVideoProgress']);
         Route::post('/video/{video}/favorite', [UserProgressController::class, 'toggleFavorite']);
+        Route::post('/video/{video}/like', [UserProgressController::class, 'toggleLike']);
+        Route::post('/video/{video}/dislike', [UserProgressController::class, 'toggleDislike']);
         Route::post('/video/{video}/rate', [UserProgressController::class, 'rateVideo']);
+        Route::get('/favorites/list', [UserProgressController::class, 'getFavorites']);
     });
 
     // Admin routes
@@ -91,6 +104,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/admin/videos/{id}', [VideoController::class, 'update']);
         Route::delete('/admin/videos/{id}', [VideoController::class, 'destroy']);
         Route::post('/admin/videos/{id}/reencode', [VideoController::class, 'reencode']);
+        Route::get('/admin/videos/{id}/codec-info', [VideoController::class, 'codecInfo']);
         
         // Admin read access to series and videos (for admin panel)
         Route::get('/admin/series', [SeriesController::class, 'index']);
@@ -192,6 +206,12 @@ Route::middleware('auth:sanctum')->group(function () {
     // Videos (additional authenticated routes)
     Route::get('/videos/{video}/accessible', [VideoController::class, 'isAccessibleTo']);
 
+    // Video Comments (authenticated)
+    Route::post('/videos/{video}/comments', [\App\Http\Controllers\Api\VideoCommentController::class, 'store']);
+    Route::put('/comments/{comment}', [\App\Http\Controllers\Api\VideoCommentController::class, 'update']);
+    Route::delete('/comments/{comment}', [\App\Http\Controllers\Api\VideoCommentController::class, 'destroy']);
+    Route::post('/comments/{comment}/like', [\App\Http\Controllers\Api\VideoCommentController::class, 'toggleLike']);
+
     // User support and feedback routes
     Route::prefix('support-tickets')->group(function () {
         Route::get('/', [SupportTicketController::class, 'index']);
@@ -221,4 +241,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     
 });
+
+// Stripe webhook (public)
+Route::post('/payments/stripe/webhook', [StripeController::class, 'webhook']);
 

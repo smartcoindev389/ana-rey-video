@@ -320,6 +320,7 @@ const FeedbackSuggestions = () => {
 
       {/* Feedback Table */}
       <Card>
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -338,8 +339,8 @@ const FeedbackSuggestions = () => {
               <TableRow key={feedback.id}>
                 <TableCell>
                   <div>
-                    <div className="font-medium">{feedback.subject}</div>
-                    <div className="text-sm text-muted-foreground line-clamp-2">
+                    <div className="font-medium break-words">{feedback.subject}</div>
+                    <div className="text-sm text-muted-foreground line-clamp-2 break-words">
                       {feedback.message}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
@@ -353,7 +354,7 @@ const FeedbackSuggestions = () => {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div>
+                  <div className="break-words">
                     <div className="font-medium">{feedback.user}</div>
                     <div className="text-sm text-muted-foreground">{feedback.email}</div>
                   </div>
@@ -409,6 +410,7 @@ const FeedbackSuggestions = () => {
             ))}
           </TableBody>
         </Table>
+        </div>
       </Card>
 
       {/* Summary Stats */}

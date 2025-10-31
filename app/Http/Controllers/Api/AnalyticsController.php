@@ -225,21 +225,29 @@ class AnalyticsController extends Controller
      */
     public function contentAnalytics(): JsonResponse
     {
+        $totalCategories = Category::count();
+        $totalVideos = Video::count();
+        $averageVideosPerCategory = $totalCategories > 0 ? round($totalVideos / $totalCategories, 2) : 0;
+
         $contentStats = [
-            'total_categories' => Category::count(),
+            'total_categories' => $totalCategories,
             'published_categories' => Category::published()->count(),
-            'total_videos' => Video::count(),
+            'total_videos' => $totalVideos,
             'published_videos' => Video::published()->count(),
             'active_categories' => Category::where('status', 'active')->count(),
-            'average_videos_per_category' => Category::withCount('videos')->avg('videos_count'),
+            'average_videos_per_category' => $averageVideosPerCategory,
             'total_content_duration' => Video::sum('duration'),
         ];
 
-        // Top performing categories
-        $topCategories = Category::withCount(['videos'])
-            ->leftJoin('videos', 'categories.id', '=', 'videos.category_id')
-            ->selectRaw('categories.*, COALESCE(SUM(videos.views), 0) as total_category_views')
-            ->groupBy('categories.id')
+        // Top performing categories (single query, explicit aggregates and grouping)
+        $topCategories = Category::leftJoin('videos', 'categories.id', '=', 'videos.category_id')
+            ->select(
+                'categories.id',
+                'categories.name',
+                DB::raw('COUNT(videos.id) as videos_count'),
+                DB::raw('COALESCE(SUM(videos.views), 0) as total_category_views')
+            )
+            ->groupBy('categories.id', 'categories.name')
             ->orderBy('total_category_views', 'desc')
             ->limit(5)
             ->get();

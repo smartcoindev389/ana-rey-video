@@ -89,21 +89,21 @@ const AdminLayout = () => {
           </Button>
         </div>
 
-        <nav className="flex-1 px-4 py-6 space-y-2">
+        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
           {menuItems.map((item) => {
             const Icon = item.icon;
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 relative ${
+                className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 relative whitespace-nowrap overflow-hidden text-ellipsis ${
                   isActive(item.path, item.exact)
                     ? 'bg-primary text-primary-foreground font-semibold shadow-sm'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
                 onClick={() => setSidebarOpen(false)}
               >
-                <Icon className={`mr-3 h-5 w-5 ${isActive(item.path, item.exact) ? 'text-primary-foreground' : ''}`} />
+                <Icon className={`mr-3 h-5 w-5 flex-shrink-0 ${isActive(item.path, item.exact) ? 'text-primary-foreground' : ''}`} />
                 {item.label}
                 {isActive(item.path, item.exact) && (
                   <div className="absolute right-2 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-primary-foreground rounded-full opacity-80"></div>
@@ -133,7 +133,7 @@ const AdminLayout = () => {
       </div>
 
       {/* Main content */}
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         {/* Top bar */}
         <div className="sticky top-0 z-30 flex items-center justify-between h-16 px-6 bg-background border-b">
           <Button

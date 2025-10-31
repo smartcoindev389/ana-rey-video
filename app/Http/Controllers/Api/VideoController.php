@@ -40,7 +40,9 @@ class VideoController extends Controller
         // Apply visibility filters based on user subscription (skip for admin)
         if (!$isAdminRequest) {
             if ($user) {
-                $query->visibleTo($user->subscription_type);
+                // Default to freemium if subscription_type is null/empty
+                $subscriptionType = $user->subscription_type ?: 'freemium';
+                $query->visibleTo($subscriptionType);
             } else {
                 $query->where('visibility', 'freemium');
             }
@@ -123,6 +125,7 @@ class VideoController extends Controller
             'intro_image_file' => 'nullable|file|image|mimes:jpeg,png,jpg,webp,gif|max:10240',
             'intro_image' => 'nullable|string|max:255',
             'intro_description' => 'nullable|string',
+            // duration is auto-computed from uploaded file
             'duration' => 'nullable|integer|min:0',
             'file_size' => 'nullable|integer|min:0',
             'video_format' => 'nullable|string|max:50',
@@ -177,54 +180,21 @@ class VideoController extends Controller
                     'size' => $videoUploadResult['size'],
                 ]);
                 
-                // Re-encode video with web-compatible codecs (H.264 + AAC)
-                // This fixes audio codec issues that prevent playback in browsers
+                // Immediately use original video path; optionally re-encode after create
+                $validated['video_file_path'] = $originalPath;
+                $validated['file_size'] = $videoUploadResult['size'];
+                $validated['video_format'] = pathinfo($originalPath, PATHINFO_EXTENSION);
+
+                // Auto-calculate duration using ffprobe via service
                 try {
-                    \Log::info('Starting video re-encoding for web compatibility');
-                    
-                    $reencodeResult = $this->transcodingService->reencodeStorageVideo(
-                        $originalPath,
-                        [
-                            'audio_bitrate' => 128,      // 128kbps AAC audio (good quality)
-                            'video_quality' => 23,       // CRF 23 (good quality, smaller file)
-                            'preset' => 'medium',        // Encoding speed preset
-                            'delete_original' => true,   // Delete original to save space
-                        ]
-                    );
-                    
-                    if ($reencodeResult['success']) {
-                        \Log::info('Video re-encoded successfully', [
-                            'original_path' => $originalPath,
-                            'new_path' => $reencodeResult['relative_path'],
-                            'original_size' => $reencodeResult['original_size'],
-                            'new_size' => $reencodeResult['new_size'],
-                            'size_saved' => $reencodeResult['original_size'] - $reencodeResult['new_size'],
-                        ]);
-                        
-                        // Use re-encoded video
-                        $validated['video_file_path'] = $reencodeResult['relative_path'];
-                        $validated['file_size'] = $reencodeResult['new_size'];
-                    } else {
-                        \Log::warning('Video re-encoding failed, using original', [
-                            'error' => $reencodeResult['message'],
-                        ]);
-                        
-                        // Fall back to original video
-                        $validated['video_file_path'] = $originalPath;
-                        $validated['file_size'] = $videoUploadResult['size'];
+                    $fullPath = storage_path('app/public/' . $originalPath);
+                    $info = $this->transcodingService->getVideoInfo($fullPath);
+                    if (isset($info['duration']) && is_numeric($info['duration'])) {
+                        $validated['duration'] = (int) $info['duration'];
                     }
-                } catch (\Exception $e) {
-                    \Log::error('Video re-encoding error', [
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString(),
-                    ]);
-                    
-                    // Fall back to original video if re-encoding fails
-                    $validated['video_file_path'] = $originalPath;
-                    $validated['file_size'] = $videoUploadResult['size'];
+                } catch (\Throwable $ie) {
+                    \Log::warning('Failed to auto-calculate video duration', ['error' => $ie->getMessage()]);
                 }
-                
-                $validated['video_format'] = pathinfo($validated['video_file_path'], PATHINFO_EXTENSION);
             } catch (\Exception $e) {
                 \Log::error('Video file upload failed', [
                     'error' => $e->getMessage(),
@@ -285,6 +255,35 @@ class VideoController extends Controller
         }
 
         $video = Video::create($validated);
+
+        // Optional: re-encode after create and update record if successful
+        if ($request->hasFile('video_file') && config('ffmpeg.auto_reencode')) {
+            try {
+                // Only re-encode if codecs are not web-compatible
+                $needs = $this->transcodingService->needsReencoding(storage_path('app/public/' . $video->video_file_path));
+                if ($needs) {
+                    \Log::info('Starting video re-encoding for web compatibility');
+                    $reencodeResult = $this->transcodingService->reencodeStorageVideo(
+                        $video->video_file_path,
+                        [
+                            'audio_bitrate' => (int) config('ffmpeg.encoding.audio_bitrate', 128),
+                            'video_quality' => (int) config('ffmpeg.encoding.video_quality', 23),
+                            'preset' => (string) config('ffmpeg.encoding.preset', 'faster'),
+                            'delete_original' => (bool) config('ffmpeg.encoding.delete_original', true),
+                        ]
+                    );
+                    if ($reencodeResult['success'] ?? false) {
+                        $video->update([
+                            'video_file_path' => $reencodeResult['relative_path'],
+                            'file_size' => $reencodeResult['new_size'],
+                            'video_format' => pathinfo($reencodeResult['relative_path'], PATHINFO_EXTENSION),
+                        ]);
+                    }
+                }
+            } catch (\Throwable $te) {
+                \Log::warning('Background re-encode failed; keeping original', ['error' => $te->getMessage()]);
+            }
+        }
 
         return response()->json([
             'success' => true,
@@ -371,6 +370,7 @@ class VideoController extends Controller
             'intro_image_file' => 'nullable|file|image|mimes:jpeg,png,jpg,webp,gif|max:10240',
             'intro_image' => 'nullable|string|max:255',
             'intro_description' => 'nullable|string',
+            // duration is auto-computed from uploaded file
             'duration' => 'nullable|integer|min:0',
             'file_size' => 'nullable|integer|min:0',
             'video_format' => 'nullable|string|max:50',
@@ -418,6 +418,17 @@ class VideoController extends Controller
                 $validated['video_file_path'] = $videoUploadResult['path'];
                 $validated['file_size'] = $videoUploadResult['size'];
                 $validated['video_format'] = pathinfo($videoUploadResult['filename'], PATHINFO_EXTENSION);
+
+                // Auto-calculate duration for updated file
+                try {
+                    $fullPath = storage_path('app/public/' . $videoUploadResult['path']);
+                    $info = $this->transcodingService->getVideoInfo($fullPath);
+                    if (isset($info['duration']) && is_numeric($info['duration'])) {
+                        $validated['duration'] = (int) $info['duration'];
+                    }
+                } catch (\Throwable $ie) {
+                    \Log::warning('Failed to auto-calculate video duration (update)', ['error' => $ie->getMessage()]);
+                }
                 
                 \Log::info('Video file updated successfully', [
                     'path' => $videoUploadResult['path'],
@@ -498,6 +509,24 @@ class VideoController extends Controller
             ], 403);
         }
 
+        // Delete associated media files from storage
+        try {
+            if (!empty($video->video_file_path)) {
+                $this->webpService->deleteFile($video->video_file_path);
+            }
+            if (!empty($video->intro_image)) {
+                $this->webpService->deleteFile($video->intro_image);
+            }
+            if (!empty($video->thumbnail)) {
+                $this->webpService->deleteFile($video->thumbnail);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Failed to delete one or more media files for video', [
+                'video_id' => $video->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         $video->delete();
 
         return response()->json([
@@ -525,7 +554,9 @@ class VideoController extends Controller
 
         // Apply visibility filters
         if ($user) {
-            $query->visibleTo($user->subscription_type);
+            // Default to freemium if subscription_type is null/empty
+            $subscriptionType = $user->subscription_type ?: 'freemium';
+            $query->visibleTo($subscriptionType);
         } else {
             $query->where('visibility', 'freemium');
         }
@@ -577,7 +608,13 @@ class VideoController extends Controller
         // If video_file_path exists, stream the actual file with proper headers
         if ($video->video_file_path) {
             $path = storage_path('app/public/' . $video->video_file_path);
-            
+
+            \Log::info('Video stream request', [
+                'video_id' => $video->id,
+                'path' => $path,
+                'exists' => file_exists($path),
+            ]);
+
             if (!file_exists($path)) {
                 return response()->json([
                     'success' => false,
@@ -585,16 +622,24 @@ class VideoController extends Controller
                 ], 404);
             }
 
+            // Prevent output buffering issues for large streams
+            if (function_exists('apache_setenv')) {
+                @apache_setenv('no-gzip', '1');
+            }
+            @ini_set('zlib.output_compression', '0');
+            @ini_set('output_buffering', 'off');
+            @ini_set('implicit_flush', '1');
+            @set_time_limit(0);
+
             $fileSize = filesize($path);
-            $mimeType = mime_content_type($path);
-            
+            $mimeType = mime_content_type($path) ?: 'video/mp4';
+
             // Handle Range requests for video seeking
             $headers = [
                 'Content-Type' => $mimeType,
                 'Content-Length' => $fileSize,
                 'Accept-Ranges' => 'bytes',
                 'Cache-Control' => 'public, max-age=31536000',
-                // CORS headers are handled globally by HandleCors middleware
             ];
 
             // Check if this is a range request
@@ -602,31 +647,58 @@ class VideoController extends Controller
                 $range = $request->header('Range');
                 $range = str_replace('bytes=', '', $range);
                 $rangeParts = explode('-', $range);
-                $start = intval($rangeParts[0]);
+                $start = max(0, intval($rangeParts[0]));
                 $end = isset($rangeParts[1]) && $rangeParts[1] !== '' ? intval($rangeParts[1]) : $fileSize - 1;
-                
+                $end = min($end, $fileSize - 1);
+
+                if ($start > $end) {
+                    $start = 0;
+                }
+
                 $length = $end - $start + 1;
-                
+
                 $headers['Content-Range'] = "bytes {$start}-{$end}/{$fileSize}";
                 $headers['Content-Length'] = $length;
-                
+
                 return response()->stream(function () use ($path, $start, $length) {
+                    $chunkSize = 8192;
                     $stream = fopen($path, 'rb');
                     fseek($stream, $start);
-                    echo fread($stream, $length);
+                    $bytesLeft = $length;
+                    while ($bytesLeft > 0 && !feof($stream)) {
+                        $read = ($bytesLeft > $chunkSize) ? $chunkSize : $bytesLeft;
+                        echo fread($stream, $read);
+                        $bytesLeft -= $read;
+                        @ob_flush();
+                        flush();
+                    }
                     fclose($stream);
                 }, 206, $headers);
             }
 
             // Full file response
             return response()->stream(function () use ($path) {
+                $chunkSize = 8192;
                 $stream = fopen($path, 'rb');
-                fpassthru($stream);
+                while (!feof($stream)) {
+                    echo fread($stream, $chunkSize);
+                    @ob_flush();
+                    flush();
+                }
                 fclose($stream);
             }, 200, $headers);
         }
 
-        // Fallback to JSON response with URLs
+        // Fallback: if no local file, but a direct URL exists, redirect to it
+        if ($video->video_url) {
+            \Log::info('Video stream redirect to direct URL', [
+                'video_id' => $video->id,
+                'url' => $video->video_url,
+            ]);
+            return redirect()->away($video->video_url);
+        }
+
+        // Fallback to JSON response with URLs (for HLS/DASH players)
         $quality = $request->get('quality', 'auto');
         $streamingUrls = [];
 
@@ -739,6 +811,48 @@ class VideoController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Re-encoding failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get codec/media info for a video's current file (admin/debugging).
+     */
+    public function codecInfo($id): JsonResponse
+    {
+        $video = Video::findOrFail($id);
+
+        if (!$video->video_file_path) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No local video_file_path set for this video.',
+            ], 400);
+        }
+
+        $path = storage_path('app/public/' . $video->video_file_path);
+
+        if (!file_exists($path)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'File does not exist at: ' . $video->video_file_path,
+            ], 404);
+        }
+
+        try {
+            $info = $this->transcodingService->getVideoInfo($path);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'video_id' => $video->id,
+                    'file' => $video->video_file_path,
+                    'info' => $info,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to probe video: ' . $e->getMessage(),
             ], 500);
         }
     }

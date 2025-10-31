@@ -277,7 +277,7 @@ const UserLayout = () => {
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Link to="/explore">
                   <Button size="lg" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white font-semibold px-8">
-                    Browse All Series
+                    Browse All Videos
                   </Button>
                 </Link>
                 <Link to="/subscription">

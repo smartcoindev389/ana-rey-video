@@ -33,7 +33,10 @@ import {
   Sparkles
 } from 'lucide-react';
 import { videoApi, Video } from '@/services/videoApi';
+import { userProgressApi } from '@/services/userProgressApi';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 const Explore = () => {
   const [videos, setVideos] = useState<Video[]>([]);
@@ -48,24 +51,51 @@ const Explore = () => {
   const [selectedDifficulty, setSelectedDifficulty] = useState('all');
   const [selectedDuration, setSelectedDuration] = useState('all');
   const [selectedRating, setSelectedRating] = useState('all');
+  const [favorites, setFavorites] = useState<Set<number>>(new Set());
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
     // Fetch from backend API
     const fetchVideos = async () => {
       setLoading(true);
       try {
-        // Fetch published videos
-        const response = await videoApi.getAll({ 
-          status: 'published',
-          sort_by: 'created_at',
-          sort_order: 'desc'
-        });
-        
-        const videosData = response.data?.data || [];
-        
-        setVideos(videosData);
-        setFilteredVideos(videosData);
+        // Fetch published videos from public endpoint (applies visibility filters)
+        try {
+          const response = await videoApi.getPublic({ 
+            status: 'published',
+            sort_by: 'created_at',
+            sort_order: 'desc'
+          });
+          
+          const videosData = response.data?.data || [];
+          
+          setVideos(videosData);
+          setFilteredVideos(videosData);
+        } catch (error) {
+          console.error('Error fetching videos:', error);
+          setVideos([]);
+          setFilteredVideos([]);
+        }
+
+        // Load user favorites if authenticated
+        if (user) {
+          try {
+            const favoritesResponse = await userProgressApi.getFavoritesList();
+            if (favoritesResponse.success && favoritesResponse.data) {
+              // Handle both array and paginated response
+              const favoritesData = Array.isArray(favoritesResponse.data) 
+                ? favoritesResponse.data 
+                : favoritesResponse.data?.data || favoritesResponse.data || [];
+              const favoriteVideoIds = new Set(
+                favoritesData.map((fav: any) => fav.video_id)
+              );
+              setFavorites(favoriteVideoIds);
+            }
+          } catch (error) {
+            console.error('Failed to load favorites:', error);
+          }
+        }
       } catch (error) {
         console.error('Error fetching videos:', error);
         setVideos([]);
@@ -76,7 +106,7 @@ const Explore = () => {
     };
 
     fetchVideos();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     let filtered = [...videos];
@@ -260,11 +290,33 @@ const Explore = () => {
         <div className="flex items-start justify-between mb-2">
           <h3 className="font-semibold text-sm lg:text-base line-clamp-2 flex-1">{item.title}</h3>
           <div className="flex items-center space-x-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button className="p-1 hover:bg-muted rounded-full transition-colors" onClick={(e) => { e.stopPropagation(); }}>
-              <Heart className="h-4 w-4" />
-            </button>
-            <button className="p-1 hover:bg-muted rounded-full transition-colors" onClick={(e) => { e.stopPropagation(); }}>
-              <Bookmark className="h-4 w-4" />
+            <button 
+              className={`p-1 hover:bg-muted rounded-full transition-colors ${favorites.has(item.id) ? 'text-red-500' : ''}`}
+              onClick={async (e) => { 
+                e.stopPropagation();
+                if (!user) {
+                  toast.error('Please sign in to add favorites');
+                  return;
+                }
+                try {
+                  const response = await userProgressApi.toggleFavorite(item.id);
+                  if (response.success && response.data) {
+                    const isFavoriteNow = response.data.is_favorite === true || response.data.is_favorite === 1;
+                    const newFavorites = new Set(favorites);
+                    if (isFavoriteNow) {
+                      newFavorites.add(item.id);
+                    } else {
+                      newFavorites.delete(item.id);
+                    }
+                    setFavorites(newFavorites);
+                    toast.success(isFavoriteNow ? 'Added to favorites' : 'Removed from favorites');
+                  }
+                } catch (error: any) {
+                  toast.error(error.message || 'Failed to update favorites');
+                }
+              }}
+            >
+              <Heart className={`h-4 w-4 ${favorites.has(item.id) ? 'fill-current' : ''}`} />
             </button>
           </div>
         </div>

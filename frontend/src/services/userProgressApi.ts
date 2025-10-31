@@ -41,6 +41,8 @@ export interface UserProgress {
   progress_percentage: number;
   is_completed: boolean;
   is_favorite: boolean;
+  is_liked?: boolean;
+  is_disliked?: boolean;
   rating: number | null;
   review: string | null;
   first_watched_at: string;
@@ -117,13 +119,22 @@ export const userProgressApi = {
     return handleResponse<any>(response);
   },
 
-  // Get favorites
+  // Get favorites (paginated)
   getFavorites: async (perPage?: number): Promise<any> => {
     const queryParams = new URLSearchParams();
     if (perPage) queryParams.append('per_page', perPage.toString());
     
     const url = `${API_BASE_URL}/progress/favorites${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
     const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<any>(response);
+  },
+
+  // Get favorites with full video data (for profile page)
+  getFavoritesList: async (): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/progress/favorites/list`, {
       method: 'GET',
       headers: getAuthHeaders(),
     });
@@ -137,6 +148,15 @@ export const userProgressApi = {
     
     const url = `${API_BASE_URL}/progress/completed${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
     const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<any>(response);
+  },
+
+  // Get series progress (returns series_progress and video_progress keyed by video_id)
+  getSeriesProgress: async (seriesId: number): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/progress/series/${seriesId}`, {
       method: 'GET',
       headers: getAuthHeaders(),
     });
@@ -165,6 +185,24 @@ export const userProgressApi = {
   // Toggle favorite
   toggleFavorite: async (videoId: number): Promise<any> => {
     const response = await fetch(`${API_BASE_URL}/progress/video/${videoId}/favorite`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<any>(response);
+  },
+
+  // Toggle like
+  toggleLike: async (videoId: number): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/progress/video/${videoId}/like`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<any>(response);
+  },
+
+  // Toggle dislike
+  toggleDislike: async (videoId: number): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/progress/video/${videoId}/dislike`, {
       method: 'POST',
       headers: getAuthHeaders(),
     });

@@ -365,6 +365,31 @@ export const videoApi = {
     });
     return handleResponse<{ success: boolean; data: { videos: Video[]; user_progress?: any; category: Category } }>(response);
   },
+
+  // Public endpoint for normal users (applies visibility filters)
+  async getPublic(params?: { 
+    search?: string; 
+    category_id?: number; 
+    status?: string;
+    visibility?: string;
+    sort_by?: string;
+    sort_order?: string;
+    per_page?: number;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.category_id) queryParams.append('category_id', params.category_id.toString());
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.visibility) queryParams.append('visibility', params.visibility);
+    if (params?.sort_by) queryParams.append('sort_by', params.sort_by);
+    if (params?.sort_order) queryParams.append('sort_order', params.sort_order);
+    if (params?.per_page) queryParams.append('per_page', params.per_page.toString());
+    
+    const response = await fetch(`${API_BASE_URL}/videos?${queryParams}`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<{ success: boolean; data: { data: Video[]; total: number; current_page?: number; last_page?: number } }>(response);
+  },
 };
 
 export default {

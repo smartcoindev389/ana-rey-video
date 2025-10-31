@@ -29,6 +29,9 @@ class UserProgress extends Model
         'review',
         'is_favorite',
         'favorited_at',
+        'is_liked',
+        'is_disliked',
+        'liked_at',
         'last_watched_at',
         'first_watched_at',
         'total_watch_time',
@@ -38,8 +41,11 @@ class UserProgress extends Model
         'watch_history' => 'array',
         'is_completed' => 'boolean',
         'is_favorite' => 'boolean',
+        'is_liked' => 'boolean',
+        'is_disliked' => 'boolean',
         'completed_at' => 'datetime',
         'favorited_at' => 'datetime',
+        'liked_at' => 'datetime',
         'last_watched_at' => 'datetime',
         'first_watched_at' => 'datetime',
         'progress_percentage' => 'integer',
@@ -49,7 +55,7 @@ class UserProgress extends Model
         'watch_count' => 'integer',
         'videos_completed' => 'integer',
         'total_videos' => 'integer',
-        'category_progress' => 'decimal:2',
+        'series_progress' => 'decimal:2',
         'rating' => 'integer',
         'total_watch_time' => 'integer',
     ];
@@ -180,7 +186,7 @@ class UserProgress extends Model
             [
                 'videos_completed' => $completedVideos,
                 'total_videos' => $totalVideos,
-                'category_progress' => $categoryProgressPercentage,
+                'series_progress' => $categoryProgressPercentage,
             ]
         );
     }
@@ -192,7 +198,7 @@ class UserProgress extends Model
     {
         $totalVideosWatched = static::forUser($user->id)->count();
         $totalCategoriesStarted = static::forUser($user->id)->whereNotNull('category_id')->distinct('category_id')->count();
-        $totalCategoriesCompleted = static::forUser($user->id)->where('category_progress', '>=', 100)->distinct('category_id')->count();
+        $totalCategoriesCompleted = static::forUser($user->id)->where('series_progress', '>=', 100)->distinct('category_id')->count();
         $totalWatchTime = static::forUser($user->id)->sum('total_watch_time');
 
         return [

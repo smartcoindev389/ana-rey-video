@@ -20,6 +20,7 @@ import Profile from "./pages/Profile";
 import Support from "./pages/Support";
 import AdminRoutes from "./pages/admin/AdminRoutes";
 import NotFound from "./pages/NotFound";
+import { SupportTicketsProvider } from "./contexts/SupportTicketsContext";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,14 +38,16 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
+          <SupportTicketsProvider>
           <BrowserRouter>
             <Routes>
               {/* Public Routes */}
               <Route path="/" element={<UserLayout />}>
-                <Route index element={<Home />} />
-                <Route path="explore" element={<Explore />} />
-                <Route path="series/:id" element={<SeriesDetail />} />
-                <Route path="video/:id" element={<VideoPlayer />} />
+              <Route index element={<Home />} />
+              <Route path="explore" element={<Explore />} />
+              <Route path="series/:id" element={<SeriesDetail />} />
+              <Route path="category/:id" element={<SeriesDetail />} />
+              <Route path="video/:id" element={<VideoPlayer />} />
                 <Route path="library" element={
                   <ProtectedRoute>
                     <Library />
@@ -76,6 +79,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
+          </SupportTicketsProvider>
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>

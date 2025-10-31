@@ -94,7 +94,7 @@ const Support = () => {
 
     const fetchFaqs = async () => {
       try {
-        const response = await faqApi.getAll();
+        const response = await faqApi.getFaqs();
         if (response.success) {
           const faqData = Array.isArray(response.data) ? response.data : [];
           // Flatten grouped FAQs
@@ -116,7 +116,9 @@ const Support = () => {
     fetchFaqs();
   }, [user]);
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string | undefined) => {
+    if (!status) return null;
+    
     switch (status) {
       case 'open':
         return <AlertCircle className="h-4 w-4 text-orange-500" />;
@@ -131,7 +133,9 @@ const Support = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string | undefined) => {
+    if (!status) return null;
+    
     const variants = {
       open: 'destructive',
       in_progress: 'default',
@@ -140,14 +144,16 @@ const Support = () => {
     } as const;
 
     return (
-      <Badge variant={variants[status as keyof typeof variants]}>
+      <Badge variant={variants[status as keyof typeof variants] || 'outline'}>
         {getStatusIcon(status)}
-        <span className="ml-1 capitalize">{status.replace('_', ' ')}</span>
+        <span className="ml-1 capitalize">{(status || '').replace('_', ' ')}</span>
       </Badge>
     );
   };
 
-  const getPriorityBadge = (priority: string) => {
+  const getPriorityBadge = (priority: string | undefined) => {
+    if (!priority) return null;
+    
     const colors = {
       low: 'bg-green-100 text-green-800',
       medium: 'bg-yellow-100 text-yellow-800',
@@ -156,8 +162,8 @@ const Support = () => {
     };
 
     return (
-      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${colors[priority as keyof typeof colors]}`}>
-        {priority.toUpperCase()}
+      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${colors[priority as keyof typeof colors] || 'bg-gray-100 text-gray-800'}`}>
+        {(priority || '').toUpperCase()}
       </span>
     );
   };
@@ -177,11 +183,16 @@ const Support = () => {
     }
   };
 
-  const filteredTickets = tickets.filter(ticket => {
-    const matchesSearch = ticket.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ticket.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = selectedFilter === 'all' || ticket.status === selectedFilter;
-    const matchesCategory = selectedCategory === 'all' || ticket.category === selectedCategory;
+  const filteredTickets = (tickets || []).filter((ticket: any) => {
+    const subject = (ticket?.subject || '').toString();
+    const description = (ticket?.description || '').toString();
+    const category = (ticket?.category || '').toString();
+    const status = (ticket?.status || '').toString();
+
+    const matchesSearch = subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = selectedFilter === 'all' || status === selectedFilter;
+    const matchesCategory = selectedCategory === 'all' || category === selectedCategory;
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
@@ -225,13 +236,19 @@ const Support = () => {
 
       if (response.success) {
         // Refresh ticket to get updated messages
-        const ticketResponse = await supportTicketApi.get(selectedTicket.id);
-        if (ticketResponse.success) {
-          const updatedTicket = ticketResponse.data;
-          setTickets(prev => prev.map(ticket => 
-            ticket.id === selectedTicket.id ? updatedTicket : ticket
-          ));
-          setSelectedTicket(updatedTicket);
+        try {
+          const ticketResponse = await supportTicketApi.get(selectedTicket.id);
+          const updatedTicket = ticketResponse?.data || ticketResponse?.data?.data || ticketResponse;
+          
+          if (updatedTicket) {
+            setTickets(prev => prev.map(ticket => 
+              ticket.id === selectedTicket.id ? updatedTicket : ticket
+            ));
+            setSelectedTicket(updatedTicket);
+          }
+        } catch (refreshError) {
+          console.error('Error refreshing ticket:', refreshError);
+          // Still show success even if refresh fails
         }
         setNewMessage('');
         toast.success("Message sent successfully");
@@ -242,14 +259,19 @@ const Support = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const formatDate = (dateString: string | undefined | null) => {
+    if (!dateString) return 'No date';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return 'Invalid date';
+    }
   };
 
   if (loading) {
@@ -386,16 +408,16 @@ const Support = () => {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="font-medium">{ticket.subject}</h3>
+                        <h3 className="font-medium">{ticket.subject || 'No Subject'}</h3>
                         <span className="text-sm text-muted-foreground">#{ticket.id}</span>
                       </div>
                       <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                        {ticket.description}
+                        {ticket.description || 'No description'}
                       </p>
-                      <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                        <span>{formatDate(ticket.createdAt)}</span>
-                        <span>{ticket.messages.length} message{ticket.messages.length !== 1 ? 's' : ''}</span>
-                      </div>
+              <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                <span>{formatDate(ticket.created_at)}</span>
+                <span>{(ticket.replies?.length || 0)} message{(ticket.replies?.length || 0) !== 1 ? 's' : ''}</span>
+              </div>
                     </div>
                     <div className="flex flex-col items-end space-y-2">
                       {getStatusBadge(ticket.status)}
@@ -549,8 +571,8 @@ const Support = () => {
         <DialogContent className="sm:max-w-[700px]">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
-              <span>{selectedTicket?.subject}</span>
-              <span className="text-sm text-muted-foreground">#{selectedTicket?.id}</span>
+              <span>{selectedTicket?.subject || 'No Subject'}</span>
+              <span className="text-sm text-muted-foreground">#{selectedTicket?.id || 'N/A'}</span>
             </DialogTitle>
             <DialogDescription>
               <div className="flex items-center space-x-4 mt-2">
@@ -562,43 +584,52 @@ const Support = () => {
           
           {selectedTicket && (
             <div className="space-y-4">
+              {/* Ticket Description */}
+              {selectedTicket.description && (
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-sm">{selectedTicket.description}</p>
+                </div>
+              )}
+              
               {/* Messages */}
               <div className="space-y-4 max-h-96 overflow-y-auto">
-                {selectedTicket.messages.map((message) => (
-                  <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                {selectedTicket.replies?.map((reply) => (
+                  <div key={reply.id} className={`flex ${(reply.user_id === user?.id) ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[80%] p-3 rounded-lg ${
-                      message.sender === 'user' 
-                        ? 'bg-primary text-primary-foreground' 
+                      (reply.user_id === user?.id)
+                        ? 'bg-primary text-primary-foreground'
                         : 'bg-muted'
                     }`}>
                       <div className="flex items-center space-x-2 mb-1">
-                        <span className="text-xs font-medium">{message.senderName}</span>
-                        <span className="text-xs opacity-70">{formatDate(message.createdAt)}</span>
+                        <span className="text-xs font-medium">{reply.user?.name || 'Support'}</span>
+                        <span className="text-xs opacity-70">{formatDate(reply.created_at || reply.updated_at)}</span>
                       </div>
-                      <p className="text-sm">{message.content}</p>
+                      <p className="text-sm">{reply.message || 'No message content'}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* New Message */}
-              <div className="border-t pt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="newMessage">Reply</Label>
-                  <Textarea
-                    id="newMessage"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Type your message..."
-                    className="min-h-[80px]"
-                  />
+              {/* New Message (hidden when ticket is closed or resolved) */}
+              {selectedTicket.status !== 'closed' && selectedTicket.status !== 'resolved' && (
+                <div className="border-t pt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="newMessage">Reply</Label>
+                    <Textarea
+                      id="newMessage"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Type your message..."
+                      className="min-h-[80px]"
+                    />
+                  </div>
+                  <div className="flex justify-end mt-3">
+                    <Button onClick={handleSendMessage} disabled={!newMessage.trim()}>
+                      Send Message
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex justify-end mt-3">
-                  <Button onClick={handleSendMessage} disabled={!newMessage.trim()}>
-                    Send Message
-                  </Button>
-                </div>
-              </div>
+              )}
             </div>
           )}
           

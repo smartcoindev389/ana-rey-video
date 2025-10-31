@@ -230,17 +230,12 @@ class WebpConversionService
         }
 
         try {
-            // Move the uploaded file
-            $uploadedFilePath = $file->getRealPath();
-            if (!$uploadedFilePath || !file_exists($uploadedFilePath)) {
-                throw new \Exception('Uploaded video file path is invalid');
+            // Prefer Laravel Storage which handles streams robustly
+            $storedPath = \Storage::disk('public')->putFileAs($directory, $file, $filename);
+            if (!$storedPath) {
+                throw new \Exception('Storage putFileAs returned false');
             }
-            
-            // Copy file to destination
-            if (!copy($uploadedFilePath, $storagePath)) {
-                throw new \Exception('Failed to copy video file to storage');
-            }
-            
+
             // Verify file was saved
             if (!file_exists($storagePath)) {
                 throw new \Exception('Video file does not exist after save');

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +25,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { categoryApi, videoApi } from '@/services/videoApi';
+import { userProgressApi } from '@/services/userProgressApi';
 import { toast } from 'sonner';
 
 const SeriesDetail = () => {
@@ -32,6 +33,8 @@ const SeriesDetail = () => {
   const [category, setCategory] = useState<any | null>(null);
   const [videos, setVideos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [progressMap, setProgressMap] = useState<Record<number, any>>({});
+  const location = useLocation();
   const [isFavorite, setIsFavorite] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -41,17 +44,47 @@ const SeriesDetail = () => {
       try {
         setLoading(true);
         
-        // Fetch category details
-        const categoryResponse = await categoryApi.get(parseInt(id || '1'));
-        const categoryData = categoryResponse.success ? categoryResponse.data : null;
-        setCategory(categoryData);
-        
         // Fetch videos for this category
-        const videosResponse = await videoApi.getAll({ category_id: parseInt(id || '1'), per_page: 100 });
+        const videosResponse = await videoApi.getPublic({ category_id: parseInt(id || '1'), per_page: 100 });
         const videosData = Array.isArray(videosResponse.data) 
           ? videosResponse.data 
           : videosResponse.data?.data || [];
         setVideos(videosData);
+        
+        // Derive category details from first video's embedded category
+        if (videosData.length > 0 && videosData[0].category) {
+          setCategory(videosData[0].category);
+        } else {
+          // Fallback: fetch public categories and find by id so the page works even with 0 videos
+          try {
+            const catsRes = await categoryApi.getPublic();
+            const cats = Array.isArray(catsRes.data) ? catsRes.data : [];
+            const found = cats.find((c: any) => c.id === parseInt(id || '0')) || null;
+            setCategory(found);
+          } catch (e) {
+            setCategory(null);
+          }
+        }
+
+        // If asked to show only videos with progress, load series progress
+        const params = new URLSearchParams(location.search);
+        const filter = params.get('filter');
+        if (filter === 'progress') {
+          try {
+            const progRes = await userProgressApi.getSeriesProgress(parseInt(id || '1'));
+            const videoProgress = progRes?.data?.video_progress || {};
+            // Normalize to a map of video_id -> progress
+            const map: Record<number, any> = {};
+            Object.values(videoProgress).forEach((p: any) => {
+              if (p && typeof p.video_id === 'number') {
+                map[p.video_id] = p;
+              }
+            });
+            setProgressMap(map);
+          } catch (e) {
+            // ignore progress fetch errors
+          }
+        }
         
       } catch (error: any) {
         console.error('Error loading category data:', error);
@@ -66,7 +99,7 @@ const SeriesDetail = () => {
     if (id) {
       fetchCategoryData();
     }
-  }, [id]);
+  }, [id, location.search]);
 
   const getVisibilityIcon = (visibility: string) => {
     switch (visibility) {
@@ -153,6 +186,18 @@ const SeriesDetail = () => {
     return `${mins}m`;
   };
 
+  // Apply progress-only filter if requested
+  const params = new URLSearchParams(location.search);
+  const filter = params.get('filter');
+  const videosToShow = filter === 'progress'
+    ? videos.filter((v: any) => {
+        const p = progressMap[v.id];
+        if (!p) return false;
+        const pct = p.progress_percentage ?? 0;
+        return pct > 0 && pct < 100;
+      })
+    : videos;
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Hero Section */}
@@ -195,7 +240,11 @@ const SeriesDetail = () => {
                 <div className="text-right">
                   <div className="flex items-center">
                     <Star className="h-4 w-4 text-yellow-500 mr-1" />
-                    <span className="font-semibold">{category.rating?.toFixed(1) || '0.0'}</span>
+                    <span className="font-semibold">{(() => {
+                      const r = category?.rating;
+                      const num = typeof r === 'number' ? r : parseFloat(r || '0');
+                      return isNaN(num) ? '0.0' : num.toFixed(1);
+                    })()}</span>
                   </div>
                   <div className="text-sm text-muted-foreground">({category.rating_count || 0} reviews)</div>
                 </div>
@@ -221,17 +270,6 @@ const SeriesDetail = () => {
                 Created {category.created_at ? new Date(category.created_at).toLocaleDateString() : 'N/A'}
               </div>
             </div>
-
-            {/* Progress */}
-            {user && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span>Your Progress</span>
-                  <span>0 of {category.video_count || 0} episodes watched</span>
-                </div>
-                <Progress value={75} className="h-2" />
-              </div>
-            )}
           </div>
 
           {/* Episodes */}
@@ -244,7 +282,12 @@ const SeriesDetail = () => {
             </div>
 
             <div className="space-y-3">
-              {videos.map((video, index) => {
+              {videosToShow.length === 0 ? (
+                <div className="text-sm text-muted-foreground text-center py-6">
+                  No episodes yet. Please check back soon.
+                </div>
+              ) : (
+              videosToShow.map((video, index) => {
                 const hasAccess = canAccessVideo(video.visibility);
                 const isCompleted = index < 3; // Mock completed videos
 
@@ -290,7 +333,8 @@ const SeriesDetail = () => {
                     )}
                   </div>
                 );
-              })}
+              })
+              )}
             </div>
           </Card>
         </div>

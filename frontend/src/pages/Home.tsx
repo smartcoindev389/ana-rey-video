@@ -456,7 +456,7 @@ const Home = () => {
     try {
       const videosPromises = cats.map(async (category) => {
         try {
-          const response = await videoApi.getAll({
+          const response = await videoApi.getPublic({
             category_id: category.id,
             status: 'published',
             per_page: 10
@@ -784,18 +784,6 @@ const Home = () => {
         {/* HBO Max Style Grid - Always 2 Rows with Arrow Navigation */}
         <div className="w-full max-w-6xl mx-auto">
           <div className="flex items-center">
-            {/* Left Arrow */}
-            <button 
-              onClick={() => {
-                const container = document.querySelector('.content-grid') as HTMLElement;
-                if (container) {
-                  container.scrollBy({ left: -300, behavior: 'smooth' });
-                }
-              }}
-              className="text-gray-400 hover:text-white transition-colors duration-300 p-2 flex-shrink-0 mr-4"
-            >
-              <ChevronRight className="h-6 w-6 rotate-180" />
-            </button>
             
             {/* Content Grid */}
             <div 
@@ -808,18 +796,7 @@ const Home = () => {
               ))}
             </div>
             
-            {/* Right Arrow */}
-            <button 
-              onClick={() => {
-                const container = document.querySelector('.content-grid') as HTMLElement;
-                if (container) {
-                  container.scrollBy({ left: 300, behavior: 'smooth' });
-                }
-              }}
-              className="text-gray-400 hover:text-white transition-colors duration-300 p-2 flex-shrink-0 ml-4"
-            >
-              <ChevronRight className="h-6 w-6" />
-            </button>
+           
           </div>
         </div>
     </section>

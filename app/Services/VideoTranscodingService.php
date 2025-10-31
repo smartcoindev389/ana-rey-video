@@ -23,7 +23,8 @@ class VideoTranscodingService
             ]);
         } catch (\Exception $e) {
             Log::error('FFMpeg initialization failed: ' . $e->getMessage());
-            throw new \Exception('FFMpeg is not installed or not properly configured. Please install FFMpeg on your system.');
+            // Do not throw here; allow app to function without transcoding
+            $this->ffmpeg = null;
         }
     }
 
@@ -38,6 +39,8 @@ class VideoTranscodingService
     public function reencodeForWeb(string $inputPath, ?string $outputPath = null, array $options = []): array
     {
         try {
+            // Prevent PHP max execution time from interrupting long encodes
+            @set_time_limit(0);
             // Validate input file exists
             if (!file_exists($inputPath)) {
                 throw new \Exception("Input file not found: {$inputPath}");
@@ -56,6 +59,15 @@ class VideoTranscodingService
                 'output' => $outputPath,
                 'input_size' => filesize($inputPath),
             ]);
+
+            // If ffmpeg is unavailable, skip transcoding gracefully
+            if ($this->ffmpeg === null) {
+                return [
+                    'success' => false,
+                    'path' => null,
+                    'message' => 'FFMpeg is not available on this system.',
+                ];
+            }
 
             // Open video file
             $video = $this->ffmpeg->open($inputPath);

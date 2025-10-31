@@ -91,7 +91,8 @@ const AnalyticsReports = () => {
         analyticsApi.getContentAnalytics(),
       ]);
 
-      setAnalytics({
+      setAnalytics((prev: any) => ({
+        ...prev,
         overview: {
           totalUsers: overviewRes.data?.total_users || 0,
           activeUsers: overviewRes.data?.active_subscriptions || 0,
@@ -105,14 +106,17 @@ const AnalyticsReports = () => {
         revenue: revenueRes.data || [],
         topVideos: (topVideosRes.data || []).map((video: any) => ({
           title: video.title,
-          views: video.total_views || 0,
+          views: video.views || video.total_views || 0,
           completionRate: 85, // Keep static for now
           rating: video.rating || 0
         })),
-        subscriptionStats: subscriptionRes.data || analytics.subscriptionStats,
-        contentStats: contentRes.data || analytics.contentStats,
-        usersByCountry: analytics.usersByCountry // Keep static for now
-      });
+        subscriptionStats: subscriptionRes.data || prev.subscriptionStats,
+        contentStats: contentRes.data || prev.contentStats,
+        // Preserve static/demo sections to avoid undefined access
+        deviceStats: prev.deviceStats,
+        geographicStats: prev.geographicStats,
+        usersByCountry: prev.usersByCountry // Keep static for now
+      }));
       
     } catch (error: any) {
       console.error('Error loading analytics:', error);

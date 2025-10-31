@@ -57,7 +57,7 @@ return [
 
         // Encoding preset (ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow)
         // Faster = quicker encoding but larger file size
-        'preset' => env('FFMPEG_PRESET', 'medium'),
+        'preset' => env('FFMPEG_PRESET', 'faster'),
 
         // Whether to delete original video after successful re-encoding
         'delete_original' => env('FFMPEG_DELETE_ORIGINAL', true),

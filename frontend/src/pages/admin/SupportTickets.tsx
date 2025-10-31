@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
+import { 
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -34,91 +34,47 @@ import {
   Tag,
   Plus
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { supportTicketApi, SupportTicket } from '@/services/supportTicketApi';
+import { useSupportTickets } from '@/contexts/SupportTicketsContext';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 const SupportTickets = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
+  const { tickets, setTickets, selectedTicket, setSelectedTicket, updateTicket, appendReply } = useSupportTickets();
+  const [loading, setLoading] = useState<boolean>(true);
+  const [detailOpen, setDetailOpen] = useState<boolean>(false);
+  const [replyMessage, setReplyMessage] = useState<string>('');
 
-  // Mock data - replace with real API calls
-  const tickets = [
-    {
-      id: 'TKT-001',
-      user: 'John Doe',
-      email: 'john@example.com',
-      subject: 'Video playback issues',
-      message: 'I am having trouble playing videos on my mobile device. The video keeps buffering...',
-      category: 'Technical',
-      priority: 'high',
-      status: 'open',
-      assignedTo: 'Support Team',
-      createdAt: '2024-01-20 14:30:00',
-      lastReply: '2024-01-20 15:45:00',
-      replies: 2,
-      relatedVideo: 'React Fundamentals - Episode 3'
-    },
-    {
-      id: 'TKT-002',
-      user: 'Jane Smith',
-      email: 'jane@example.com',
-      subject: 'Subscription billing question',
-      message: 'I was charged twice for my premium subscription this month. Can you help me resolve this?',
-      category: 'Billing',
-      priority: 'medium',
-      status: 'in_progress',
-      assignedTo: 'Billing Team',
-      createdAt: '2024-01-19 09:15:00',
-      lastReply: '2024-01-19 10:30:00',
-      replies: 3,
-      relatedVideo: null
-    },
-    {
-      id: 'TKT-003',
-      user: 'Mike Johnson',
-      email: 'mike@example.com',
-      subject: 'Content request',
-      message: 'Would it be possible to add more advanced JavaScript topics?',
-      category: 'Content',
-      priority: 'low',
-      status: 'resolved',
-      assignedTo: 'Content Team',
-      createdAt: '2024-01-18 16:20:00',
-      lastReply: '2024-01-19 09:00:00',
-      replies: 1,
-      relatedVideo: null
-    },
-    {
-      id: 'TKT-004',
-      user: 'Sarah Wilson',
-      email: 'sarah@example.com',
-      subject: 'Account access problem',
-      message: 'I cannot log into my account. I keep getting an error message.',
-      category: 'Account',
-      priority: 'high',
-      status: 'open',
-      assignedTo: 'Technical Team',
-      createdAt: '2024-01-17 11:45:00',
-      lastReply: null,
-      replies: 0,
-      relatedVideo: null
-    },
-    {
-      id: 'TKT-005',
-      user: 'David Brown',
-      email: 'david@example.com',
-      subject: 'Feature suggestion',
-      message: 'It would be great to have a dark mode option for the platform.',
-      category: 'Feature Request',
-      priority: 'low',
-      status: 'closed',
-      assignedTo: 'Product Team',
-      createdAt: '2024-01-16 14:10:00',
-      lastReply: '2024-01-17 08:30:00',
-      replies: 2,
-      relatedVideo: null
-    }
-  ];
+  useEffect(() => {
+    const loadTickets = async () => {
+      setLoading(true);
+      try {
+        const response = await supportTicketApi.getAll();
+        const data = Array.isArray(response?.data?.data) ? response.data.data : (response?.data || []);
+        setTickets(data);
+      } catch (e) {
+        console.error('Failed to load tickets', e);
+        toast.error('Failed to load tickets');
+        setTickets([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadTickets();
+  }, []);
 
-  const getPriorityIcon = (priority: string) => {
+  const getPriorityIcon = (priority: string | undefined) => {
+    if (!priority) return null;
+    
     switch (priority) {
       case 'high':
         return <AlertCircle className="h-4 w-4 text-red-500" />;
@@ -126,27 +82,34 @@ const SupportTickets = () => {
         return <Clock className="h-4 w-4 text-yellow-500" />;
       case 'low':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'urgent':
+        return <AlertCircle className="h-4 w-4 text-red-600" />;
       default:
         return null;
     }
   };
 
-  const getPriorityBadge = (priority: string) => {
+  const getPriorityBadge = (priority: string | undefined) => {
+    if (!priority) return null;
+    
     const variants = {
       high: 'destructive',
       medium: 'secondary',
-      low: 'outline'
+      low: 'outline',
+      urgent: 'destructive'
     } as const;
 
     return (
-      <Badge variant={variants[priority as keyof typeof variants]}>
+      <Badge variant={variants[priority as keyof typeof variants] || 'outline'}>
         {getPriorityIcon(priority)}
         <span className="ml-1 capitalize">{priority}</span>
       </Badge>
     );
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string | undefined) => {
+    if (!status) return null;
+    
     const variants = {
       open: 'default',
       in_progress: 'secondary',
@@ -162,37 +125,40 @@ const SupportTickets = () => {
     };
 
     return (
-      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${colors[status as keyof typeof colors]}`}>
+      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800'}`}>
         {status === 'open' && <AlertCircle className="h-3 w-3 mr-1" />}
         {status === 'in_progress' && <Clock className="h-3 w-3 mr-1" />}
         {status === 'resolved' && <CheckCircle className="h-3 w-3 mr-1" />}
         {status === 'closed' && <XCircle className="h-3 w-3 mr-1" />}
-        {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
+        {(status || '').charAt(0).toUpperCase() + (status || '').slice(1).replace('_', ' ')}
       </span>
     );
   };
 
-  const getCategoryBadge = (category: string) => {
+  const getCategoryBadge = (category: string | undefined) => {
+    if (!category) return null;
+    
     const colors = {
-      Technical: 'bg-blue-100 text-blue-800',
-      Billing: 'bg-green-100 text-green-800',
-      Content: 'bg-purple-100 text-purple-800',
-      Account: 'bg-orange-100 text-orange-800',
-      'Feature Request': 'bg-pink-100 text-pink-800'
+      technical: 'bg-blue-100 text-blue-800',
+      billing: 'bg-green-100 text-green-800',
+      content: 'bg-purple-100 text-purple-800',
+      account: 'bg-orange-100 text-orange-800',
+      general: 'bg-gray-100 text-gray-800'
     };
 
     return (
-      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${colors[category as keyof typeof colors]}`}>
+      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${colors[category as keyof typeof colors] || 'bg-gray-100 text-gray-800'}`}>
         <Tag className="h-3 w-3 mr-1" />
-        {category}
+        {(category || '').charAt(0).toUpperCase() + (category || '').slice(1)}
       </span>
     );
   };
 
   const filteredTickets = tickets.filter(ticket => {
-    const matchesSearch = ticket.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ticket.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ticket.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const subject = (ticket.subject || '').toString();
+    const matchesSearch = subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (ticket.user?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (ticket.user?.email || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = selectedFilter === 'all' || ticket.status === selectedFilter;
     return matchesSearch && matchesFilter;
   });
@@ -203,8 +169,138 @@ const SupportTickets = () => {
     inProgressTickets: tickets.filter(t => t.status === 'in_progress').length,
     resolvedTickets: tickets.filter(t => t.status === 'resolved').length,
     closedTickets: tickets.filter(t => t.status === 'closed').length,
-    highPriorityTickets: tickets.filter(t => t.priority === 'high').length,
-    averageResponseTime: '2.5 hours'
+    highPriorityTickets: tickets.filter(t => t.priority === 'high' || t.priority === 'urgent').length,
+    averageResponseTime: '—'
+  };
+
+  const handleResolve = async (id: number) => {
+    try {
+      const response = await supportTicketApi.resolve(id);
+      if (response.success) {
+        updateTicket({ ...(selectedTicket as any), id, status: 'resolved' } as SupportTicket);
+        if (selectedTicket?.id === id) {
+          setSelectedTicket({ ...selectedTicket, status: 'resolved' });
+        }
+        toast.success('Ticket marked as resolved');
+      }
+    } catch (e) {
+      console.error('Failed to resolve ticket:', e);
+      toast.error('Failed to resolve ticket');
+    }
+  };
+
+  const handleClose = async (id: number) => {
+    try {
+      const response = await supportTicketApi.close(id);
+      if (response.success) {
+        updateTicket({ ...(selectedTicket as any), id, status: 'closed' } as SupportTicket);
+        if (selectedTicket?.id === id) {
+          setSelectedTicket({ ...selectedTicket, status: 'closed' });
+        }
+        toast.success('Ticket closed');
+      }
+    } catch (e) {
+      console.error('Failed to close ticket:', e);
+      toast.error('Failed to close ticket');
+    }
+  };
+
+  const handleReopen = async (id: number) => {
+    try {
+      const response = await supportTicketApi.reopen(id);
+      if (response.success) {
+        updateTicket({ ...(selectedTicket as any), id, status: 'open' } as SupportTicket);
+        if (selectedTicket?.id === id) {
+          setSelectedTicket({ ...selectedTicket, status: 'open' });
+        }
+        toast.success('Ticket reopened');
+      }
+    } catch (e) {
+      console.error('Failed to reopen ticket:', e);
+      toast.error('Failed to reopen ticket');
+    }
+  };
+
+  const openDetail = async (ticket: SupportTicket) => {
+    try {
+      const response = await supportTicketApi.get(ticket.id);
+      const data = (response as any)?.data?.data || (response as any)?.data || ticket;
+      // Normalize assigned user key for UI
+      if (!(data as any).assigned_user && (data as any).assignedTo) {
+        (data as any).assigned_user = (data as any).assignedTo;
+      }
+      // Ensure status is present (fallback to list item)
+      if (!(data as any).status && (ticket as any).status) {
+        (data as any).status = (ticket as any).status;
+      }
+      // Ensure basic identifiers exist
+      if (!(data as any)?.id) {
+        (data as any).id = ticket.id;
+      }
+      // Ensure replies are loaded
+      try {
+        const repliesRes = await supportTicketApi.getReplies((data as any).id || ticket.id);
+        const replies = repliesRes?.data || repliesRes?.data?.data || repliesRes || [];
+        (data as any).replies = replies;
+      } catch (e) {
+        // ignore replies load error; dialog will still open
+      }
+      setSelectedTicket(data);
+      setDetailOpen(true);
+      setReplyMessage('');
+    } catch (e) {
+      console.error('Failed to load ticket details:', e);
+      // Fallback to ticket data we already have
+      setSelectedTicket(ticket);
+      setDetailOpen(true);
+      setReplyMessage('');
+    }
+  };
+
+  const sendReply = async () => {
+    if (!selectedTicket || !replyMessage.trim()) return;
+    if (!selectedTicket.id) {
+      toast.error('Ticket ID is missing. Please reopen the ticket and try again.');
+      return;
+    }
+
+    try {
+      const response = await supportTicketApi.addReply(selectedTicket.id, { message: replyMessage });
+      if (response.success) {
+        // Optimistically append the new reply to the dialog
+        const createdReply = (response as any).data || (response as any).data?.data || null;
+        if (createdReply) appendReply(selectedTicket.id, createdReply);
+        // Refresh ticket to get updated replies
+        try {
+          const ticketResponse = await supportTicketApi.get(selectedTicket.id);
+          const updatedTicket = (ticketResponse as any)?.data?.data || (ticketResponse as any)?.data || ticketResponse;
+          try {
+            const repliesRes = await supportTicketApi.getReplies((updatedTicket as any).id || selectedTicket.id);
+            const replies = repliesRes?.data || repliesRes?.data?.data || repliesRes || [];
+            (updatedTicket as any).replies = replies;
+          } catch {}
+
+          if (updatedTicket) {
+            // Normalize for list UI
+            if (!(updatedTicket as any).assigned_user && (updatedTicket as any).assignedTo) {
+              (updatedTicket as any).assigned_user = (updatedTicket as any).assignedTo;
+            }
+            updateTicket(updatedTicket as SupportTicket);
+            setSelectedTicket(updatedTicket);
+          }
+        } catch (refreshError) {
+          console.error('Error refreshing ticket:', refreshError);
+          // Still show success even if refresh fails
+        }
+        setReplyMessage('');
+        toast.success('Reply sent successfully');
+        // Close detail modal after sending reply
+        setDetailOpen(false);
+      }
+    } catch (e) {
+      console.error('Failed to send reply:', e);
+      toast.error('Failed to send reply');
+    }
   };
 
   return (
@@ -306,6 +402,16 @@ const SupportTickets = () => {
 
       {/* Tickets Table */}
       <Card>
+        {loading ? (
+          <div className="p-8 text-center">
+            <div className="animate-pulse space-y-4">
+              <div className="h-4 bg-muted rounded w-3/4 mx-auto"></div>
+              <div className="h-4 bg-muted rounded w-1/2 mx-auto"></div>
+              <div className="h-4 bg-muted rounded w-2/3 mx-auto"></div>
+            </div>
+          </div>
+        ) : (
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -320,23 +426,29 @@ const SupportTickets = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredTickets.map((ticket) => (
-              <TableRow key={ticket.id}>
+            {filteredTickets.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-8">
+                  <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No tickets found</h3>
+                  <p className="text-muted-foreground">
+                    {searchTerm ? 'Try adjusting your search terms' : 'No support tickets have been created yet'}
+                  </p>
+                </TableCell>
+              </TableRow>
+            ) : (
+            filteredTickets.map((ticket, index) => (
+              <TableRow key={ticket.id ?? `ticket-${index}`}>
                 <TableCell>
                   <div>
-                    <div className="font-medium">{ticket.subject}</div>
-                    <div className="text-sm text-muted-foreground">{ticket.id}</div>
-                    {ticket.relatedVideo && (
-                      <div className="text-xs text-blue-600 mt-1">
-                        Related: {ticket.relatedVideo}
-                      </div>
-                    )}
+                    <div className="font-medium break-words">{ticket.subject || 'No Subject'}</div>
+                    <div className="text-sm text-muted-foreground">#{ticket.id}</div>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div>
-                    <div className="font-medium">{ticket.user}</div>
-                    <div className="text-sm text-muted-foreground">{ticket.email}</div>
+                  <div className="break-words">
+                    <div className="font-medium">{ticket.user?.name || '—'}</div>
+                    <div className="text-sm text-muted-foreground">{ticket.user?.email || '—'}</div>
                   </div>
                 </TableCell>
                 <TableCell>
@@ -349,15 +461,15 @@ const SupportTickets = () => {
                   {getStatusBadge(ticket.status)}
                 </TableCell>
                 <TableCell>
-                  <span className="text-sm">{ticket.assignedTo}</span>
+                  <span className="text-sm">{ticket.assigned_user?.name || (ticket as any).assignedTo?.name || 'Unassigned'}</span>
                 </TableCell>
                 <TableCell>
                   <div>
                     <div className="text-sm">
-                      {new Date(ticket.createdAt).toLocaleDateString()}
+                      {ticket.created_at ? new Date(ticket.created_at).toLocaleDateString() : 'N/A'}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {ticket.replies} replies
+                      {(ticket.replies?.length || 0)} replies
                     </div>
                   </div>
                 </TableCell>
@@ -369,29 +481,35 @@ const SupportTickets = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48 bg-gray-800 border border-gray-700 shadow-lg">
-                      <DropdownMenuItem className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer">
+                      <DropdownMenuItem onClick={() => openDetail(ticket)} className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer">
                         <Eye className="mr-2 h-4 w-4" />
                         View Details
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer">
+                      <DropdownMenuItem onClick={() => handleResolve(ticket.id)} className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer">
                         <Reply className="mr-2 h-4 w-4" />
-                        Reply
+                        Mark Resolved
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer">
-                        <User className="mr-2 h-4 w-4" />
-                        Assign
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer">
-                        <Tag className="mr-2 h-4 w-4" />
-                        Change Priority
-                      </DropdownMenuItem>
+                      {ticket.status === 'closed' ? (
+                        <DropdownMenuItem onClick={() => handleReopen(ticket.id)} className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer">
+                          <Tag className="mr-2 h-4 w-4" />
+                          Reopen
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem onClick={() => handleClose(ticket.id)} className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer">
+                          <Tag className="mr-2 h-4 w-4" />
+                          Close
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
               </TableRow>
-            ))}
+            ))
+            )}
           </TableBody>
         </Table>
+        </div>
+        )}
       </Card>
 
       {/* Quick Stats */}
@@ -415,6 +533,102 @@ const SupportTickets = () => {
           </div>
         </Card>
       </div>
+
+      {/* Detail Dialog */}
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>{selectedTicket?.subject || 'Ticket Details'}</span>
+              <span className="text-sm text-muted-foreground">#{selectedTicket?.id || 'N/A'}</span>
+            </DialogTitle>
+            <DialogDescription>
+              <span className="flex items-center space-x-3 mt-2">
+                {selectedTicket && getStatusBadge(selectedTicket.status)}
+                {selectedTicket && getPriorityBadge(selectedTicket.priority)}
+                {selectedTicket && getCategoryBadge(selectedTicket.category)}
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedTicket && (
+            <div className="space-y-4">
+              {/* Ticket Description */}
+              <div className="p-4 bg-muted rounded-lg">
+                <div className="text-xs text-muted-foreground mb-1">Ticket Description</div>
+                <p className="text-sm">{selectedTicket.description || 'No description provided'}</p>
+              </div>
+
+              {/* User Info */}
+              <div className="flex items-center justify-between text-sm">
+                <div>
+                  <span className="text-muted-foreground">Created by: </span>
+                  <span className="font-medium">{selectedTicket.user?.name || 'Unknown'}</span>
+                  <span className="text-muted-foreground ml-2">({selectedTicket.user?.email || 'No email'})</span>
+                </div>
+                <div className="text-muted-foreground">
+                  {selectedTicket.created_at ? new Date(selectedTicket.created_at).toLocaleDateString() : 'N/A'}
+                </div>
+              </div>
+
+              {/* Replies */}
+              <div className="border-t pt-4">
+                <div className="text-sm font-medium mb-3">
+                  Conversation ({(selectedTicket.replies || []).length} {selectedTicket.replies?.length === 1 ? 'reply' : 'replies'})
+                </div>
+                <div className="space-y-3 max-h-72 overflow-y-auto">
+                  {(selectedTicket.replies && selectedTicket.replies.length > 0) ? (
+                    selectedTicket.replies.map((r) => (
+                      <div key={r.id} className={`p-3 rounded-lg border ${
+                        r.user_id === selectedTicket.user_id ? 'bg-primary/10 border-primary/20' : 'bg-muted'
+                      }`}>
+                        <div className="flex items-center justify-between text-xs mb-2">
+                          <span className="font-medium">{r.user?.name || 'Agent'}</span>
+                          <span className="text-muted-foreground">
+                            {(r.created_at || r.updated_at) ? new Date(r.created_at || r.updated_at).toLocaleString() : 'N/A'}
+                          </span>
+                        </div>
+                        <div className="text-sm whitespace-pre-wrap">{r.message || 'No message content'}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      No replies yet. Be the first to respond.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Reply Form (only show for active statuses) */}
+              {['open', 'in_progress', 'pending'].includes((selectedTicket.status || '').toString()) && (
+                <div className="border-t pt-4 space-y-2">
+                  <Textarea 
+                    value={replyMessage} 
+                    onChange={(e) => setReplyMessage(e.target.value)} 
+                    placeholder="Type your reply..." 
+                    className="min-h-[100px]"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => {
+                      setDetailOpen(false);
+                      setReplyMessage('');
+                    }}>
+                      Cancel
+                    </Button>
+                    <Button onClick={sendReply} disabled={!replyMessage.trim() || loading}>
+                      Send Reply
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -9,6 +9,7 @@ use App\Models\Series;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class UserProgressController extends Controller
 {
@@ -19,7 +20,7 @@ class UserProgressController extends Controller
     {
         $user = Auth::user();
         
-        $query = UserProgress::with(['series', 'video'])
+        $query = UserProgress::with(['category', 'video.category'])
             ->where('user_id', $user->id);
 
         // Filter by type
@@ -37,9 +38,11 @@ class UserProgressController extends Controller
             }
         }
 
-        // Filter by series
-        if ($request->has('series_id')) {
-            $query->where('series_id', $request->get('series_id'));
+        // Filter by category (backward-compat: accept series_id as category_id)
+        if ($request->has('category_id')) {
+            $query->where('category_id', $request->get('category_id'));
+        } elseif ($request->has('series_id')) {
+            $query->where('category_id', $request->get('series_id'));
         }
 
         // Sorting
@@ -102,9 +105,10 @@ class UserProgressController extends Controller
             ->where('video_id', $video->id)
             ->first();
 
+        // If no progress exists, return null instead of error
         return response()->json([
             'success' => true,
-            'data' => $progress,
+            'data' => $progress, // Can be null if no progress yet
         ]);
     }
 
@@ -146,11 +150,18 @@ class UserProgressController extends Controller
             ->where('video_id', $video->id)
             ->first();
 
+        Log::info('Toggle Favorite', [
+            'user_id' => $user->id,
+            'video_id' => $video->id,
+            'progress_exists' => $progress !== null,
+            'current_favorite' => $progress ? $progress->is_favorite : null,
+        ]);
+
         if (!$progress) {
             // Create new progress record
             $progress = UserProgress::create([
                 'user_id' => $user->id,
-                'series_id' => $video->series_id,
+                'category_id' => $video->category_id,
                 'video_id' => $video->id,
                 'is_favorite' => true,
                 'favorited_at' => now(),
@@ -158,16 +169,25 @@ class UserProgressController extends Controller
             ]);
         } else {
             // Toggle favorite status
-            $progress->update([
-                'is_favorite' => !$progress->is_favorite,
-                'favorited_at' => !$progress->is_favorite ? now() : null,
-            ]);
+            $newFavoriteStatus = !$progress->is_favorite;
+            $progress->is_favorite = $newFavoriteStatus;
+            $progress->favorited_at = $newFavoriteStatus ? now() : null;
+            $progress->save(); // Explicitly save
         }
+
+        $progress->refresh(); // Refresh to get latest data from database
+
+        Log::info('Favorite Toggled', [
+            'user_id' => $user->id,
+            'video_id' => $video->id,
+            'is_favorite' => $progress->is_favorite,
+            'favorited_at' => $progress->favorited_at,
+        ]);
 
         return response()->json([
             'success' => true,
             'message' => $progress->is_favorite ? 'Added to favorites.' : 'Removed from favorites.',
-            'data' => $progress,
+            'data' => $progress->fresh(), // Return fresh data from database
         ]);
     }
 
@@ -191,7 +211,7 @@ class UserProgressController extends Controller
             // Create new progress record
             $progress = UserProgress::create([
                 'user_id' => $user->id,
-                'series_id' => $video->series_id,
+                'category_id' => $video->category_id,
                 'video_id' => $video->id,
                 'rating' => $validated['rating'],
                 'review' => $validated['review'] ?? null,
@@ -226,7 +246,7 @@ class UserProgressController extends Controller
         // Get additional stats
         $favoriteCount = UserProgress::forUser($user->id)->favorites()->count();
         $recentlyWatched = UserProgress::forUser($user->id)
-            ->with(['video.series'])
+            ->with(['video.category'])
             ->orderBy('last_watched_at', 'desc')
             ->limit(10)
             ->get();
@@ -247,17 +267,30 @@ class UserProgressController extends Controller
     {
         $user = Auth::user();
 
-        $query = UserProgress::with(['video.series'])
+        // Get videos with progress, excluding completed (100%) and 0% progress
+        $query = UserProgress::with(['video.category', 'video.instructor', 'category'])
             ->where('user_id', $user->id)
-            ->where('is_completed', false)
+            ->whereNotNull('video_id')
+            ->where(function ($q) {
+                $q->where('is_completed', false)
+                  ->orWhere(function ($qq) {
+                      // Include completed but less than 100% progress
+                      $qq->where('progress_percentage', '<', 100);
+                  });
+            })
             ->where('progress_percentage', '>', 0)
             ->orderBy('last_watched_at', 'desc');
 
         $progress = $query->limit($request->get('limit', 10))->get();
 
+        // Filter out null videos and ensure we have video relationship
+        $filteredProgress = $progress->filter(function ($item) {
+            return $item->video !== null;
+        });
+
         return response()->json([
             'success' => true,
-            'data' => $progress,
+            'data' => $filteredProgress->values(),
         ]);
     }
 
@@ -268,7 +301,7 @@ class UserProgressController extends Controller
     {
         $user = Auth::user();
 
-        $query = UserProgress::with(['video.series', 'series'])
+        $query = UserProgress::with(['video.category', 'category'])
             ->where('user_id', $user->id)
             ->favorites()
             ->orderBy('favorited_at', 'desc');
@@ -288,7 +321,7 @@ class UserProgressController extends Controller
     {
         $user = Auth::user();
 
-        $query = UserProgress::with(['video.series', 'series'])
+        $query = UserProgress::with(['video.category', 'category'])
             ->where('user_id', $user->id)
             ->completed()
             ->orderBy('completed_at', 'desc');
@@ -298,6 +331,153 @@ class UserProgressController extends Controller
         return response()->json([
             'success' => true,
             'data' => $completed,
+        ]);
+    }
+
+    /**
+     * Toggle like on a video.
+     */
+    public function toggleLike(Video $video): JsonResponse
+    {
+        $user = Auth::user();
+
+        $progress = UserProgress::where('user_id', $user->id)
+            ->where('video_id', $video->id)
+            ->first();
+
+        Log::info('Toggle Like', [
+            'user_id' => $user->id,
+            'video_id' => $video->id,
+            'progress_exists' => $progress !== null,
+            'current_liked' => $progress ? $progress->is_liked : null,
+            'current_disliked' => $progress ? $progress->is_disliked : null,
+        ]);
+
+        if (!$progress) {
+            // Create new progress record
+            $progress = UserProgress::create([
+                'user_id' => $user->id,
+                'category_id' => $video->category_id,
+                'video_id' => $video->id,
+                'is_liked' => true,
+                'is_disliked' => false,
+                'liked_at' => now(),
+                'first_watched_at' => now(),
+            ]);
+        } else {
+            // Toggle like status
+            if ($progress->is_disliked) {
+                // If disliked, remove dislike and add like
+                $progress->is_liked = true;
+                $progress->is_disliked = false;
+                $progress->liked_at = now();
+            } else if ($progress->is_liked) {
+                // If liked, remove like
+                $progress->is_liked = false;
+                $progress->liked_at = null;
+            } else {
+                // If neither, add like
+                $progress->is_liked = true;
+                $progress->liked_at = now();
+            }
+            $progress->save(); // Explicitly save
+        }
+
+        $progress->refresh(); // Refresh to get latest data from database
+
+        Log::info('Like Toggled', [
+            'user_id' => $user->id,
+            'video_id' => $video->id,
+            'is_liked' => $progress->is_liked,
+            'is_disliked' => $progress->is_disliked,
+            'liked_at' => $progress->liked_at,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $progress->is_liked ? 'Video liked.' : 'Like removed.',
+            'data' => $progress->fresh(), // Return fresh data from database
+        ]);
+    }
+
+    /**
+     * Toggle dislike on a video.
+     */
+    public function toggleDislike(Video $video): JsonResponse
+    {
+        $user = Auth::user();
+
+        $progress = UserProgress::where('user_id', $user->id)
+            ->where('video_id', $video->id)
+            ->first();
+
+        Log::info('Toggle Dislike', [
+            'user_id' => $user->id,
+            'video_id' => $video->id,
+            'progress_exists' => $progress !== null,
+            'current_liked' => $progress ? $progress->is_liked : null,
+            'current_disliked' => $progress ? $progress->is_disliked : null,
+        ]);
+
+        if (!$progress) {
+            // Create new progress record
+            $progress = UserProgress::create([
+                'user_id' => $user->id,
+                'category_id' => $video->category_id,
+                'video_id' => $video->id,
+                'is_liked' => false,
+                'is_disliked' => true,
+                'first_watched_at' => now(),
+            ]);
+        } else {
+            // Toggle dislike status
+            if ($progress->is_liked) {
+                // If liked, remove like and add dislike
+                $progress->is_liked = false;
+                $progress->is_disliked = true;
+                $progress->liked_at = null;
+            } else if ($progress->is_disliked) {
+                // If disliked, remove dislike
+                $progress->is_disliked = false;
+            } else {
+                // If neither, add dislike
+                $progress->is_disliked = true;
+            }
+            $progress->save(); // Explicitly save
+        }
+
+        $progress->refresh(); // Refresh to get latest data from database
+
+        Log::info('Dislike Toggled', [
+            'user_id' => $user->id,
+            'video_id' => $video->id,
+            'is_liked' => $progress->is_liked,
+            'is_disliked' => $progress->is_disliked,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $progress->is_disliked ? 'Video disliked.' : 'Dislike removed.',
+            'data' => $progress->fresh(), // Return fresh data from database
+        ]);
+    }
+
+    /**
+     * Get user's favorites with full video data.
+     */
+    public function getFavorites(): JsonResponse
+    {
+        $user = Auth::user();
+
+        $favorites = UserProgress::forUser($user->id)
+            ->favorites()
+            ->with(['video.category', 'video.instructor'])
+            ->orderBy('favorited_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $favorites,
         ]);
     }
 

@@ -58,7 +58,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
     // Validate file type
     const allowedTypes = type === 'image' 
       ? ['image/jpeg', 'image/png', 'image/jpg', 'image/webp']
-      : ['video/mp4', 'video/mov', 'video/avi'];
+      : ['video/mp4', 'video/mov', 'video/avi', 'video/quicktime', 'video/x-msvideo'];
     
     if (!allowedTypes.includes(file.type)) {
       setUploadError(`Please select a valid ${type} file`);
@@ -133,7 +133,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
     if (accept) return accept;
     return type === 'image' 
       ? 'image/jpeg,image/png,image/jpg,image/webp'
-      : 'video/mp4,video/mov,video/avi';
+      : 'video/mp4,video/mov,video/avi,video/quicktime,video/x-msvideo';
   };
 
   const getIcon = () => {

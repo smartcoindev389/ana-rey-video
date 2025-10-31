@@ -40,11 +40,15 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  LayoutDashboard
+  LayoutDashboard,
+  Heart,
+  Play,
+  Clock
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { userProgressApi } from '@/services/userProgressApi';
 
 const Profile = () => {
   const { user, updateUser } = useAuth();
@@ -53,6 +57,8 @@ const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [favorites, setFavorites] = useState<any[]>([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(false);
   
   // Form states
   const [formData, setFormData] = useState({
@@ -94,8 +100,26 @@ const Profile = () => {
           allowMessages: true,
         }
       });
+
+      // Load favorites
+      loadFavorites();
     }
   }, [user]);
+
+  const loadFavorites = async () => {
+    if (!user) return;
+    setLoadingFavorites(true);
+    try {
+      const response = await userProgressApi.getFavoritesList();
+      if (response.success) {
+        setFavorites(response.data || []);
+      }
+    } catch (error) {
+      console.error('Failed to load favorites:', error);
+    } finally {
+      setLoadingFavorites(false);
+    }
+  };
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({
@@ -435,6 +459,64 @@ const Profile = () => {
                 <span className="font-medium">7 days</span>
               </div>
             </div>
+          </Card>
+
+          {/* Favorite Content */}
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">Favorite Content</h3>
+              <Badge variant="secondary">{favorites.length} videos</Badge>
+            </div>
+            {loadingFavorites ? (
+              <div className="text-center py-4 text-sm text-muted-foreground">Loading favorites...</div>
+            ) : favorites.length === 0 ? (
+              <div className="text-center py-4 text-sm text-muted-foreground">
+                No favorite videos yet. Start adding favorites while watching videos!
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                {favorites.map((fav: any) => (
+                  fav.video ? (
+                    <div
+                      key={fav.id}
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted cursor-pointer transition-colors"
+                      onClick={() => navigate(`/video/${fav.video.id}`)}
+                    >
+                      <div className="w-24 h-16 bg-gradient-to-br from-primary/20 to-primary/5 rounded relative overflow-hidden flex-shrink-0">
+                        {fav.video.thumbnail_url && (
+                          <img
+                            src={fav.video.thumbnail_url}
+                            alt={fav.video.title}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <Play className="h-4 w-4 text-white" />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-sm line-clamp-2">{fav.video.title}</h4>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                          {fav.video.duration && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {Math.floor(fav.video.duration / 60)}m
+                            </span>
+                          )}
+                          {fav.video.total_views && (
+                            <span className="flex items-center gap-1">
+                              <Eye className="h-3 w-3" />
+                              {fav.video.total_views}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Heart className="h-4 w-4 text-red-500 fill-current flex-shrink-0" />
+                    </div>
+                  ) : null
+                ))}
+              </div>
+            )}
           </Card>
         </div>
       </div>

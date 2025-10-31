@@ -35,6 +35,7 @@ const Library = () => {
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [loading, setLoading] = useState(true);
+  const [totalWatchTime, setTotalWatchTime] = useState<number>(0);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -43,17 +44,23 @@ const Library = () => {
       try {
         setLoading(true);
         
-        // Fetch categories (user's enrolled categories)
-        const categoriesResponse = await categoryApi.getAll();
+        // Fetch categories (user's enrolled categories) - use public endpoint for normal users
+        const categoriesResponse = await categoryApi.getPublic();
         const categoriesData = Array.isArray(categoriesResponse.data) 
           ? categoriesResponse.data 
-          : categoriesResponse.data?.data || [];
+          : [];
         setMyCategories(categoriesData);
         
-        // Fetch continue watching
+        // Fetch continue watching (filter out null videos and 100% completed)
         const continueResponse = await userProgressApi.continueWatching(10);
         const continueData = continueResponse.success && continueResponse.data 
-          ? continueResponse.data 
+          ? continueResponse.data.filter((item: any) => 
+              item.video_id && 
+              item.video && 
+              (item.progress_percentage || 0) > 0 && 
+              (item.progress_percentage || 0) < 100 &&
+              !item.is_completed
+            )
           : [];
         setContinueWatching(continueData);
         
@@ -63,6 +70,16 @@ const Library = () => {
           ? (Array.isArray(historyResponse.data) ? historyResponse.data : historyResponse.data?.data || [])
           : [];
         setWatchHistory(historyData);
+
+        // Fetch user stats for total watch time
+        try {
+          const statsResponse = await userProgressApi.getStats();
+          const statsData = statsResponse?.data || statsResponse;
+          const totalSeconds = statsData?.total_watch_time || 0;
+          setTotalWatchTime(totalSeconds);
+        } catch (e) {
+          // ignore stats error, keep default 0
+        }
         
       } catch (error: any) {
         console.error('Error loading library data:', error);
@@ -70,6 +87,7 @@ const Library = () => {
         setMyCategories([]);
         setContinueWatching([]);
         setWatchHistory([]);
+        setTotalWatchTime(0);
       } finally {
         setLoading(false);
       }
@@ -177,12 +195,23 @@ const Library = () => {
       return `${diffDays} days ago`;
     };
 
+    if (!item.video || !item.video_id) {
+      return null; // Don't render if no video data
+    }
+
+    const categoryId = item.video?.category_id || item.category_id;
+    const categoryName = item.video?.category?.name || item.category?.name || 'Category';
+
     return (
       <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/video/${item.video_id}`)}>
         <div className="flex">
-          <div className="w-32 aspect-video bg-gradient-to-br from-primary/20 to-primary/5 relative">
-            {item.video?.intro_image ? (
-              <img src={item.video.intro_image} alt={item.video?.title} className="w-full h-full object-cover" />
+          <div className="w-32 aspect-video bg-gradient-to-br from-primary/20 to-primary/5 relative overflow-hidden">
+            {item.video?.intro_image_url || item.video?.intro_image || item.video?.thumbnail_url || item.video?.thumbnail ? (
+              <img 
+                src={item.video.intro_image_url || item.video.intro_image || item.video.thumbnail_url || item.video.thumbnail} 
+                alt={item.video?.title || 'Video'} 
+                className="w-full h-full object-cover" 
+              />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="w-8 h-8 bg-primary/90 rounded-full flex items-center justify-center">
@@ -191,15 +220,27 @@ const Library = () => {
               </div>
             )}
             <div className="absolute bottom-0 left-0 right-0 bg-black/50 p-1">
-              <Progress value={item.progress_percentage} className="h-1" />
+              <Progress value={item.progress_percentage || 0} className="h-1" />
             </div>
           </div>
           <div className="flex-1 p-4">
-            <h3 className="font-medium text-sm mb-1">{item.video?.title || 'Untitled Video'}</h3>
-            <p className="text-xs text-muted-foreground mb-2">{item.category?.name || item.video?.category?.name || 'Category'}</p>
+            <h3 className="font-medium text-sm mb-1 line-clamp-2">{item.video?.title || 'Untitled Video'}</h3>
+            {categoryId ? (
+              <p 
+                className="text-xs text-muted-foreground mb-2 hover:text-primary transition-colors cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/category/${categoryId}?filter=progress`);
+                }}
+              >
+                {categoryName}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground mb-2">{categoryName}</p>
+            )}
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{formatTime(item.time_watched)} / {formatTime(item.video?.duration || 0)}</span>
-              <span>{getTimeAgo(item.last_watched_at)}</span>
+              <span>{formatTime(item.time_watched || 0)} / {formatTime(item.video?.duration || item.video_duration || 0)}</span>
+              <span>{item.last_watched_at ? getTimeAgo(item.last_watched_at) : ''}</span>
             </div>
           </div>
         </div>
@@ -249,7 +290,7 @@ const Library = () => {
         <p className="text-muted-foreground">Pick up where you left off</p>
       </div>
 
-      {/* Continue Watching Section */}
+      {/* Continue Watching Section - grouped by series/category with per-series rows */}
       {continueWatching.length > 0 && (
         <section className="mb-12">
           <div className="flex items-center justify-between mb-6">
@@ -257,15 +298,97 @@ const Library = () => {
               <Play className="h-5 w-5 text-primary" />
               <h2 className="text-2xl font-bold">Continue Watching</h2>
             </div>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/library')}>
               View All
             </Button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {continueWatching.map((item) => (
-              <ContinueWatchingCard key={item.id} item={item} />
-            ))}
-          </div>
+
+          {(() => {
+            // Build filtered list once
+            const items = continueWatching
+              .filter((item: any) => item.video_id && item.video && (item.progress_percentage || 0) > 0 && (item.progress_percentage || 0) < 100);
+
+            // All in-progress row
+            if (items.length > 0) {
+              return (
+                <>
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-lg font-semibold">In-progress Videos</h3>
+                      <Button variant="link" className="px-0" onClick={() => navigate('/library')}>View all</Button>
+                    </div>
+                    <div className="flex gap-4 overflow-x-auto pb-2">
+                      {items.map((item: any) => (
+                        <div key={`all-${item.id}`} className="min-w-[220px]">
+                          <ContinueWatchingCard item={item} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              );
+            }
+
+            // Fallback if no items
+            return (
+              <div className="text-sm text-muted-foreground">No in-progress videos yet.</div>
+            );
+          })()}
+
+          {(() => {
+            // Prepare grouped map: category_id -> items with progress
+            const items = continueWatching
+              .filter((item: any) => item.video_id && item.video && (item.progress_percentage || 0) > 0 && (item.progress_percentage || 0) < 100);
+            const grouped: Record<number, any[]> = {};
+            for (const it of items) {
+              const cid = it.video?.category_id || it.category_id;
+              if (!cid) continue;
+              if (!grouped[cid]) grouped[cid] = [];
+              grouped[cid].push(it);
+            }
+
+            const rows = Object.entries(grouped);
+            if (rows.length === 0) return (
+              <div className="text-sm text-muted-foreground">No in-progress videos yet.</div>
+            );
+
+            return rows.map(([cidStr, items]) => {
+              const cid = Number(cidStr);
+              const first = (items as any[])[0];
+              const seriesName = first?.video?.category?.name || first?.category?.name || 'Series';
+              const cover = first?.video?.category?.cover_image || null;
+
+              return (
+                <div key={cid} className="mb-8">
+                  {/* Series header */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded bg-muted overflow-hidden flex items-center justify-center">
+                        {cover ? (
+                          <img src={cover} alt={seriesName} className="w-full h-full object-cover" />
+                        ) : (
+                          <Play className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                      <h3 className="text-lg font-semibold">{seriesName}</h3>
+                    </div>
+                    <Button variant="link" className="px-0" onClick={() => navigate(`/category/${cid}?filter=progress`)}>
+                      View series
+                    </Button>
+                  </div>
+
+                  {/* Videos row */}
+                  <div className="flex gap-4 overflow-x-auto pb-2">
+                    {(items as any[]).map((item) => (
+                      <div key={item.id} className="min-w-[220px]">
+                        <ContinueWatchingCard item={item} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            });
+          })()}
         </section>
       )}
 
@@ -440,7 +563,7 @@ const Library = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Total Hours</p>
-              <p className="text-2xl font-bold">24.5</p>
+              <p className="text-2xl font-bold">{(totalWatchTime / 3600).toFixed(1)}</p>
             </div>
             <Clock className="h-8 w-8 text-purple-500" />
           </div>

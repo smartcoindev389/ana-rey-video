@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Check } from "lucide-react";
@@ -63,10 +63,27 @@ const plans: Plan[] = [
 const Subscription = () => {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [backendPlans, setBackendPlans] = useState<any[]>([]);
   const navigate = useNavigate();
   const location = useLocation();
   const { register, isAuthenticated, updateUser } = useAuth();
   const isFromSignup = location.state !== null;
+
+  useEffect(() => {
+    // Load active plans from backend so we can map to Stripe price via plan id
+    (async () => {
+      try {
+        const res = await fetch(`/api/subscription-plans/public`);
+        const data = await res.json();
+        if (data?.success && Array.isArray(data.data)) {
+          setBackendPlans(data.data);
+        }
+      } catch (e) {
+        // non-blocking
+        console.warn('Failed to load backend plans');
+      }
+    })();
+  }, []);
 
   const handleSelectPlan = async (plan: Plan) => {
     console.log('=== Plan Selected ===');
@@ -90,7 +107,7 @@ const Subscription = () => {
         toast.success(`Account created successfully with ${plan.name} plan!`);
         navigate("/");
       } else {
-        // Update subscription
+        // For paid plans, start Stripe Checkout; freemium updates locally
         console.log('Updating subscription...');
         if (!isAuthenticated) {
           console.log('Not authenticated, redirecting to login');
@@ -98,11 +115,35 @@ const Subscription = () => {
           navigate("/auth");
           return;
         }
-        const response = await api.updateSubscription(plan.id);
-        console.log('Subscription updated:', response);
-        updateUser(response.user);
-        toast.success(`Subscription updated to ${plan.name}!`);
-        navigate("/");
+        if (plan.id === 'freemium') {
+          const response = await api.updateSubscription(plan.id);
+          updateUser(response.user);
+          toast.success(`Subscription updated to ${plan.name}!`);
+          navigate("/");
+          return;
+        }
+
+        // Find corresponding plan in backend by name
+        const match = backendPlans.find(p => (p.display_name || p.name || '').toLowerCase() === plan.name.toLowerCase());
+        if (!match) {
+          toast.error('Selected plan is not available.');
+          return;
+        }
+
+        const successUrl = `${window.location.origin}/?payment=success`;
+        const cancelUrl = `${window.location.origin}/subscription?payment=cancel`;
+
+        const res = await fetch('/api/payments/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ plan_id: match.id, success_url: successUrl, cancel_url: cancelUrl })
+        });
+        const data = await res.json();
+        if (data?.success && data.url) {
+          window.location.href = data.url;
+          return;
+        }
+        throw new Error(data?.message || 'Failed to start checkout');
       }
     } catch (error) {
       console.error('Subscription error:', error);

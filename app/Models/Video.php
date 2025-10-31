@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+
+use App\Models\VideoComment;
 use Illuminate\Support\Str;
 
 class Video extends Model
@@ -145,6 +147,14 @@ class Video extends Model
     }
 
     /**
+     * Get comments for this video.
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(VideoComment::class);
+    }
+
+    /**
      * Get the full video URL.
      */
     public function getVideoUrlFullAttribute(): ?string
@@ -209,8 +219,11 @@ class Video extends Model
     /**
      * Scope a query to filter by visibility.
      */
-    public function scopeVisibleTo($query, string $subscriptionType)
+    public function scopeVisibleTo($query, ?string $subscriptionType)
     {
+        // Default to freemium if subscription_type is null/empty
+        $subscriptionType = $subscriptionType ?: 'freemium';
+        
         // Admin can see all content
         if ($subscriptionType === 'admin') {
             return $query;

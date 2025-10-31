@@ -86,7 +86,7 @@ export const supportTicketApi = {
     if (params?.category) queryParams.append('category', params.category);
     if (params?.priority) queryParams.append('priority', params.priority);
     
-    const url = `${API_BASE_URL}/admin/support-tickets${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    const url = `${API_BASE_URL}/support-tickets${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
     const response = await fetch(url, {
       method: 'GET',
       headers: getAuthHeaders(),
@@ -122,9 +122,9 @@ export const supportTicketApi = {
     return handleResponse<any>(response);
   },
 
-  // Update ticket
+  // Update ticket (admin)
   update: async (id: number, data: SupportTicketUpdateRequest): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL}/admin/support-tickets/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/support-tickets/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -132,9 +132,9 @@ export const supportTicketApi = {
     return handleResponse<any>(response);
   },
 
-  // Delete ticket
+  // Delete ticket (admin)
   delete: async (id: number): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL}/admin/support-tickets/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/support-tickets/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -143,7 +143,7 @@ export const supportTicketApi = {
 
   // Assign ticket
   assign: async (id: number, userId: number): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL}/admin/support-tickets/${id}/assign`, {
+    const response = await fetch(`${API_BASE_URL}/support-tickets/${id}/assign`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ user_id: userId }),
@@ -153,7 +153,7 @@ export const supportTicketApi = {
 
   // Resolve ticket
   resolve: async (id: number): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL}/admin/support-tickets/${id}/resolve`, {
+    const response = await fetch(`${API_BASE_URL}/support-tickets/${id}/resolve`, {
       method: 'POST',
       headers: getAuthHeaders(),
     });
@@ -162,7 +162,7 @@ export const supportTicketApi = {
 
   // Close ticket
   close: async (id: number): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL}/admin/support-tickets/${id}/close`, {
+    const response = await fetch(`${API_BASE_URL}/support-tickets/${id}/close`, {
       method: 'POST',
       headers: getAuthHeaders(),
     });
@@ -171,7 +171,7 @@ export const supportTicketApi = {
 
   // Reopen ticket
   reopen: async (id: number): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL}/admin/support-tickets/${id}/reopen`, {
+    const response = await fetch(`${API_BASE_URL}/support-tickets/${id}/reopen`, {
       method: 'POST',
       headers: getAuthHeaders(),
     });
@@ -197,9 +197,9 @@ export const supportTicketApi = {
     return handleResponse<any>(response);
   },
 
-  // Get statistics
+  // Get statistics (admin)
   getStatistics: async (): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL}/admin/support-tickets-statistics`, {
+    const response = await fetch(`${API_BASE_URL}/support-tickets-statistics`, {
       method: 'GET',
       headers: getAuthHeaders(),
     });
