@@ -10,6 +10,8 @@ class Testimonial extends Model
     protected $fillable = [
         'user_id',
         'video_id',
+        'type', // 'testimonial', 'feedback', 'suggestion'
+        'subject',
         'name',
         'role',
         'company',
@@ -17,6 +19,9 @@ class Testimonial extends Model
         'content',
         'rating',
         'is_approved',
+        'status', // 'pending', 'approved', 'rejected'
+        'priority', // 'low', 'medium', 'high'
+        'category',
         'is_featured',
         'sort_order',
     ];
@@ -27,6 +32,38 @@ class Testimonial extends Model
         'rating' => 'integer',
         'sort_order' => 'integer',
     ];
+
+    /**
+     * Scope to get feedback type testimonials.
+     */
+    public function scopeFeedback($query)
+    {
+        return $query->where('type', 'feedback');
+    }
+
+    /**
+     * Scope to get suggestion type testimonials.
+     */
+    public function scopeSuggestion($query)
+    {
+        return $query->where('type', 'suggestion');
+    }
+
+    /**
+     * Scope to get testimonial type testimonials.
+     */
+    public function scopeTestimonial($query)
+    {
+        return $query->where('type', 'testimonial');
+    }
+
+    /**
+     * Scope to get by status.
+     */
+    public function scopeByStatus($query, $status)
+    {
+        return $query->where('status', $status);
+    }
 
     /**
      * Get the user that owns the testimonial.

@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { 
   Play, 
   Pause, 
@@ -32,7 +33,17 @@ import { useNavigate } from 'react-router-dom';
 import { videoApi, categoryApi } from '@/services/videoApi';
 import { userProgressApi } from '@/services/userProgressApi';
 import { commentsApi, VideoComment } from '@/services/commentsApi';
+import { feedbackApi } from '@/services/feedbackApi';
 import { toast } from 'sonner';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { MessageCircle, Lightbulb } from 'lucide-react';
 
 const VideoPlayer = () => {
   const { id } = useParams<{ id: string }>();
@@ -59,6 +70,11 @@ const VideoPlayer = () => {
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState<VideoComment[]>([]);
   const [commentSortBy, setCommentSortBy] = useState<'newest' | 'most_liked'>('newest');
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [feedbackType, setFeedbackType] = useState<'feedback' | 'suggestion'>('feedback');
+  const [feedbackDescription, setFeedbackDescription] = useState('');
+  const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
+  const [feedbackPriority, setFeedbackPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const { user } = useAuth();
@@ -796,117 +812,154 @@ const VideoPlayer = () => {
             </div>
           </div>
 
-          {/* Comments Section */}
+          {/* Feedback & Suggestions Section */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Comments ({comments.length})</h3>
-              <div className="flex gap-2">
-                <Button
-                  variant={commentSortBy === 'newest' ? 'default' : 'outline'}
+              <h3 className="text-lg font-semibold">Feedback & Suggestions</h3>
+              {user && (
+                <Button 
+                  variant={showFeedbackForm ? 'outline' : 'default'}
                   size="sm"
-                  onClick={() => setCommentSortBy('newest')}
+                  onClick={() => {
+                    setShowFeedbackForm(!showFeedbackForm);
+                    if (!showFeedbackForm) {
+                      setFeedbackDescription('');
+                      setFeedbackRating(null);
+                      setFeedbackPriority('medium');
+                    }
+                  }}
                 >
-                  Newest
+                  {showFeedbackForm ? 'Cancel' : 'Share Feedback'}
                 </Button>
-                <Button
-                  variant={commentSortBy === 'most_liked' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setCommentSortBy('most_liked')}
-                >
-                  Most Liked
-                </Button>
-              </div>
+              )}
             </div>
-
-            {user && (
-              <div className="space-y-4 mb-6">
-                <Textarea
-                  placeholder="Add a comment..."
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  className="min-h-[80px]"
-                />
-                <Button onClick={handleSubmitComment} disabled={!comment.trim()}>
-                  Post Comment
-                </Button>
-              </div>
-            )}
 
             {!user && (
               <div className="mb-6 p-4 bg-muted rounded-lg text-center text-sm text-muted-foreground">
-                Please sign in to view and add comments
+                Please sign in to share feedback or suggestions
               </div>
             )}
 
-            <div className="space-y-4">
-              {comments.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No comments yet</p>
-              ) : (
-                comments.map((comment) => (
-                  <div key={comment.id} className="border-l-2 border-primary/20 pl-4 py-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm">{comment.user?.name || 'Anonymous'}</span>
-                        {comment.comment_time !== null && (
-                          <span className="text-xs text-muted-foreground">
-                            @ {formatTime(comment.comment_time)}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(comment.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-2">{comment.comment}</p>
-                    <div className="flex items-center gap-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleLikeComment(comment.id)}
-                        className={comment.is_liked ? 'text-primary' : ''}
-                      >
-                        <ThumbsUp className={`h-3 w-3 mr-1 ${comment.is_liked ? 'fill-current' : ''}`} />
-                        {comment.likes_count}
-                      </Button>
-                      {user && (user.id === comment.user_id || user.is_admin) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteComment(comment.id)}
-                          className="text-destructive"
+            {user && showFeedbackForm && (
+              <div className="space-y-4 mb-6">
+                <div className="flex gap-2">
+                  <Button
+                    variant={feedbackType === 'feedback' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setFeedbackType('feedback')}
+                    className="flex-1"
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    Feedback
+                  </Button>
+                  <Button
+                    variant={feedbackType === 'suggestion' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setFeedbackType('suggestion')}
+                    className="flex-1"
+                  >
+                    <Lightbulb className="h-4 w-4 mr-2" />
+                    Suggestion
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="feedbackDescription">Description</Label>
+                  <Textarea
+                    id="feedbackDescription"
+                    value={feedbackDescription}
+                    onChange={(e) => setFeedbackDescription(e.target.value)}
+                    placeholder={`Please provide details about your ${feedbackType === 'feedback' ? 'feedback' : 'suggestion'}...`}
+                    className="min-h-[120px]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="feedbackRating">Rating (Optional)</Label>
+                    <div className="flex items-center space-x-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setFeedbackRating(feedbackRating === star ? null : star)}
+                          className="focus:outline-none transition-transform hover:scale-110"
                         >
-                          Delete
-                        </Button>
+                          <Star
+                            className={`h-6 w-6 ${
+                              feedbackRating && star <= feedbackRating
+                                ? 'text-yellow-400 fill-current'
+                                : 'text-gray-300'
+                            }`}
+                          />
+                        </button>
+                      ))}
+                      {feedbackRating && (
+                        <span className="ml-2 text-sm text-muted-foreground">
+                          {feedbackRating} {feedbackRating === 1 ? 'star' : 'stars'}
+                        </span>
                       )}
                     </div>
-                    {comment.replies && comment.replies.length > 0 && (
-                      <div className="mt-3 ml-4 space-y-2">
-                        {comment.replies.map((reply) => (
-                          <div key={reply.id} className="border-l-2 border-muted pl-3 py-2">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="font-medium text-xs">{reply.user?.name || 'Anonymous'}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {new Date(reply.created_at).toLocaleDateString()}
-                              </span>
-                            </div>
-                            <p className="text-xs text-muted-foreground mb-1">{reply.comment}</p>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleLikeComment(reply.id)}
-                              className={`text-xs ${reply.is_liked ? 'text-primary' : ''}`}
-                            >
-                              <ThumbsUp className={`h-3 w-3 mr-1 ${reply.is_liked ? 'fill-current' : ''}`} />
-                              {reply.likes_count}
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
-                ))
-              )}
-            </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="feedbackPriority">Priority</Label>
+                    <Select 
+                      value={feedbackPriority} 
+                      onValueChange={(value) => setFeedbackPriority(value as 'low' | 'medium' | 'high' | 'urgent')}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="urgent">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={async () => {
+                    if (!feedbackDescription.trim() || !video) {
+                      toast.error('Please fill in description');
+                      return;
+                    }
+                    try {
+                      const response = await feedbackApi.create({
+                        video_id: video.id,
+                        type: feedbackType === 'feedback' ? 'general_feedback' : 'feature_request',
+                        description: feedbackDescription,
+                        rating: feedbackRating || undefined,
+                        priority: feedbackPriority,
+                        category: 'Video Content',
+                      });
+                      if (response.success) {
+                        toast.success('Feedback submitted successfully! Thank you for your input.');
+                        setShowFeedbackForm(false);
+                        setFeedbackDescription('');
+                        setFeedbackRating(null);
+                        setFeedbackPriority('medium');
+                      }
+                    } catch (error: any) {
+                      toast.error(error.message || 'Failed to submit feedback');
+                    }
+                  }}
+                  disabled={!feedbackDescription.trim()}
+                  className="w-full"
+                >
+                  Submit {feedbackType === 'feedback' ? 'Feedback' : 'Suggestion'}
+                </Button>
+              </div>
+            )}
+
+            {user && !showFeedbackForm && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Help us improve by sharing your feedback or suggestions about this video
+              </p>
+            )}
           </Card>
         </div>
 
@@ -925,6 +978,121 @@ const VideoPlayer = () => {
                 <div className="text-xs text-muted-foreground">
                   {relatedVideos.length} more video{relatedVideos.length !== 1 ? 's' : ''} in this category
                 </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Comments Section */}
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">Comments ({comments.length})</h3>
+              <div className="flex gap-1">
+                <Button
+                  variant={commentSortBy === 'newest' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setCommentSortBy('newest')}
+                  className="h-7 text-xs px-2"
+                >
+                  Newest
+                </Button>
+                <Button
+                  variant={commentSortBy === 'most_liked' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setCommentSortBy('most_liked')}
+                  className="h-7 text-xs px-2"
+                >
+                  Most Liked
+                </Button>
+              </div>
+            </div>
+
+            {user && (
+              <div className="space-y-3 mb-4">
+                <Textarea
+                  placeholder="Add a comment..."
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  className="min-h-[70px] text-sm"
+                />
+                <Button onClick={handleSubmitComment} disabled={!comment.trim()} size="sm" className="w-full">
+                  Post Comment
+                </Button>
+              </div>
+            )}
+
+            {!user && (
+              <div className="mb-4 p-3 bg-muted rounded-lg text-center text-xs text-muted-foreground">
+                Please sign in to view and add comments
+              </div>
+            )}
+
+            <div className="space-y-3 max-h-[600px] overflow-y-auto">
+              {comments.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">No comments yet</p>
+              ) : (
+                comments.map((comment) => (
+                  <div key={comment.id} className="border-l-2 border-primary/20 pl-3 py-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-xs">{comment.user?.name || 'Anonymous'}</span>
+                        {comment.comment_time !== null && (
+                          <span className="text-xs text-muted-foreground">
+                            @ {formatTime(comment.comment_time)}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(comment.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">{comment.comment}</p>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleLikeComment(comment.id)}
+                        className={`h-7 text-xs px-2 ${comment.is_liked ? 'text-primary' : ''}`}
+                      >
+                        <ThumbsUp className={`h-3 w-3 mr-1 ${comment.is_liked ? 'fill-current' : ''}`} />
+                        {comment.likes_count}
+                      </Button>
+                      {user && (user.id === comment.user_id || user.is_admin) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteComment(comment.id)}
+                          className="text-destructive h-7 text-xs px-2"
+                        >
+                          Delete
+                        </Button>
+                      )}
+                    </div>
+                    {comment.replies && comment.replies.length > 0 && (
+                      <div className="mt-2 ml-3 space-y-2">
+                        {comment.replies.map((reply) => (
+                          <div key={reply.id} className="border-l-2 border-muted pl-2 py-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-medium text-xs">{reply.user?.name || 'Anonymous'}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(reply.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mb-1">{reply.comment}</p>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleLikeComment(reply.id)}
+                              className={`h-6 text-xs px-1 ${reply.is_liked ? 'text-primary' : ''}`}
+                            >
+                              <ThumbsUp className={`h-3 w-3 mr-1 ${reply.is_liked ? 'fill-current' : ''}`} />
+                              {reply.likes_count}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))
               )}
             </div>
           </Card>

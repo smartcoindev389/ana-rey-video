@@ -28,7 +28,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { settingsApi, SiteSetting, SettingsUpdateRequest } from '@/services/settingsApi';
 import { faqApi, Faq, FaqCreateRequest, FaqUpdateRequest } from '@/services/faqApi';
-import { testimonialApi, Testimonial, TestimonialCreateRequest, TestimonialUpdateRequest } from '@/services/testimonialApi';
+import { feedbackApi, Feedback } from '@/services/feedbackApi';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -60,8 +60,8 @@ const Settings = () => {
     is_active: true
   });
 
-  // Testimonial Management State
-  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  // Testimonial Management State (using Feedback)
+  const [testimonials, setTestimonials] = useState<Feedback[]>([]);
   const [testimonialLoading, setTestimonialLoading] = useState(true);
   const [testimonialSearch, setTestimonialSearch] = useState('');
   const [testimonialFilter, setTestimonialFilter] = useState<'all' | 'approved' | 'pending'>('all');
@@ -203,9 +203,9 @@ const Settings = () => {
   const fetchTestimonials = async () => {
     try {
       setTestimonialLoading(true);
-      const response = await testimonialApi.getAll();
+      const response = await feedbackApi.getAll({ type: 'general_feedback' });
       if (response.success) {
-        setTestimonials(response.data?.data || []);
+        setTestimonials(response.data?.data || response.data || []);
       }
     } catch (error) {
       console.error('Error fetching testimonials:', error);
@@ -215,10 +215,11 @@ const Settings = () => {
     }
   };
 
-  const handleToggleTestimonialApproval = async (testimonial: Testimonial) => {
+  const handleToggleTestimonialApproval = async (testimonial: Feedback) => {
     try {
-      await testimonialApi.toggleApproval(testimonial.id);
-      toast.success(`Testimonial ${testimonial.is_approved ? 'unapproved' : 'approved'} successfully`);
+      const newStatus = testimonial.status === 'resolved' ? 'reviewed' : 'resolved';
+      await feedbackApi.update(testimonial.id, { status: newStatus });
+      toast.success(`Testimonial ${newStatus === 'resolved' ? 'approved' : 'unapproved'} successfully`);
       await fetchTestimonials();
     } catch (error) {
       console.error('Error toggling testimonial approval:', error);
@@ -226,10 +227,11 @@ const Settings = () => {
     }
   };
 
-  const handleToggleTestimonialFeatured = async (testimonial: Testimonial) => {
+  const handleToggleTestimonialFeatured = async (testimonial: Feedback) => {
     try {
-      await testimonialApi.toggleFeatured(testimonial.id);
-      toast.success(`Testimonial ${testimonial.is_featured ? 'unfeatured' : 'featured'} successfully`);
+      const newPriority = testimonial.priority === 'high' ? 'medium' : 'high';
+      await feedbackApi.update(testimonial.id, { priority: newPriority });
+      toast.success(`Testimonial ${newPriority === 'high' ? 'featured' : 'unfeatured'} successfully`);
       await fetchTestimonials();
     } catch (error) {
       console.error('Error toggling testimonial featured:', error);
@@ -240,7 +242,7 @@ const Settings = () => {
   const handleDeleteTestimonial = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this testimonial?')) {
       try {
-        await testimonialApi.delete(id);
+        await feedbackApi.delete(id);
         toast.success('Testimonial deleted successfully');
         await fetchTestimonials();
       } catch (error) {
@@ -702,12 +704,12 @@ const Settings = () => {
                   .filter(t => {
                     if (testimonialSearch) {
                       const search = testimonialSearch.toLowerCase();
-                      return t.name.toLowerCase().includes(search) || 
-                             t.content.toLowerCase().includes(search) ||
-                             (t.role && t.role.toLowerCase().includes(search));
+                      return (t.user?.name || '').toLowerCase().includes(search) || 
+                             t.description.toLowerCase().includes(search) ||
+                             (t.user?.email || '').toLowerCase().includes(search);
                     }
-                    if (testimonialFilter === 'approved') return t.is_approved;
-                    if (testimonialFilter === 'pending') return !t.is_approved;
+                    if (testimonialFilter === 'approved') return t.status === 'resolved';
+                    if (testimonialFilter === 'pending') return t.status !== 'resolved';
                     return true;
                   })
                   .map((testimonial) => (
@@ -718,31 +720,31 @@ const Settings = () => {
                           ? 'bg-primary/5 border-primary/30' 
                           : 'hover:bg-muted/50'
                       }`}
-                      onClick={() => testimonial.is_approved && handleToggleHomepageTestimonial(testimonial.id)}
+                      onClick={() => testimonial.status === 'resolved' && handleToggleHomepageTestimonial(testimonial.id)}
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-semibold">{testimonial.name}</h4>
+                            <h4 className="font-semibold">{testimonial.user?.name || 'Anonymous'}</h4>
                             {selectedHomepageTestimonials.includes(testimonial.id) && (
                               <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">Show on Homepage</Badge>
                             )}
-                            {!testimonial.is_approved && (
+                            {testimonial.status !== 'resolved' && (
                               <Badge variant="secondary">Pending Approval</Badge>
                             )}
-                            {testimonial.is_featured && (
+                            {testimonial.priority === 'high' && (
                               <Badge variant="default">Featured</Badge>
                             )}
                           </div>
-                          {testimonial.role && (
+                          {testimonial.user?.email && (
                             <p className="text-sm text-muted-foreground">
-                              {testimonial.role}{testimonial.company ? ` at ${testimonial.company}` : ''}
+                              {testimonial.user.email}
                             </p>
                           )}
-                          <p className="text-sm mt-2">{testimonial.content}</p>
+                          <p className="text-sm mt-2">{testimonial.description}</p>
                           <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                            <span>Rating: {testimonial.rating}/5</span>
-                            <span>Order: {testimonial.sort_order}</span>
+                            <span>Rating: {testimonial.rating || 'N/A'}/5</span>
+                            <span>Status: {testimonial.status}</span>
                           </div>
                         </div>
                         <div className="flex gap-2 ml-4" onClick={(e) => e.stopPropagation()}>
@@ -751,10 +753,10 @@ const Settings = () => {
                             size="sm"
                             onClick={() => handleToggleTestimonialApproval(testimonial)}
                           >
-                            {testimonial.is_approved ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            {testimonial.status === 'resolved' ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           </Button>
                           <Button
-                            variant={testimonial.is_featured ? "default" : "outline"}
+                            variant={testimonial.priority === 'high' ? "default" : "outline"}
                             size="sm"
                             onClick={() => handleToggleTestimonialFeatured(testimonial)}
                           >
@@ -774,12 +776,12 @@ const Settings = () => {
                 {testimonials.filter(t => {
                   if (testimonialSearch) {
                     const search = testimonialSearch.toLowerCase();
-                    return t.name.toLowerCase().includes(search) || 
-                           t.content.toLowerCase().includes(search) ||
-                           (t.role && t.role.toLowerCase().includes(search));
+                    return (t.user?.name || '').toLowerCase().includes(search) || 
+                           t.description.toLowerCase().includes(search) ||
+                           (t.user?.email || '').toLowerCase().includes(search);
                   }
-                  if (testimonialFilter === 'approved') return t.is_approved;
-                  if (testimonialFilter === 'pending') return !t.is_approved;
+                  if (testimonialFilter === 'approved') return t.status === 'resolved';
+                  if (testimonialFilter === 'pending') return t.status !== 'resolved';
                   return true;
                 }).length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">

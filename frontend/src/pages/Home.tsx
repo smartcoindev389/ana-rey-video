@@ -26,7 +26,7 @@ import CourseHeroSection from '@/components/CourseHeroSection';
 import { faqApi, Faq } from '@/services/faqApi';
 import { settingsApi } from '@/services/settingsApi';
 import { categoryApi, Category, seriesApi, videoApi } from '@/services/videoApi';
-import { testimonialApi, Testimonial } from '@/services/testimonialApi';
+import { feedbackApi, Feedback } from '@/services/feedbackApi';
 import cover1 from '@/assets/cover1.webp';
 import cover2 from '@/assets/cover2.webp';
 import cover3 from '@/assets/cover3.webp';
@@ -44,7 +44,7 @@ const Home = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState(5); // Start at 3rd real category tab (0-2 are blank tabs on left)
+  const [activeTab, setActiveTab] = useState(0); // Start at first category tab
   const [faqs, setFaqs] = useState<Record<string, Faq[]>>({});
   const [faqLoading, setFaqLoading] = useState(false);
   const [heroSettings, setHeroSettings] = useState<Record<string, string>>({});
@@ -54,7 +54,7 @@ const Home = () => {
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [seriesByCategory, setSeriesByCategory] = useState<Record<number, any[]>>({});
   const [seriesLoading, setSeriesLoading] = useState(false);
-  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [testimonials, setTestimonials] = useState<Feedback[]>([]);
   const [testimonialsLoading, setTestimonialsLoading] = useState(false);
   const tabContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -231,9 +231,8 @@ const Home = () => {
   };
 
   const handleTabClick = (index: number) => {
-    // Skip clicking on blank tabs (first and last)
     const currentTab = tabData[index];
-    if (!currentTab || currentTab.title === '') {
+    if (!currentTab) {
       return;
     }
     setActiveTab(index);
@@ -430,9 +429,9 @@ const Home = () => {
         if (response.success) {
           const cats = response.data || [];
           setCategories(cats);
-          // Set activeTab to 3rd real category (index 5, since 0-2 are blank tabs on left)
+          // Set activeTab to first category
           if (cats.length > 0) {
-            setActiveTab(5);
+            setActiveTab(0);
           }
           
           // Fetch series for each category
@@ -515,14 +514,14 @@ const Home = () => {
           }
         }
 
-        // Fetch all approved testimonials
-        const response = await testimonialApi.getPublic({ featured: false });
+        // Fetch all approved testimonials (using feedback with type 'general_feedback')
+        const response = await feedbackApi.getAll({ type: 'general_feedback', status: 'resolved' });
         if (response.success) {
-          let allTestimonials = response.data || [];
+          let allTestimonials = response.data?.data || response.data || [];
           
           // Filter to show only selected testimonials if any are selected
           if (testimonialIds.length > 0) {
-            allTestimonials = allTestimonials.filter((t: Testimonial) => testimonialIds.includes(t.id));
+            allTestimonials = allTestimonials.filter((t: Feedback) => testimonialIds.includes(t.id));
           }
           
           setTestimonials(allTestimonials);
@@ -665,19 +664,8 @@ const Home = () => {
     { id: 50, title: "ANIMATION PRINCIPLES", subtitle: "Movement Mastery", image: cover2, videoCount: 14, duration: "6h 15m", viewers: 2234, rating: 4.8, visibility: "premium" }
   ];
 
-  // Generate tab data from database categories with blank tabs for centering
+  // Generate tab data from database categories
   const generateTabData = () => {
-    const blankTab = {
-      id: -1,
-      title: "",
-      icon: TrendingUp,
-      summary: "",
-      description: "",
-      features: [],
-      backgroundImage: cover1,
-      series: []
-    };
-
     const categoryTabs = categories.map((category, index) => {
       // Get series data from backend for this category
       const seriesData = seriesByCategory[category.id] || [];
@@ -694,8 +682,7 @@ const Home = () => {
       };
     });
 
-    // Add 3 blank tabs on the left and 3 on the right for centering
-    return [blankTab, blankTab, blankTab, ...categoryTabs, blankTab, blankTab, blankTab];
+    return categoryTabs;
   };
 
   const tabData = generateTabData();
@@ -724,11 +711,7 @@ const Home = () => {
           {/* Left Arrow - Aligned to content left */}
           <button 
             onClick={() => {
-              let newIndex = activeTab - 1;
-              // Skip blank tabs by checking if title is empty
-              while (newIndex >= 0 && tabData[newIndex]?.title === '') {
-                newIndex--;
-              }
+              const newIndex = activeTab - 1;
               if (newIndex >= 0) {
                 handleTabClick(newIndex);
               }
@@ -738,27 +721,23 @@ const Home = () => {
             <ChevronRight className="h-8 w-8 rotate-180" />
           </button>
           
-          {/* Tab Labels - Show all tabs like HBO Max */}
+          {/* Tab Labels - Show all tabs in single row */}
           <div 
             ref={tabContainerRef}
-            className="flex items-center space-x-6 lg:space-x-8 overflow-x-auto hide-scrollbar w-full"
+            className="flex items-center space-x-6 lg:space-x-8 overflow-x-auto hide-scrollbar w-full flex-nowrap"
           >
             {tabData.map((tab, index) => (
               <button
                 key={tab.id}
                 data-tab-index={index}
                 onClick={() => handleTabClick(index)}
-                className={`text-2xl lg:text-3xl xl:text-4xl font-light transition-colors duration-300 flex-shrink-0 ${
+                className={`text-2xl lg:text-3xl xl:text-4xl font-light transition-colors duration-300 flex-shrink-0 whitespace-nowrap ${
                   index === activeTab
                     ? 'text-white'
                     : 'text-gray-400 hover:text-gray-300'
-                } ${tab.title === '' ? 'invisible' : ''}`}
-                style={{
-                  width: tab.title === '' ? '8rem' : 'auto', // Fixed width for blank tabs to match real tabs
-                  minWidth: tab.title === '' ? '8rem' : 'auto'
-                }}
+                }`}
               >
-                {tab.title === '' ? '\u00A0' : tab.title}
+                {tab.title}
               </button>
             ))}
           </div>
@@ -766,11 +745,7 @@ const Home = () => {
           {/* Right Arrow - Aligned to content right */}
           <button 
             onClick={() => {
-              let newIndex = activeTab + 1;
-              // Skip blank tabs by checking if title is empty
-              while (newIndex < tabData.length && tabData[newIndex]?.title === '') {
-                newIndex++;
-              }
+              const newIndex = activeTab + 1;
               if (newIndex < tabData.length) {
                 handleTabClick(newIndex);
               }
@@ -781,13 +756,13 @@ const Home = () => {
           </button>
         </div>
         
-        {/* HBO Max Style Grid - Always 2 Rows with Arrow Navigation */}
+        {/* HBO Max Style Grid - Single Row with Arrow Navigation */}
         <div className="w-full max-w-6xl mx-auto">
           <div className="flex items-center">
             
             {/* Content Grid */}
             <div 
-              className="content-grid grid grid-flow-col grid-rows-2 gap-6 lg:gap-8 overflow-x-auto hide-scrollbar py-4 flex-1"
+              className="content-grid grid grid-flow-col grid-rows-1 gap-6 lg:gap-8 overflow-x-auto hide-scrollbar py-4 flex-1"
             >
               {currentTab.series.map((item) => (
                 <div key={item.id} className="w-72 md:w-80 lg:w-96 flex-shrink-0 hover:z-50 transition-all duration-300 group">
@@ -1005,26 +980,23 @@ const Home = () => {
                     className="flex-shrink-0 w-96 lg:w-[420px] bg-gray-900/50 rounded-xl p-8 lg:p-10 border border-white/10 hover:border-primary/50 transition-all duration-300 backdrop-blur-sm"
                   >
                     <div className="flex items-center mb-6">
-                      {testimonial.avatar ? (
+                      {testimonial.user?.avatar ? (
                         <img
-                          src={testimonial.avatar}
-                          alt={testimonial.name}
+                          src={testimonial.user.avatar}
+                          alt={testimonial.user?.name || 'User'}
                           className="w-12 h-12 rounded-full object-cover mr-4"
                         />
                       ) : (
                         <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mr-4">
-                          <span className="text-primary font-semibold">{testimonial.name.charAt(0)}</span>
+                          <span className="text-primary font-semibold">{(testimonial.user?.name || 'U').charAt(0).toUpperCase()}</span>
                         </div>
                       )}
                       <div>
-                        <h4 className="text-white font-semibold font-montserrat">{testimonial.name}</h4>
-                        <p className="text-gray-400 text-sm font-montserrat">
-                          {testimonial.role}{testimonial.company ? ` at ${testimonial.company}` : ''}
-                        </p>
+                        <h4 className="text-white font-semibold font-montserrat">{testimonial.user?.name || 'Anonymous'}</h4>
                       </div>
                     </div>
                     <p className="text-gray-300 leading-relaxed font-montserrat mb-4">
-                      "{testimonial.content}"
+                      "{testimonial.description}"
                     </p>
                     <div className="flex">
                       {[...Array(testimonial.rating || 5)].map((_, i) => (

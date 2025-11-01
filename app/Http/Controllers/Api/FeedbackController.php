@@ -16,14 +16,13 @@ class FeedbackController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Feedback::with(['user', 'assignedTo']);
+        $query = Feedback::with(['user', 'assignedTo', 'video']);
 
         // Search functionality
         if ($request->has('search')) {
             $search = $request->get('search');
             $query->where(function ($q) use ($search) {
-                $q->where('subject', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%")
+                $q->where('description', 'like', "%{$search}%")
                   ->orWhereHas('user', function ($userQuery) use ($search) {
                       $userQuery->where('name', 'like', "%{$search}%")
                                ->orWhere('email', 'like', "%{$search}%");
@@ -61,6 +60,11 @@ class FeedbackController extends Controller
             $query->where('user_id', $request->get('user_id'));
         }
 
+        // Filter by video
+        if ($request->has('video_id')) {
+            $query->where('video_id', $request->get('video_id'));
+        }
+
         // Filter by rating
         if ($request->has('rating')) {
             $query->where('rating', $request->get('rating'));
@@ -93,8 +97,8 @@ class FeedbackController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
+            'video_id' => 'nullable|exists:videos,id',
             'type' => 'required|in:bug_report,feature_request,general_feedback,complaint',
-            'subject' => 'required|string|max:255',
             'description' => 'required|string',
             'priority' => 'nullable|in:low,medium,high,urgent',
             'category' => 'nullable|string|max:100',
@@ -121,7 +125,7 @@ class FeedbackController extends Controller
      */
     public function show(Feedback $feedback): JsonResponse
     {
-        $feedback->load(['user', 'assignedTo']);
+        $feedback->load(['user', 'assignedTo', 'video']);
 
         return response()->json([
             'success' => true,
@@ -136,7 +140,6 @@ class FeedbackController extends Controller
     {
         $validated = $request->validate([
             'type' => 'sometimes|required|in:bug_report,feature_request,general_feedback,complaint',
-            'subject' => 'sometimes|required|string|max:255',
             'description' => 'sometimes|required|string',
             'priority' => 'sometimes|required|in:low,medium,high,urgent',
             'status' => 'sometimes|required|in:new,reviewed,in_progress,resolved,rejected',
@@ -281,8 +284,7 @@ class FeedbackController extends Controller
         if ($request->has('search')) {
             $search = $request->get('search');
             $query->where(function ($q) use ($search) {
-                $q->where('subject', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%")
+                $q->where('description', 'like', "%{$search}%")
                   ->orWhereHas('user', function ($userQuery) use ($search) {
                       $userQuery->where('name', 'like', "%{$search}%")
                                ->orWhere('email', 'like', "%{$search}%");

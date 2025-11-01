@@ -4,13 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Video;
 
 class Feedback extends Model
 {
     protected $fillable = [
         'user_id',
+        'video_id',
         'type', // 'bug_report', 'feature_request', 'general_feedback', 'complaint'
-        'subject',
         'description',
         'priority',
         'status', // 'new', 'reviewed', 'in_progress', 'resolved', 'rejected'
@@ -26,6 +27,14 @@ class Feedback extends Model
         'resolved_at' => 'datetime',
         'rating' => 'integer',
     ];
+
+    /**
+     * Get the video associated with the feedback.
+     */
+    public function video(): BelongsTo
+    {
+        return $this->belongsTo(Video::class);
+    }
 
     /**
      * Get the user who submitted the feedback

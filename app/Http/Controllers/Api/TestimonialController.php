@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Testimonial;
+use App\Models\Feedback;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -16,11 +16,15 @@ class TestimonialController extends Controller
     public function public(Request $request): JsonResponse
     {
         try {
-            $query = Testimonial::approved()->orderBy('sort_order', 'asc')->orderBy('created_at', 'desc');
+            // Use Feedback model with type 'general_feedback' for testimonials
+            $query = Feedback::where('type', 'general_feedback')
+                ->where('status', 'resolved') // Treat resolved as approved
+                ->with(['user', 'video'])
+                ->orderBy('created_at', 'desc');
 
-            // Filter by featured
+            // Filter by featured (using metadata or priority)
             if ($request->has('featured') && $request->get('featured') === 'true') {
-                $query->featured();
+                $query->where('priority', 'high'); // Use high priority as featured
             }
 
             // Limit results if specified
@@ -49,26 +53,36 @@ class TestimonialController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Testimonial::query()->with(['user', 'video']);
+            $query = Feedback::where('type', 'general_feedback')->with(['user', 'video']);
 
             // Search
             if ($request->has('search')) {
                 $search = $request->get('search');
                 $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('content', 'like', "%{$search}%")
-                        ->orWhere('role', 'like', "%{$search}%");
+                    $q->where('description', 'like', "%{$search}%")
+                        ->orWhereHas('user', function ($userQuery) use ($search) {
+                            $userQuery->where('name', 'like', "%{$search}%")
+                                     ->orWhere('email', 'like', "%{$search}%");
+                        });
                 });
             }
 
-            // Filter by approved status
+            // Filter by approved status (resolved = approved)
             if ($request->has('approved')) {
-                $query->where('is_approved', $request->get('approved') === 'true');
+                if ($request->get('approved') === 'true') {
+                    $query->where('status', 'resolved');
+                } else {
+                    $query->where('status', '!=', 'resolved');
+                }
             }
 
-            // Filter by featured
+            // Filter by featured (high priority = featured)
             if ($request->has('featured')) {
-                $query->where('is_featured', $request->get('featured') === 'true');
+                if ($request->get('featured') === 'true') {
+                    $query->where('priority', 'high');
+                } else {
+                    $query->where('priority', '!=', 'high');
+                }
             }
 
             // Sort
@@ -99,17 +113,12 @@ class TestimonialController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'name' => 'required|string|max:255',
-                'role' => 'nullable|string|max:255',
-                'company' => 'nullable|string|max:255',
-                'avatar' => 'nullable|string',
-                'content' => 'required|string',
-                'rating' => 'required|integer|min:1|max:5',
+                'description' => 'required|string',
+                'rating' => 'nullable|integer|min:1|max:5',
                 'user_id' => 'nullable|exists:users,id',
                 'video_id' => 'nullable|exists:videos,id',
-                'is_approved' => 'sometimes|boolean',
-                'is_featured' => 'sometimes|boolean',
-                'sort_order' => 'nullable|integer',
+                'priority' => 'nullable|in:low,medium,high,urgent',
+                'status' => 'nullable|in:new,reviewed,in_progress,resolved,rejected',
             ]);
 
             if ($validator->fails()) {
@@ -120,7 +129,13 @@ class TestimonialController extends Controller
                 ], 422);
             }
 
-            $testimonial = Testimonial::create($validator->validated());
+            $validated = $validator->validated();
+            $validated['type'] = 'general_feedback';
+            $validated['status'] = $validated['status'] ?? 'new';
+            $validated['priority'] = $validated['priority'] ?? 'medium';
+
+            $testimonial = Feedback::create($validated);
+            $testimonial->load(['user', 'video']);
 
             return response()->json([
                 'success' => true,
@@ -141,7 +156,9 @@ class TestimonialController extends Controller
     public function show(int $id): JsonResponse
     {
         try {
-            $testimonial = Testimonial::with(['user', 'video'])->findOrFail($id);
+            $testimonial = Feedback::where('type', 'general_feedback')
+                ->with(['user', 'video'])
+                ->findOrFail($id);
 
             return response()->json([
                 'success' => true,
@@ -161,20 +178,15 @@ class TestimonialController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         try {
-            $testimonial = Testimonial::findOrFail($id);
+            $testimonial = Feedback::where('type', 'general_feedback')->findOrFail($id);
 
             $validator = Validator::make($request->all(), [
-                'name' => 'sometimes|required|string|max:255',
-                'role' => 'nullable|string|max:255',
-                'company' => 'nullable|string|max:255',
-                'avatar' => 'nullable|string',
-                'content' => 'sometimes|required|string',
+                'description' => 'sometimes|required|string',
                 'rating' => 'sometimes|required|integer|min:1|max:5',
                 'user_id' => 'nullable|exists:users,id',
                 'video_id' => 'nullable|exists:videos,id',
-                'is_approved' => 'sometimes|boolean',
-                'is_featured' => 'sometimes|boolean',
-                'sort_order' => 'nullable|integer',
+                'priority' => 'sometimes|in:low,medium,high,urgent',
+                'status' => 'sometimes|in:new,reviewed,in_progress,resolved,rejected',
             ]);
 
             if ($validator->fails()) {
@@ -206,7 +218,7 @@ class TestimonialController extends Controller
     public function destroy(int $id): JsonResponse
     {
         try {
-            $testimonial = Testimonial::findOrFail($id);
+            $testimonial = Feedback::where('type', 'general_feedback')->findOrFail($id);
             $testimonial->delete();
 
             return response()->json([
@@ -227,14 +239,19 @@ class TestimonialController extends Controller
     public function toggleApproval(int $id): JsonResponse
     {
         try {
-            $testimonial = Testimonial::findOrFail($id);
-            $testimonial->is_approved = !$testimonial->is_approved;
+            $testimonial = Feedback::where('type', 'general_feedback')->findOrFail($id);
+            // Toggle between resolved (approved) and reviewed (pending)
+            if ($testimonial->status === 'resolved') {
+                $testimonial->status = 'reviewed';
+            } else {
+                $testimonial->status = 'resolved';
+            }
             $testimonial->save();
 
             return response()->json([
                 'success' => true,
                 'data' => $testimonial,
-                'message' => 'Testimonial ' . ($testimonial->is_approved ? 'approved' : 'unapproved') . ' successfully',
+                'message' => 'Testimonial ' . ($testimonial->status === 'resolved' ? 'approved' : 'unapproved') . ' successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -250,14 +267,19 @@ class TestimonialController extends Controller
     public function toggleFeatured(int $id): JsonResponse
     {
         try {
-            $testimonial = Testimonial::findOrFail($id);
-            $testimonial->is_featured = !$testimonial->is_featured;
+            $testimonial = Feedback::where('type', 'general_feedback')->findOrFail($id);
+            // Toggle featured using priority (high = featured)
+            if ($testimonial->priority === 'high') {
+                $testimonial->priority = 'medium';
+            } else {
+                $testimonial->priority = 'high';
+            }
             $testimonial->save();
 
             return response()->json([
                 'success' => true,
                 'data' => $testimonial,
-                'message' => 'Testimonial ' . ($testimonial->is_featured ? 'featured' : 'unfeatured') . ' successfully',
+                'message' => 'Testimonial ' . ($testimonial->priority === 'high' ? 'featured' : 'unfeatured') . ' successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
