@@ -1,11 +1,18 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
+// Helper function to get locale from localStorage or default to 'en'
+const getLocale = (): string => {
+  return localStorage.getItem('i18nextLng') || 'en';
+};
+
 // Helper function to get auth headers
 const getAuthHeaders = (): HeadersInit => {
   const token = localStorage.getItem('auth_token');
+  const locale = getLocale();
   return {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
+    'Accept-Language': locale,
     'Authorization': token ? `Bearer ${token}` : '',
   };
 };
@@ -41,6 +48,7 @@ export interface Category {
   short_description?: string | null;
   color: string;
   icon: string;
+  image?: string | null;
   is_active: boolean;
   sort_order: number;
   // Series fields (merged from series table)
@@ -84,6 +92,7 @@ export interface Series {
   instructor_id?: number | null;
   thumbnail?: string | null;
   cover_image?: string | null;
+  image?: string | null;
   trailer_url?: string | null;
   meta_title?: string | null;
   meta_description?: string | null;
@@ -176,20 +185,56 @@ export const categoryApi = {
     return handleResponse<{ success: boolean; data: Category[] }>(response);
   },
 
-  async create(data: Partial<Category>) {
+  async create(data: Partial<Category> | FormData) {
+    const isFormData = data instanceof FormData;
+    const baseHeaders = getAuthHeaders() as Record<string, string>;
+    
+    // Remove Content-Type for FormData to let browser set it with boundary
+    let headers: HeadersInit;
+    if (isFormData) {
+      const { 'Content-Type': _, ...headersWithoutContentType } = baseHeaders;
+      headers = headersWithoutContentType;
+    } else {
+      headers = baseHeaders;
+    }
+    
     const response = await fetch(`${API_BASE_URL}/admin/categories`, {
       method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
+      headers: headers,
+      body: isFormData ? data : JSON.stringify(data),
     });
     return handleResponse<{ success: boolean; data: Category; message: string }>(response);
   },
 
-  async update(id: number, data: Partial<Category>) {
+  async update(id: number, data: Partial<Category> | FormData) {
+    const isFormData = data instanceof FormData;
+    const baseHeaders = getAuthHeaders() as Record<string, string>;
+    
+    // Remove Content-Type for FormData to let browser set it with boundary
+    let headers: HeadersInit;
+    let method: string;
+    let body: BodyInit;
+    
+    if (isFormData) {
+      const { 'Content-Type': _, ...headersWithoutContentType } = baseHeaders;
+      headers = headersWithoutContentType;
+      // Laravel needs POST with _method=PUT for FormData to parse correctly
+      method = 'POST';
+      // Append _method for Laravel method spoofing
+      if (!(data as FormData).has('_method')) {
+        (data as FormData).append('_method', 'PUT');
+      }
+      body = data;
+    } else {
+      headers = baseHeaders;
+      method = 'PUT';
+      body = JSON.stringify(data);
+    }
+    
     const response = await fetch(`${API_BASE_URL}/admin/categories/${id}`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
+      method: method as any,
+      headers: headers,
+      body: body,
     });
     return handleResponse<{ success: boolean; data: Category; message: string }>(response);
   },

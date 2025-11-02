@@ -36,8 +36,12 @@ import {
 } from 'lucide-react';
 import { feedbackApi } from '@/services/feedbackApi';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
+import { useLocale } from '@/hooks/useLocale';
 
 const FeedbackSuggestions = () => {
+  const { t } = useTranslation();
+  const { locale } = useLocale();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
@@ -47,7 +51,7 @@ const FeedbackSuggestions = () => {
   useEffect(() => {
     fetchFeedbacks();
     fetchStatistics();
-  }, [selectedFilter]);
+  }, [selectedFilter, locale]); // Refetch when locale or filter changes
 
   const fetchFeedbacks = async () => {
     setLoading(true);
@@ -89,7 +93,7 @@ const FeedbackSuggestions = () => {
     try {
       const response = await feedbackApi.resolve(id);
       if (response.success) {
-        toast.success('Feedback marked as resolved');
+        toast.success(t('admin.feedback_resolved_success'));
         fetchFeedbacks();
         fetchStatistics();
       }
@@ -102,7 +106,7 @@ const FeedbackSuggestions = () => {
     try {
       const response = await feedbackApi.reject(id);
       if (response.success) {
-        toast.success('Feedback rejected');
+        toast.success(t('admin.feedback_rejected_success'));
         fetchFeedbacks();
         fetchStatistics();
       }
@@ -306,17 +310,34 @@ const FeedbackSuggestions = () => {
     return matchesSearch && matchesFilter;
   });
 
-  const computedStats = stats || {
-    total_feedback: feedbacks.length,
-    new_feedback: feedbacks.filter((f: any) => f.status === 'new').length,
+  // Calculate average rating safely
+  const calculateAverageRating = (): number => {
+    if (stats?.average_rating !== null && stats?.average_rating !== undefined) {
+      const avg = typeof stats.average_rating === 'string' 
+        ? parseFloat(stats.average_rating) 
+        : Number(stats.average_rating);
+      return isNaN(avg) ? 0 : avg;
+    }
+    
+    // Fallback calculation from feedbacks
+    const ratings = feedbacks.filter((f: any) => f.rating && typeof f.rating === 'number');
+    if (ratings.length === 0) return 0;
+    
+    const sum = ratings.reduce((acc: number, f: any) => acc + (f.rating || 0), 0);
+    const avg = sum / ratings.length;
+    return isNaN(avg) ? 0 : avg;
+  };
+
+  // Merge stats from API with computed stats from feedbacks array
+  const computedStats = {
+    total_feedback: stats?.total_feedback ?? feedbacks.length,
+    new_feedback: stats?.new_feedback ?? feedbacks.filter((f: any) => f.status === 'new').length,
     type_breakdown: {
-      feature_request: feedbacks.filter((f: any) => f.type === 'feature_request').length,
-      general_feedback: feedbacks.filter((f: any) => f.type === 'general_feedback').length,
+      feature_request: stats?.type_breakdown?.feature_request ?? feedbacks.filter((f: any) => f.type === 'feature_request').length,
+      general_feedback: stats?.type_breakdown?.general_feedback ?? feedbacks.filter((f: any) => f.type === 'general_feedback').length,
     },
-    average_rating: feedbacks.length > 0 
-      ? feedbacks.reduce((sum: number, f: any) => sum + (f.rating || 0), 0) / feedbacks.filter((f: any) => f.rating).length || 0
-      : 0,
-    resolved_feedback: feedbacks.filter((f: any) => f.status === 'resolved').length
+    average_rating: calculateAverageRating(),
+    resolved_feedback: stats?.resolved_feedback ?? feedbacks.filter((f: any) => f.status === 'resolved').length
   };
 
   return (
@@ -324,11 +345,11 @@ const FeedbackSuggestions = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Feedback & Suggestions</h1>
-          <p className="text-muted-foreground">Review user feedback and feature suggestions</p>
+          <h1 className="text-3xl font-bold">{t('admin.feedback_suggestions')}</h1>
+          <p className="text-muted-foreground">{t('admin.feedback_review_suggestions')}</p>
         </div>
         <Button variant="outline" onClick={fetchFeedbacks}>
-          Refresh
+          {t('admin.feedback_refresh')}
         </Button>
       </div>
 
@@ -337,7 +358,7 @@ const FeedbackSuggestions = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Feedback</p>
+              <p className="text-sm text-muted-foreground">{t('admin.feedback_total')}</p>
               <p className="text-2xl font-bold">{computedStats.total_feedback || 0}</p>
             </div>
             <ThumbsUp className="h-8 w-8 text-primary" />
@@ -346,7 +367,7 @@ const FeedbackSuggestions = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">New Items</p>
+              <p className="text-sm text-muted-foreground">{t('admin.feedback_new_items')}</p>
               <p className="text-2xl font-bold text-blue-600">{computedStats.new_feedback || 0}</p>
             </div>
             <MessageSquare className="h-8 w-8 text-blue-500" />
@@ -355,7 +376,7 @@ const FeedbackSuggestions = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Suggestions</p>
+              <p className="text-sm text-muted-foreground">{t('admin.feedback_suggestions_count')}</p>
               <p className="text-2xl font-bold text-green-600">{computedStats.type_breakdown?.feature_request || 0}</p>
             </div>
             <MessageSquare className="h-8 w-8 text-green-500" />
@@ -364,8 +385,8 @@ const FeedbackSuggestions = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Avg Rating</p>
-              <p className="text-2xl font-bold">{(computedStats.average_rating || 0).toFixed(1)}</p>
+              <p className="text-sm text-muted-foreground">{t('admin.feedback_avg_rating')}</p>
+              <p className="text-2xl font-bold">{Number(computedStats.average_rating || 0).toFixed(1)}</p>
             </div>
             <Star className="h-8 w-8 text-yellow-500" />
           </div>
@@ -379,7 +400,7 @@ const FeedbackSuggestions = () => {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Search feedback..."
+                placeholder={t('admin.feedback_search_placeholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -391,25 +412,25 @@ const FeedbackSuggestions = () => {
               variant={selectedFilter === 'all' ? 'default' : 'outline'}
               onClick={() => setSelectedFilter('all')}
             >
-              All Items
+              {t('admin.feedback_all_items')}
             </Button>
             <Button
               variant={selectedFilter === 'new' ? 'default' : 'outline'}
               onClick={() => setSelectedFilter('new')}
             >
-              New
+              {t('admin.feedback_new')}
             </Button>
             <Button
               variant={selectedFilter === 'in_progress' ? 'default' : 'outline'}
               onClick={() => setSelectedFilter('in_progress')}
             >
-              In Progress
+              {t('admin.feedback_in_progress')}
             </Button>
             <Button
               variant={selectedFilter === 'resolved' ? 'default' : 'outline'}
               onClick={() => setSelectedFilter('resolved')}
             >
-              Resolved
+              {t('admin.feedback_resolved')}
             </Button>
           </div>
         </div>
@@ -421,27 +442,27 @@ const FeedbackSuggestions = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Feedback</TableHead>
-              <TableHead>User</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Rating</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="w-[70px]">Actions</TableHead>
+                <TableHead>{t('admin.feedback_table_feedback')}</TableHead>
+                <TableHead>{t('admin.feedback_table_user')}</TableHead>
+                <TableHead>{t('admin.feedback_table_type')}</TableHead>
+                <TableHead>{t('admin.feedback_table_category')}</TableHead>
+                <TableHead>{t('admin.feedback_table_rating')}</TableHead>
+                <TableHead>{t('admin.feedback_table_status')}</TableHead>
+                <TableHead>{t('admin.feedback_table_created')}</TableHead>
+                <TableHead className="w-[70px]">{t('admin.feedback_table_actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-8">
-                  Loading feedback...
+                  {t('admin.feedback_loading')}
                 </TableCell>
               </TableRow>
             ) : filteredFeedbacks.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-8">
-                  No feedback found
+                  {t('admin.feedback_no_found')}
                 </TableCell>
               </TableRow>
             ) : (
@@ -450,7 +471,7 @@ const FeedbackSuggestions = () => {
                   <TableCell>
                     <div>
                       <div className="text-sm text-muted-foreground line-clamp-3 break-words">
-                        {feedback.description || 'No description'}
+                        {feedback.description || t('admin.feedback_no_description')}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
                         #{feedback.id}
@@ -464,7 +485,7 @@ const FeedbackSuggestions = () => {
                   </TableCell>
                   <TableCell>
                     <div className="break-words">
-                      <div className="font-medium">{feedback.user?.name || 'Anonymous'}</div>
+                      <div className="font-medium">{feedback.user?.name || t('admin.feedback_anonymous')}</div>
                       <div className="text-sm text-muted-foreground">{feedback.user?.email || ''}</div>
                     </div>
                   </TableCell>
@@ -481,7 +502,7 @@ const FeedbackSuggestions = () => {
                         <span className="text-sm ml-2">{feedback.rating}/5</span>
                       </div>
                     ) : (
-                      <span className="text-sm text-muted-foreground">No rating</span>
+                      <span className="text-sm text-muted-foreground">{t('admin.feedback_no_rating')}</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -502,7 +523,7 @@ const FeedbackSuggestions = () => {
                       <DropdownMenuContent align="end" className="w-48 bg-gray-800 border border-gray-700 shadow-lg">
                         <DropdownMenuItem className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer">
                           <Eye className="mr-2 h-4 w-4" />
-                          View Details
+                          {t('admin.feedback_view_details')}
                         </DropdownMenuItem>
                         {feedback.status !== 'resolved' && (
                           <DropdownMenuItem 
@@ -510,7 +531,7 @@ const FeedbackSuggestions = () => {
                             className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer"
                           >
                             <CheckCircle className="mr-2 h-4 w-4" />
-                            Mark as Resolved
+                            {t('admin.feedback_mark_resolved')}
                           </DropdownMenuItem>
                         )}
                         {feedback.status !== 'rejected' && (
@@ -519,7 +540,7 @@ const FeedbackSuggestions = () => {
                             className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer"
                           >
                             <Archive className="mr-2 h-4 w-4" />
-                            Reject
+                            {t('admin.feedback_mark_rejected')}
                           </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>
@@ -549,7 +570,7 @@ const FeedbackSuggestions = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Resolved Items</p>
+              <p className="text-sm text-muted-foreground">{t('admin.feedback_resolved_items')}</p>
               <p className="text-2xl font-bold text-green-600">{computedStats.resolved_feedback || 0}</p>
             </div>
             <CheckCircle className="h-8 w-8 text-green-500" />

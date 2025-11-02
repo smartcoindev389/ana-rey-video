@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import AdminLayout from '@/components/admin/AdminLayout';
 import AdminDashboard from './AdminDashboard';
 import UsersManagement from './UsersManagement';
@@ -14,23 +14,33 @@ import Settings from './Settings';
 import AnalyticsReports from './AnalyticsReports';
 
 const AdminRoutes = () => {
+  const { locale } = useParams<{ locale: string }>();
+  const location = useLocation();
+  
+  // Get the path segment after /locale/admin
+  const pathSegments = location.pathname.split('/').filter(Boolean);
+  const adminPath = pathSegments.length > 2 && pathSegments[1] === 'admin' 
+    ? pathSegments.slice(2).join('/') || ''
+    : '';
+  
   return (
-    <Routes>
-      <Route path="/" element={<AdminLayout />}>
-        <Route index element={<AdminDashboard />} />
-        <Route path="users" element={<UsersManagement />} />
-        <Route path="content" element={<ContentManagement />} />
-        <Route path="plans" element={<SubscriptionPlans />} />
-        <Route path="payments" element={<PaymentsTransactions />} />
-        <Route path="coupons" element={<CouponsDiscounts />} />
-        <Route path="multilingual" element={<MultilingualSettings />} />
-        <Route path="support" element={<SupportTickets />} />
-        <Route path="feedback" element={<FeedbackSuggestions />} />
-        <Route path="faqs" element={<FaqManagement />} />
-        <Route path="settings" element={<Settings />} />
-        <Route path="analytics" element={<AnalyticsReports />} />
-      </Route>
-    </Routes>
+    <AdminLayout>
+      {!adminPath && <AdminDashboard />}
+      {adminPath === 'users' && <UsersManagement />}
+      {adminPath === 'content' && <ContentManagement />}
+      {adminPath === 'plans' && <SubscriptionPlans />}
+      {adminPath === 'payments' && <PaymentsTransactions />}
+      {adminPath === 'coupons' && <CouponsDiscounts />}
+      {adminPath === 'multilingual' && <MultilingualSettings />}
+      {adminPath === 'support' && <SupportTickets />}
+      {adminPath === 'feedback' && <FeedbackSuggestions />}
+      {adminPath === 'faqs' && <FaqManagement />}
+      {adminPath === 'settings' && <Settings />}
+      {adminPath === 'analytics' && <AnalyticsReports />}
+      {adminPath && !['users', 'content', 'plans', 'payments', 'coupons', 'multilingual', 'support', 'feedback', 'faqs', 'settings', 'analytics'].includes(adminPath) && (
+        <Navigate to={`/${locale}/admin`} replace />
+      )}
+    </AdminLayout>
   );
 };
 

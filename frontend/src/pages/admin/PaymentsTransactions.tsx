@@ -57,8 +57,12 @@ import {
 } from 'lucide-react';
 import { generateMockTransactions, MockTransaction } from '@/services/mockData';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
+import { useLocale } from '@/hooks/useLocale';
 
 const PaymentsTransactions = () => {
+  const { t } = useTranslation();
+  const { locale } = useLocale();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [selectedPeriod, setSelectedPeriod] = useState('month');
@@ -80,7 +84,7 @@ const PaymentsTransactions = () => {
     };
 
     fetchTransactions();
-  }, []);
+  }, [locale]);
 
   useEffect(() => {
     let filtered = transactions;
@@ -125,10 +129,17 @@ const PaymentsTransactions = () => {
       refunded: 'secondary'
     } as const;
 
+    const statusLabels = {
+      completed: t('admin.payments_completed'),
+      pending: t('admin.payments_pending'),
+      failed: t('admin.payments_failed'),
+      refunded: t('admin.payments_refunded')
+    };
+
     return (
       <Badge variant={variants[status as keyof typeof variants]}>
         {getStatusIcon(status)}
-        <span className="ml-1 capitalize">{status}</span>
+        <span className="ml-1 capitalize">{statusLabels[status as keyof typeof statusLabels] || status}</span>
       </Badge>
     );
   };
@@ -158,7 +169,7 @@ const PaymentsTransactions = () => {
         ? { ...t, status: 'pending' as const }
         : t
     ));
-    toast.success("Payment retry initiated");
+    toast.success(t('admin.payments_retry_initiated'));
   };
 
   const handleProcessRefund = (transactionId: string) => {
@@ -167,17 +178,17 @@ const PaymentsTransactions = () => {
         ? { ...t, status: 'refunded' as const }
         : t
     ));
-    toast.success("Refund processed successfully");
+    toast.success(t('admin.payments_refund_processed'));
   };
 
   const handleExportTransactions = () => {
     // Simulate export functionality
-    toast.success("Transaction data exported successfully");
+    toast.success(t('admin.payments_exported'));
   };
 
   const handleRefreshTransactions = () => {
     // Simulate refresh
-    toast.success("Transactions refreshed");
+    toast.success(t('admin.payments_refreshed'));
   };
 
   const formatCurrency = (amount: number, currency: string = 'USD') => {
@@ -189,7 +200,7 @@ const PaymentsTransactions = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return new Date(dateString).toLocaleDateString(locale, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -202,8 +213,8 @@ const PaymentsTransactions = () => {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Payments & Transactions</h1>
-          <p className="text-muted-foreground">Loading transactions...</p>
+          <h1 className="text-3xl font-bold">{t('admin.payments_transactions')}</h1>
+          <p className="text-muted-foreground">{t('admin.payments_loading')}</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
@@ -235,17 +246,17 @@ const PaymentsTransactions = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Payments & Transactions</h1>
-          <p className="text-muted-foreground">Monitor payment transactions and revenue</p>
+          <h1 className="text-3xl font-bold">{t('admin.payments_transactions')}</h1>
+          <p className="text-muted-foreground">{t('admin.payments_monitor')}</p>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline" onClick={handleRefreshTransactions}>
             <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
+            {t('admin.payments_refresh')}
           </Button>
           <Button variant="outline" onClick={handleExportTransactions}>
             <Download className="mr-2 h-4 w-4" />
-            Export
+            {t('admin.payments_export')}
           </Button>
         </div>
       </div>
@@ -255,11 +266,11 @@ const PaymentsTransactions = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Revenue</p>
+              <p className="text-sm text-muted-foreground">{t('admin.payments_total_revenue')}</p>
               <p className="text-2xl font-bold">${stats.totalRevenue.toFixed(2)}</p>
               <p className="text-xs text-green-600 flex items-center">
                 <TrendingUp className="h-3 w-3 mr-1" />
-                +12% from last month
+                +12% {t('admin.payments_from_last_month')}
               </p>
             </div>
             <DollarSign className="h-8 w-8 text-green-500" />
@@ -268,11 +279,11 @@ const PaymentsTransactions = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Transactions</p>
+              <p className="text-sm text-muted-foreground">{t('admin.payments_total_transactions')}</p>
               <p className="text-2xl font-bold">{stats.totalTransactions}</p>
               <p className="text-xs text-blue-600 flex items-center">
                 <TrendingUp className="h-3 w-3 mr-1" />
-                +8% from last month
+                +8% {t('admin.payments_from_last_month')}
               </p>
             </div>
             <CreditCard className="h-8 w-8 text-blue-500" />
@@ -281,12 +292,12 @@ const PaymentsTransactions = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Success Rate</p>
+              <p className="text-sm text-muted-foreground">{t('admin.payments_success_rate')}</p>
               <p className="text-2xl font-bold">
                 {((stats.completedTransactions / stats.totalTransactions) * 100).toFixed(1)}%
               </p>
               <p className="text-xs text-muted-foreground">
-                {stats.completedTransactions} of {stats.totalTransactions} successful
+                {stats.completedTransactions} {t('admin.payments_of')} {stats.totalTransactions} {t('admin.payments_successful')}
               </p>
             </div>
             <CheckCircle className="h-8 w-8 text-green-500" />
@@ -295,10 +306,10 @@ const PaymentsTransactions = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Average Transaction</p>
+              <p className="text-sm text-muted-foreground">{t('admin.payments_avg_transaction')}</p>
               <p className="text-2xl font-bold">${stats.averageTransaction.toFixed(2)}</p>
               <p className="text-xs text-muted-foreground">
-                Per successful transaction
+                {t('admin.payments_per_transaction')}
               </p>
             </div>
             <TrendingUp className="h-8 w-8 text-purple-500" />
@@ -313,7 +324,7 @@ const PaymentsTransactions = () => {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Search transactions..."
+                placeholder={t('admin.payments_search_placeholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -323,24 +334,24 @@ const PaymentsTransactions = () => {
           <div className="flex gap-2">
             <Select value={selectedFilter} onValueChange={setSelectedFilter}>
               <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filter by status" />
+                <SelectValue placeholder={t('admin.payments_filter_status')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
+                <SelectItem value="all">{t('admin.payments_all_status')}</SelectItem>
+                <SelectItem value="completed">{t('admin.payments_completed')}</SelectItem>
+                <SelectItem value="pending">{t('admin.payments_pending')}</SelectItem>
+                <SelectItem value="failed">{t('admin.payments_failed')}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
               <SelectTrigger className="w-48">
-                <SelectValue placeholder="Time period" />
+                <SelectValue placeholder={t('admin.payments_time_period')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="week">This Week</SelectItem>
-                <SelectItem value="month">This Month</SelectItem>
-                <SelectItem value="quarter">This Quarter</SelectItem>
-                <SelectItem value="year">This Year</SelectItem>
+                <SelectItem value="week">{t('admin.payments_this_week')}</SelectItem>
+                <SelectItem value="month">{t('admin.payments_this_month')}</SelectItem>
+                <SelectItem value="quarter">{t('admin.payments_this_quarter')}</SelectItem>
+                <SelectItem value="year">{t('admin.payments_this_year')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -352,14 +363,14 @@ const PaymentsTransactions = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Transaction</TableHead>
-              <TableHead>User</TableHead>
-              <TableHead>Subscription</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Payment Method</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead className="w-[70px]">Actions</TableHead>
+              <TableHead>{t('admin.payments_table_transaction')}</TableHead>
+              <TableHead>{t('admin.payments_table_user')}</TableHead>
+              <TableHead>{t('admin.payments_table_subscription')}</TableHead>
+              <TableHead>{t('admin.payments_table_amount')}</TableHead>
+              <TableHead>{t('admin.payments_table_payment_method')}</TableHead>
+              <TableHead>{t('admin.payments_table_status')}</TableHead>
+              <TableHead>{t('admin.payments_table_date')}</TableHead>
+              <TableHead className="w-[70px]">{t('admin.payments_table_actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -400,7 +411,7 @@ const PaymentsTransactions = () => {
                     <Calendar className="h-4 w-4 mr-1 text-muted-foreground" />
                     <div>
                       <div className="text-sm">
-                        {transaction.paidAt ? formatDate(transaction.paidAt) : 'Pending'}
+                        {transaction.paidAt ? formatDate(transaction.paidAt) : t('admin.payments_pending')}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {transaction.subscriptionPeriod}
@@ -416,25 +427,25 @@ const PaymentsTransactions = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48 bg-gray-800 border border-gray-700 shadow-lg">
-                      <DropdownMenuLabel className="text-white font-semibold px-3 py-2">Actions</DropdownMenuLabel>
+                      <DropdownMenuLabel className="text-white font-semibold px-3 py-2">{t('admin.payments_table_actions')}</DropdownMenuLabel>
                       <DropdownMenuSeparator className="bg-gray-700" />
                       <DropdownMenuItem 
                         onClick={() => handleViewDetails(transaction)}
                         className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer"
                       >
                         <Eye className="mr-2 h-4 w-4" />
-                        View Details
+                        {t('admin.payments_view_details')}
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         onClick={() => handleRetryPayment(transaction.id)}
                         className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer"
                       >
                         <RefreshCw className="mr-2 h-4 w-4" />
-                        Retry Payment
+                        {t('admin.payments_retry_payment')}
                       </DropdownMenuItem>
                       <DropdownMenuItem className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer">
                         <Receipt className="mr-2 h-4 w-4" />
-                        Download Receipt
+                        {t('admin.payments_download_receipt')}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator className="bg-gray-700" />
                       <DropdownMenuItem 
@@ -442,7 +453,7 @@ const PaymentsTransactions = () => {
                         className="text-red-400 hover:text-red-300 hover:bg-red-900/20 px-3 py-2 cursor-pointer"
                       >
                         <XCircle className="mr-2 h-4 w-4" />
-                        Process Refund
+                        {t('admin.payments_process_refund')}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -458,7 +469,7 @@ const PaymentsTransactions = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Completed</p>
+              <p className="text-sm text-muted-foreground">{t('admin.payments_completed_count')}</p>
               <p className="text-2xl font-bold text-green-600">{stats.completedTransactions}</p>
             </div>
             <CheckCircle className="h-8 w-8 text-green-500" />
@@ -467,7 +478,7 @@ const PaymentsTransactions = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Pending</p>
+              <p className="text-sm text-muted-foreground">{t('admin.payments_pending_count')}</p>
               <p className="text-2xl font-bold text-yellow-600">{stats.pendingTransactions}</p>
             </div>
             <Clock className="h-8 w-8 text-yellow-500" />
@@ -476,7 +487,7 @@ const PaymentsTransactions = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Failed</p>
+              <p className="text-sm text-muted-foreground">{t('admin.payments_failed_count')}</p>
               <p className="text-2xl font-bold text-red-600">{stats.failedTransactions}</p>
             </div>
             <XCircle className="h-8 w-8 text-red-500" />
@@ -488,74 +499,74 @@ const PaymentsTransactions = () => {
       <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Transaction Details</DialogTitle>
+            <DialogTitle>{t('admin.payments_transaction_details')}</DialogTitle>
             <DialogDescription>
-              Detailed information about the selected transaction
+              {t('admin.payments_details_description')}
             </DialogDescription>
           </DialogHeader>
           {selectedTransaction && (
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <h4 className="font-medium mb-2">Transaction Information</h4>
+                  <h4 className="font-medium mb-2">{t('admin.payments_transaction_info')}</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Transaction ID:</span>
+                      <span className="text-muted-foreground">{t('admin.payments_transaction_id')}</span>
                       <span className="font-mono">{selectedTransaction.transactionId}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Gateway:</span>
+                      <span className="text-muted-foreground">{t('admin.payments_gateway')}</span>
                       <span>{selectedTransaction.gateway}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Type:</span>
+                      <span className="text-muted-foreground">{t('admin.payments_type')}</span>
                       <span>{selectedTransaction.type}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Status:</span>
+                      <span className="text-muted-foreground">{t('admin.payments_status_label')}</span>
                       {getStatusBadge(selectedTransaction.status)}
                     </div>
                   </div>
                 </div>
                 <div>
-                  <h4 className="font-medium mb-2">Payment Details</h4>
+                  <h4 className="font-medium mb-2">{t('admin.payments_payment_details')}</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Amount:</span>
+                      <span className="text-muted-foreground">{t('admin.payments_amount_label')}</span>
                       <span className="font-medium">{formatCurrency(selectedTransaction.amount, selectedTransaction.currency)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Payment Method:</span>
+                      <span className="text-muted-foreground">{t('admin.payments_payment_method_label')}</span>
                       <span>{selectedTransaction.paymentMethod}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Card:</span>
+                      <span className="text-muted-foreground">{t('admin.payments_card')}</span>
                       <span>****{selectedTransaction.cardLastFour}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Paid At:</span>
-                      <span>{selectedTransaction.paidAt ? formatDate(selectedTransaction.paidAt) : 'Pending'}</span>
+                      <span className="text-muted-foreground">{t('admin.payments_paid_at')}</span>
+                      <span>{selectedTransaction.paidAt ? formatDate(selectedTransaction.paidAt) : t('admin.payments_pending')}</span>
                     </div>
                   </div>
                 </div>
               </div>
               <div>
-                <h4 className="font-medium mb-2">Customer Information</h4>
+                <h4 className="font-medium mb-2">{t('admin.payments_customer_info')}</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Name:</span>
+                    <span className="text-muted-foreground">{t('admin.payments_name')}</span>
                     <span>{selectedTransaction.user}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Email:</span>
+                    <span className="text-muted-foreground">{t('admin.payments_email')}</span>
                     <span>{selectedTransaction.userEmail}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Subscription:</span>
+                    <span className="text-muted-foreground">{t('admin.payments_subscription_label')}</span>
                     {getSubscriptionBadge(selectedTransaction.subscription)}
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Period:</span>
+                    <span className="text-muted-foreground">{t('admin.payments_period')}</span>
                     <span>{selectedTransaction.subscriptionPeriod}</span>
                   </div>
                 </div>
@@ -564,7 +575,7 @@ const PaymentsTransactions = () => {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDetailsDialogOpen(false)}>
-              Close
+              {t('admin.payments_close')}
             </Button>
             <Button onClick={() => {
               if (selectedTransaction) {
@@ -572,7 +583,7 @@ const PaymentsTransactions = () => {
                 setIsDetailsDialogOpen(false);
               }
             }}>
-              Process Refund
+              {t('admin.payments_process_refund')}
             </Button>
           </DialogFooter>
         </DialogContent>

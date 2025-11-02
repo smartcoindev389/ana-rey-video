@@ -46,7 +46,12 @@ class FaqApi {
         params.append('category', category);
       }
       
-      const response = await axios.get(`${this.baseURL}?${params.toString()}`);
+      const locale = this.getLocale();
+      const response = await axios.get(`${this.baseURL}?${params.toString()}`, {
+        headers: {
+          'Accept-Language': locale
+        }
+      });
       return response.data;
     } catch (error) {
       console.error('Error fetching FAQs:', error);
@@ -56,7 +61,12 @@ class FaqApi {
 
   async getCategories(): Promise<{ success: boolean; data: string[] }> {
     try {
-      const response = await axios.get(`${this.baseURL}/categories`);
+      const locale = this.getLocale();
+      const response = await axios.get(`${this.baseURL}/categories`, {
+        headers: {
+          'Accept-Language': locale
+        }
+      });
       return response.data;
     } catch (error) {
       console.error('Error fetching FAQ categories:', error);
@@ -64,11 +74,17 @@ class FaqApi {
     }
   }
 
+  // Helper method to get locale from localStorage or default to 'en'
+  private getLocale(): string {
+    return localStorage.getItem('i18nextLng') || 'en';
+  }
+
   // Helper method to get auth headers
   private getAuthHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Accept': 'application/json'
+      'Accept': 'application/json',
+      'Accept-Language': this.getLocale()
     };
 
     const token = localStorage.getItem('auth_token');

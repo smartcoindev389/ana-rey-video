@@ -30,6 +30,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { useLocale } from '@/hooks/useLocale';
 import { videoApi, categoryApi } from '@/services/videoApi';
 import { userProgressApi } from '@/services/userProgressApi';
 import { commentsApi, VideoComment } from '@/services/commentsApi';
@@ -46,7 +48,7 @@ import {
 import { MessageCircle, Lightbulb } from 'lucide-react';
 
 const VideoPlayer = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id, locale } = useParams<{ id: string; locale?: string }>();
   const [video, setVideo] = useState<any | null>(null);
   const [category, setCategory] = useState<any | null>(null);
   const [relatedVideos, setRelatedVideos] = useState<any[]>([]);
@@ -63,7 +65,6 @@ const VideoPlayer = () => {
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [progress, setProgress] = useState(0);
   const [userProgress, setUserProgress] = useState<any>(null);
-  const [sourceIndex, setSourceIndex] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [isDisliked, setIsDisliked] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -75,10 +76,15 @@ const VideoPlayer = () => {
   const [feedbackDescription, setFeedbackDescription] = useState('');
   const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
   const [feedbackPriority, setFeedbackPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
+  const [videoFeedbacks, setVideoFeedbacks] = useState<any[]>([]);
+  const [userHasFeedback, setUserHasFeedback] = useState(false);
+  const [loadingFeedback, setLoadingFeedback] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const { navigateWithLocale } = useLocale();
 
   useEffect(() => {
     const fetchVideoData = async () => {
@@ -101,7 +107,6 @@ const VideoPlayer = () => {
         }
         
         setVideo(videoData);
-        setSourceIndex(0);
         
         // Debug: Log video URLs
         console.log('Video data loaded:', {
@@ -172,12 +177,38 @@ const VideoPlayer = () => {
             console.error('Failed to fetch comments:', error);
           }
         }
+
+        // Fetch all feedback for this video
+        if (videoData.id) {
+          try {
+            setLoadingFeedback(true);
+            const feedbackResponse = await feedbackApi.getAll({ video_id: videoData.id });
+            if (feedbackResponse.success) {
+              const feedbackData = Array.isArray(feedbackResponse.data)
+                ? feedbackResponse.data
+                : feedbackResponse.data?.data || [];
+              setVideoFeedbacks(feedbackData);
+              
+              // Check if current user has already submitted feedback
+              if (user) {
+                const userFeedback = feedbackData.find((f: any) => f.user_id === user.id);
+                setUserHasFeedback(!!userFeedback);
+              } else {
+                setUserHasFeedback(false);
+              }
+            }
+          } catch (error) {
+            console.error('Failed to fetch feedback:', error);
+          } finally {
+            setLoadingFeedback(false);
+          }
+        }
         
         setDuration(videoData.duration || 0);
         
       } catch (error: any) {
         console.error('Error loading video data:', error);
-        toast.error(error.message || 'Failed to load video');
+        toast.error(error.message || t('video.failed_load_video'));
         setVideo(null);
       } finally {
         setLoading(false);
@@ -250,7 +281,7 @@ const VideoPlayer = () => {
 
   const handleToggleFavorite = async () => {
     if (!user || !video) {
-      toast.error('Please sign in to add favorites');
+      toast.error(t('video.please_sign_in_favorites'));
       return;
     }
 
@@ -258,7 +289,7 @@ const VideoPlayer = () => {
       const response = await userProgressApi.toggleFavorite(video.id);
       if (response.success && response.data) {
         setIsFavorite(response.data.is_favorite || false);
-        toast.success(response.data.is_favorite ? 'Added to favorites' : 'Removed from favorites');
+        toast.success(response.data.is_favorite ? t('video.added_to_favorites') : t('video.removed_from_favorites'));
         
         // Update user progress state
         if (userProgress) {
@@ -270,7 +301,7 @@ const VideoPlayer = () => {
         }
       }
     } catch (error: any) {
-      toast.error(error.message || 'Failed to update favorites');
+      toast.error(error.message || t('video.failed_update_favorites'));
     }
   };
 
@@ -314,7 +345,7 @@ const VideoPlayer = () => {
 
   const handleSubmitComment = async () => {
     if (!comment.trim() || !user || !video) {
-      toast.error('Please sign in to comment');
+      toast.error(t('video.please_sign_in_comment'));
       return;
     }
 
@@ -327,16 +358,16 @@ const VideoPlayer = () => {
       if (response.success) {
         setComments([response.data, ...comments]);
         setComment('');
-        toast.success('Comment added successfully');
+        toast.success(t('video.comment_added_successfully'));
       }
     } catch (error: any) {
-      toast.error(error.message || 'Failed to add comment');
+      toast.error(error.message || t('video.failed_add_comment'));
     }
   };
 
   const handleLikeComment = async (commentId: number) => {
     if (!user) {
-      toast.error('Please sign in to like comments');
+      toast.error(t('video.please_sign_in_like_comments'));
       return;
     }
 
@@ -350,7 +381,7 @@ const VideoPlayer = () => {
         ));
       }
     } catch (error: any) {
-      toast.error(error.message || 'Failed to like comment');
+      toast.error(error.message || t('video.failed_like_comment'));
     }
   };
 
@@ -361,10 +392,10 @@ const VideoPlayer = () => {
       const response = await commentsApi.deleteComment(commentId);
       if (response.success) {
         setComments(comments.filter(c => c.id !== commentId));
-        toast.success('Comment deleted');
+        toast.success(t('video.comment_deleted'));
       }
     } catch (error: any) {
-      toast.error(error.message || 'Failed to delete comment');
+      toast.error(error.message || t('video.failed_delete_comment'));
     }
   };
 
@@ -448,9 +479,9 @@ const VideoPlayer = () => {
   if (!video) {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
-        <h1 className="text-2xl font-bold mb-4">Video not found</h1>
+        <h1 className="text-2xl font-bold mb-4">{t('video.video_not_found')}</h1>
         <Button onClick={() => navigate('/explore')}>
-          Browse All Videos
+          {t('video.browse_all_videos')}
         </Button>
       </div>
     );
@@ -470,10 +501,10 @@ const VideoPlayer = () => {
                 <div className="text-center space-y-4">
                   <Lock className="h-16 w-16 text-muted-foreground mx-auto" />
                   <div>
-                    <h3 className="text-lg font-semibold mb-2">Premium Content</h3>
-                    <p className="text-muted-foreground mb-4">Upgrade your plan to access this video</p>
+                    <h3 className="text-lg font-semibold mb-2">{t('video.premium_content')}</h3>
+                    <p className="text-muted-foreground mb-4">{t('video.upgrade_plan_access')}</p>
                     <Button onClick={() => navigate('/subscription')}>
-                      Upgrade Now
+                      {t('video.upgrade_now')}
                     </Button>
                   </div>
                 </div>
@@ -481,17 +512,19 @@ const VideoPlayer = () => {
             ) : (
               <>
                 {/* Video Player */}
-                {(video.video_url_full || video.video_file_path || video.video_url) ? (
+                {video.video_url_full ? (
                   <video
-                    key={video.id}
+                    key={`${video.id}-video`}
                     ref={videoRef}
-                    src={[video.video_url_full, video.video_url, video.video_file_path].filter(Boolean)[sourceIndex] as string}
+                    src={video.video_url_full}
                     className="w-full h-full"
                     controls
+                    controlsList="nodownload"
                     playsInline
                     preload="auto"
-                    crossOrigin="use-credentials"
+                    disablePictureInPicture
                     poster={video.intro_image_url || video.intro_image || undefined}
+                    onContextMenu={(e) => e.preventDefault()}
                     onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
                     onLoadedMetadata={(e) => {
                       const duration = e.currentTarget.duration;
@@ -528,7 +561,7 @@ const VideoPlayer = () => {
                         setCurrentTime(duration);
                       }
                     }}
-                    onError={(e) => {
+                    onError={async (e) => {
                       const error = e.currentTarget.error;
                       console.error('❌ Video error:', {
                         code: error?.code,
@@ -536,46 +569,46 @@ const VideoPlayer = () => {
                         src: e.currentTarget.src
                       });
                       
+                      // Only use video_url_full (stream endpoint) - don't try invalid fallbacks
+                      if (!video.video_url_full) {
+                        toast.error(t('video.no_valid_video_source'));
+                        return;
+                      }
+                      
+                      // Handle specific error codes
                       if (error?.code === 3) {
                         // Code 3 = MEDIA_ERR_DECODE (audio/video codec issue)
-                        // Often an audio codec problem - try to continue playing without audio
-                        console.warn('⚠️ Audio codec not supported, attempting to play video without audio');
-                        
-                        // Don't show error toast for audio codec issues
-                        // The video might still play with video track only
-                        // Try next available source if present
-                        const sources = [video.video_url_full, video.video_url, video.video_file_path].filter(Boolean);
-                        if (sourceIndex + 1 < sources.length) {
-                          setSourceIndex(sourceIndex + 1);
+                        // Try playing without audio
+                        console.warn('⚠️ Audio codec issue detected, attempting to play muted');
+                        if (videoRef.current) {
+                          videoRef.current.muted = true;
+                          try {
+                            await videoRef.current.play();
+                          } catch (playError) {
+                            console.error('Failed to play muted video:', playError);
+                            toast.error(t('video.video_playback_failed'));
+                          }
                         }
                         return;
                       }
                       
+                      // Show user-friendly error messages
                       if (error?.code === 4) {
-                        // Try next available source, then surface error if none left
-                        const sources = [video.video_url_full, video.video_url, video.video_file_path].filter(Boolean);
-                        if (sourceIndex + 1 < sources.length) {
-                          setSourceIndex(sourceIndex + 1);
-                          return;
-                        }
-                        toast.error('Video format not supported');
+                        toast.error(t('video.video_format_not_supported'));
                       } else if (error?.code === 2) {
-                        const sources = [video.video_url_full, video.video_url, video.video_file_path].filter(Boolean);
-                        if (sourceIndex + 1 < sources.length) {
-                          setSourceIndex(sourceIndex + 1);
-                          return;
-                        }
-                        toast.error('Network error loading video');
+                        toast.error(t('video.network_error_loading_video'));
+                      } else if (error?.code === 1) {
+                        toast.error(t('video.video_file_not_found'));
                       }
                     }}
                   >
-                    Your browser does not support the video tag.
+                    {t('video.browser_no_video_support')}
                   </video>
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
                     <div className="text-center">
                       <Play className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">Video file not available</p>
+                      <p className="text-muted-foreground">{t('video.video_file_not_available')}</p>
                     </div>
                   </div>
                 )}
@@ -704,9 +737,9 @@ const VideoPlayer = () => {
               <div>
                 <h1 className="text-2xl font-bold mb-2">{video.title}</h1>
                 <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                  <span>{(video.total_views || 0).toLocaleString()} views</span>
+                  <span>{(video.total_views || 0).toLocaleString()} {t('video.views')}</span>
                   <span>{formatTime(video.duration || 0)}</span>
-                  <span>{video.created_at ? new Date(video.created_at).toLocaleDateString() : 'N/A'}</span>
+                  <span>{video.created_at ? new Date(video.created_at).toLocaleDateString() : t('video.na')}</span>
                   {category && (
                     <span className="flex items-center">
                       <BookOpen className="h-3 w-3 mr-1" />
@@ -721,7 +754,7 @@ const VideoPlayer = () => {
                   size="sm"
                   onClick={async () => {
                     if (!user || !video) {
-                      toast.error('Please sign in to like videos');
+                      toast.error(t('video.please_sign_in_like'));
                       return;
                     }
                     try {
@@ -742,22 +775,22 @@ const VideoPlayer = () => {
                             liked_at: response.data.liked_at,
                           });
                         }
-                        toast.success(isLikedNow ? 'Video liked' : 'Like removed');
+                        toast.success(isLikedNow ? t('video.video_liked') : t('video.like_removed'));
                       }
                     } catch (error: any) {
-                      toast.error(error.message || 'Failed to like video');
+                      toast.error(error.message || t('video.failed_like_video'));
                     }
                   }}
                 >
                   <ThumbsUp className="h-4 w-4 mr-1" />
-                  Like
+                  {t('video.like')}
                 </Button>
                 <Button
                   variant={isDisliked ? "destructive" : "outline"}
                   size="sm"
                   onClick={async () => {
                     if (!user || !video) {
-                      toast.error('Please sign in to dislike videos');
+                      toast.error(t('video.please_sign_in_dislike'));
                       return;
                     }
                     try {
@@ -778,10 +811,10 @@ const VideoPlayer = () => {
                             liked_at: null,
                           });
                         }
-                        toast.success(isDislikedNow ? 'Video disliked' : 'Dislike removed');
+                        toast.success(isDislikedNow ? t('video.video_disliked') : t('video.dislike_removed'));
                       }
                     } catch (error: any) {
-                      toast.error(error.message || 'Failed to dislike video');
+                      toast.error(error.message || t('video.failed_dislike_video'));
                     }
                   }}
                 >
@@ -793,11 +826,7 @@ const VideoPlayer = () => {
                   onClick={handleToggleFavorite}
                 >
                   <Heart className={`h-4 w-4 mr-1 ${isFavorite ? 'fill-current' : ''}`} />
-                  {isFavorite ? 'Saved' : 'Save'}
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Share2 className="h-4 w-4 mr-1" />
-                  Share
+                  {isFavorite ? t('video.saved') : t('video.save')}
                 </Button>
               </div>
             </div>
@@ -805,8 +834,8 @@ const VideoPlayer = () => {
             {/* Progress */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span>Your Progress</span>
-                <span>{Math.round(progress)}% complete</span>
+                <span>{t('video.your_progress')}</span>
+                <span>{t('video.percent_complete', { percent: Math.round(progress) })}</span>
               </div>
               <Progress value={progress} className="h-2" />
             </div>
@@ -815,28 +844,33 @@ const VideoPlayer = () => {
           {/* Feedback & Suggestions Section */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Feedback & Suggestions</h3>
-              {user && (
-                <Button 
-                  variant={showFeedbackForm ? 'outline' : 'default'}
-                  size="sm"
-                  onClick={() => {
-                    setShowFeedbackForm(!showFeedbackForm);
-                    if (!showFeedbackForm) {
-                      setFeedbackDescription('');
-                      setFeedbackRating(null);
-                      setFeedbackPriority('medium');
-                    }
-                  }}
-                >
-                  {showFeedbackForm ? 'Cancel' : 'Share Feedback'}
-                </Button>
-              )}
+              <h3 className="text-lg font-semibold">{t('video.feedback_suggestions')}</h3>
+            {user && !userHasFeedback && (
+              <Button 
+                variant={showFeedbackForm ? 'outline' : 'default'}
+                size="sm"
+                onClick={() => {
+                  setShowFeedbackForm(!showFeedbackForm);
+                  if (!showFeedbackForm) {
+                    setFeedbackDescription('');
+                    setFeedbackRating(null);
+                    setFeedbackPriority('medium');
+                  }
+                }}
+              >
+                {showFeedbackForm ? t('video.cancel') : t('video.share_feedback')}
+              </Button>
+            )}
+            {user && userHasFeedback && (
+              <Badge variant="secondary" className="text-sm">
+                {t('video.already_submitted_feedback')}
+              </Badge>
+            )}
             </div>
 
             {!user && (
               <div className="mb-6 p-4 bg-muted rounded-lg text-center text-sm text-muted-foreground">
-                Please sign in to share feedback or suggestions
+                {t('video.please_sign_in_feedback')}
               </div>
             )}
 
@@ -850,7 +884,7 @@ const VideoPlayer = () => {
                     className="flex-1"
                   >
                     <MessageCircle className="h-4 w-4 mr-2" />
-                    Feedback
+                    {t('video.feedback')}
                   </Button>
                   <Button
                     variant={feedbackType === 'suggestion' ? 'default' : 'outline'}
@@ -859,24 +893,24 @@ const VideoPlayer = () => {
                     className="flex-1"
                   >
                     <Lightbulb className="h-4 w-4 mr-2" />
-                    Suggestion
+                    {t('video.suggestion')}
                   </Button>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="feedbackDescription">Description</Label>
+                  <Label htmlFor="feedbackDescription">{t('video.description')}</Label>
                   <Textarea
                     id="feedbackDescription"
                     value={feedbackDescription}
                     onChange={(e) => setFeedbackDescription(e.target.value)}
-                    placeholder={`Please provide details about your ${feedbackType === 'feedback' ? 'feedback' : 'suggestion'}...`}
+                    placeholder={t('video.provide_feedback_details', { type: feedbackType === 'feedback' ? t('video.feedback').toLowerCase() : t('video.suggestion').toLowerCase() })}
                     className="min-h-[120px]"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="feedbackRating">Rating (Optional)</Label>
+                    <Label htmlFor="feedbackRating">{t('video.rating_optional')}</Label>
                     <div className="flex items-center space-x-1">
                       {[1, 2, 3, 4, 5].map((star) => (
                         <button
@@ -896,14 +930,14 @@ const VideoPlayer = () => {
                       ))}
                       {feedbackRating && (
                         <span className="ml-2 text-sm text-muted-foreground">
-                          {feedbackRating} {feedbackRating === 1 ? 'star' : 'stars'}
+                          {feedbackRating} {feedbackRating === 1 ? t('video.star') : t('video.stars')}
                         </span>
                       )}
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="feedbackPriority">Priority</Label>
+                    <Label htmlFor="feedbackPriority">{t('video.priority')}</Label>
                     <Select 
                       value={feedbackPriority} 
                       onValueChange={(value) => setFeedbackPriority(value as 'low' | 'medium' | 'high' | 'urgent')}
@@ -912,10 +946,10 @@ const VideoPlayer = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="urgent">Urgent</SelectItem>
+                        <SelectItem value="low">{t('video.low')}</SelectItem>
+                        <SelectItem value="medium">{t('video.medium')}</SelectItem>
+                        <SelectItem value="high">{t('video.high')}</SelectItem>
+                        <SelectItem value="urgent">{t('video.urgent')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -924,7 +958,7 @@ const VideoPlayer = () => {
                 <Button
                   onClick={async () => {
                     if (!feedbackDescription.trim() || !video) {
-                      toast.error('Please fill in description');
+                      toast.error(t('video.description_required'));
                       return;
                     }
                     try {
@@ -937,27 +971,105 @@ const VideoPlayer = () => {
                         category: 'Video Content',
                       });
                       if (response.success) {
-                        toast.success('Feedback submitted successfully! Thank you for your input.');
+                        toast.success(t('video.feedback_submitted'));
                         setShowFeedbackForm(false);
                         setFeedbackDescription('');
                         setFeedbackRating(null);
                         setFeedbackPriority('medium');
+                        setUserHasFeedback(true);
+                        
+                        // Refresh feedback list
+                        try {
+                          const feedbackResponse = await feedbackApi.getAll({ video_id: video.id });
+                          if (feedbackResponse.success) {
+                            const feedbackData = Array.isArray(feedbackResponse.data)
+                              ? feedbackResponse.data
+                              : feedbackResponse.data?.data || [];
+                            setVideoFeedbacks(feedbackData);
+                          }
+                        } catch (error) {
+                          console.error('Failed to refresh feedback:', error);
+                        }
                       }
                     } catch (error: any) {
-                      toast.error(error.message || 'Failed to submit feedback');
+                      // Handle duplicate feedback error
+                      if (error.message && error.message.includes('already submitted feedback')) {
+                        toast.error(t('video.already_submitted_error'));
+                        setUserHasFeedback(true);
+                      } else {
+                        toast.error(error.message || t('video.failed_submit_feedback'));
+                      }
                     }
                   }}
                   disabled={!feedbackDescription.trim()}
                   className="w-full"
                 >
-                  Submit {feedbackType === 'feedback' ? 'Feedback' : 'Suggestion'}
+                  {t('video.submit')} {feedbackType === 'feedback' ? t('video.feedback') : t('video.suggestion')}
                 </Button>
               </div>
             )}
 
-            {user && !showFeedbackForm && (
+            {/* Display all feedback for this video */}
+            {videoFeedbacks.length > 0 && (
+              <div className="space-y-4 mt-6">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold">{t('video.all_feedback', { count: videoFeedbacks.length })}</h4>
+                </div>
+                <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                  {videoFeedbacks.map((feedback: any) => (
+                    <div key={feedback.id} className="border rounded-lg p-4 bg-muted/50">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-medium">{feedback.user?.name || t('video.anonymous')}</span>
+                            {feedback.rating && (
+                              <div className="flex items-center gap-1">
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    className={`h-3 w-3 ${
+                                      i < feedback.rating
+                                        ? 'text-yellow-400 fill-current'
+                                        : 'text-gray-300'
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                            <Badge variant="outline" className="text-xs">
+                              {feedback.type === 'general_feedback' ? t('video.feedback') : 
+                               feedback.type === 'feature_request' ? t('video.suggestion') : feedback.type}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">{feedback.description}</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>{new Date(feedback.created_at).toLocaleDateString()}</span>
+                            {feedback.status && (
+                              <>
+                                <span>•</span>
+                                <Badge variant="outline" className="text-xs">
+                                  {feedback.status}
+                                </Badge>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!loadingFeedback && videoFeedbacks.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">
-                Help us improve by sharing your feedback or suggestions about this video
+                {t('video.no_feedback_yet')}
+              </p>
+            )}
+
+            {user && !showFeedbackForm && !userHasFeedback && videoFeedbacks.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                {t('video.help_improve_feedback')}
               </p>
             )}
           </Card>
@@ -967,16 +1079,16 @@ const VideoPlayer = () => {
         <div className="space-y-6">
           {/* Course Progress */}
           <Card className="p-4">
-            <h3 className="font-semibold mb-3">Course Progress</h3>
+            <h3 className="font-semibold mb-3">{t('video.course_progress')}</h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
-                <span>Overall Progress</span>
-                <span>{relatedVideos.length > 0 ? `1 of ${relatedVideos.length + 1}` : '1 of 1'} videos</span>
+                <span>{t('video.overall_progress')}</span>
+                <span>{t('video.videos_count', { current: 1, total: relatedVideos.length + 1 })}</span>
               </div>
               <Progress value={relatedVideos.length > 0 ? (1 / (relatedVideos.length + 1)) * 100 : 100} className="h-2" />
               {relatedVideos.length > 0 && (
                 <div className="text-xs text-muted-foreground">
-                  {relatedVideos.length} more video{relatedVideos.length !== 1 ? 's' : ''} in this category
+                  {t('video.more_videos_category', { count: relatedVideos.length, plural: relatedVideos.length !== 1 ? 's' : '' })}
                 </div>
               )}
             </div>
@@ -985,7 +1097,7 @@ const VideoPlayer = () => {
           {/* Comments Section */}
           <Card className="p-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">Comments ({comments.length})</h3>
+              <h3 className="font-semibold">{t('video.comments')} ({comments.length})</h3>
               <div className="flex gap-1">
                 <Button
                   variant={commentSortBy === 'newest' ? 'default' : 'outline'}
@@ -993,7 +1105,7 @@ const VideoPlayer = () => {
                   onClick={() => setCommentSortBy('newest')}
                   className="h-7 text-xs px-2"
                 >
-                  Newest
+                  {t('video.newest')}
                 </Button>
                 <Button
                   variant={commentSortBy === 'most_liked' ? 'default' : 'outline'}
@@ -1001,7 +1113,7 @@ const VideoPlayer = () => {
                   onClick={() => setCommentSortBy('most_liked')}
                   className="h-7 text-xs px-2"
                 >
-                  Most Liked
+                  {t('video.most_liked')}
                 </Button>
               </div>
             </div>
@@ -1009,32 +1121,32 @@ const VideoPlayer = () => {
             {user && (
               <div className="space-y-3 mb-4">
                 <Textarea
-                  placeholder="Add a comment..."
+                  placeholder={t('video.add_comment')}
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   className="min-h-[70px] text-sm"
                 />
                 <Button onClick={handleSubmitComment} disabled={!comment.trim()} size="sm" className="w-full">
-                  Post Comment
+                  {t('video.post_comment')}
                 </Button>
               </div>
             )}
 
             {!user && (
               <div className="mb-4 p-3 bg-muted rounded-lg text-center text-xs text-muted-foreground">
-                Please sign in to view and add comments
+                {t('video.please_sign_in_comments')}
               </div>
             )}
 
             <div className="space-y-3 max-h-[600px] overflow-y-auto">
               {comments.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">No comments yet</p>
+                <p className="text-xs text-muted-foreground text-center py-4">{t('video.no_comments_yet')}</p>
               ) : (
                 comments.map((comment) => (
                   <div key={comment.id} className="border-l-2 border-primary/20 pl-3 py-2">
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-xs">{comment.user?.name || 'Anonymous'}</span>
+                        <span className="font-medium text-xs">{comment.user?.name || t('video.anonymous')}</span>
                         {comment.comment_time !== null && (
                           <span className="text-xs text-muted-foreground">
                             @ {formatTime(comment.comment_time)}
@@ -1063,7 +1175,7 @@ const VideoPlayer = () => {
                           onClick={() => handleDeleteComment(comment.id)}
                           className="text-destructive h-7 text-xs px-2"
                         >
-                          Delete
+                          {t('video.delete')}
                         </Button>
                       )}
                     </div>
@@ -1072,7 +1184,7 @@ const VideoPlayer = () => {
                         {comment.replies.map((reply) => (
                           <div key={reply.id} className="border-l-2 border-muted pl-2 py-1">
                             <div className="flex items-center justify-between mb-1">
-                              <span className="font-medium text-xs">{reply.user?.name || 'Anonymous'}</span>
+                              <span className="font-medium text-xs">{reply.user?.name || t('video.anonymous')}</span>
                               <span className="text-xs text-muted-foreground">
                                 {new Date(reply.created_at).toLocaleDateString()}
                               </span>
@@ -1099,7 +1211,7 @@ const VideoPlayer = () => {
 
           {/* Course Chapters */}
           <Card className="p-4">
-            <h3 className="font-semibold mb-3">Course Chapters</h3>
+            <h3 className="font-semibold mb-3">{t('video.course_chapters')}</h3>
             <div className="space-y-2">
               {relatedVideos.map((relatedVideo, index) => (
                 <div
@@ -1107,7 +1219,7 @@ const VideoPlayer = () => {
                   className={`flex items-center p-2 rounded cursor-pointer transition-colors ${
                     relatedVideo.id === video.id ? 'bg-primary/10' : 'hover:bg-muted'
                   }`}
-                  onClick={() => navigate(`/video/${relatedVideo.id}`)}
+                  onClick={() => navigateWithLocale(`/video/${relatedVideo.id}`)}
                 >
                   <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center mr-3">
                     {index < 3 ? (

@@ -48,10 +48,12 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supportTicketApi, SupportTicket as TicketType, TicketReply } from '@/services/supportTicketApi';
 import { faqApi, Faq } from '@/services/faqApi';
+import { useTranslation } from 'react-i18next';
 
 const Support = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -216,11 +218,11 @@ const Support = () => {
           category: 'general',
           priority: 'medium',
         });
-        toast.success("Support ticket created successfully");
+        toast.success(t('support.ticket_created'));
       }
     } catch (error) {
       console.error('Error creating ticket:', error);
-      toast.error("Failed to create support ticket");
+      toast.error(t('support.failed_create'));
     } finally {
       setLoading(false);
     }
@@ -251,16 +253,16 @@ const Support = () => {
           // Still show success even if refresh fails
         }
         setNewMessage('');
-        toast.success("Message sent successfully");
+        toast.success(t('support.message_sent'));
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      toast.error("Failed to send message");
+      toast.error(t('support.failed_send'));
     }
   };
 
   const formatDate = (dateString: string | undefined | null) => {
-    if (!dateString) return 'No date';
+    if (!dateString) return t('support.no_date');
     try {
       return new Date(dateString).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -270,7 +272,7 @@ const Support = () => {
         minute: '2-digit'
       });
     } catch {
-      return 'Invalid date';
+      return t('support.invalid_date');
     }
   };
 
@@ -300,8 +302,8 @@ const Support = () => {
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Support Center</h1>
-        <p className="text-muted-foreground">Get help with your account, billing, and technical issues</p>
+        <h1 className="text-3xl font-bold mb-2">{t('support.center')}</h1>
+        <p className="text-muted-foreground">{t('support.get_help')}</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
@@ -315,8 +317,8 @@ const Support = () => {
                   <Plus className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-medium">Create Ticket</h3>
-                  <p className="text-sm text-muted-foreground">Get personalized help</p>
+                  <h3 className="font-medium">{t('support.create_ticket')}</h3>
+                  <p className="text-sm text-muted-foreground">{t('support.get_personalized')}</p>
                 </div>
               </div>
             </Card>
@@ -327,7 +329,7 @@ const Support = () => {
                   <Mail className="h-5 w-5 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="font-medium">Email Support</h3>
+                  <h3 className="font-medium">{t('support.email_support')}</h3>
                   <p className="text-sm text-muted-foreground">support@sacrart.com</p>
                 </div>
               </div>
@@ -339,7 +341,7 @@ const Support = () => {
                   <Phone className="h-5 w-5 text-green-600" />
                 </div>
                 <div>
-                  <h3 className="font-medium">Phone Support</h3>
+                  <h3 className="font-medium">{t('support.phone_support')}</h3>
                   <p className="text-sm text-muted-foreground">+1 (555) 123-4567</p>
                 </div>
               </div>
@@ -349,10 +351,10 @@ const Support = () => {
           {/* My Tickets */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold">My Support Tickets</h2>
+              <h2 className="text-xl font-semibold">{t('support.my_tickets')}</h2>
               <Button onClick={() => setIsCreateTicketOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
-                New Ticket
+                {t('support.new_ticket')}
               </Button>
             </div>
 
@@ -361,7 +363,7 @@ const Support = () => {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
-                  placeholder="Search tickets..."
+                  placeholder={t('support.search_tickets')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -369,27 +371,27 @@ const Support = () => {
               </div>
               <Select value={selectedFilter} onValueChange={setSelectedFilter}>
                 <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Filter by status" />
+                  <SelectValue placeholder={t('support.filter_status')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="resolved">Resolved</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
+                  <SelectItem value="all">{t('support.all_status')}</SelectItem>
+                  <SelectItem value="open">{t('support.open')}</SelectItem>
+                  <SelectItem value="in_progress">{t('support.in_progress')}</SelectItem>
+                  <SelectItem value="resolved">{t('support.resolved')}</SelectItem>
+                  <SelectItem value="closed">{t('support.closed')}</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Filter by category" />
+                  <SelectValue placeholder={t('support.filter_category')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="technical">Technical</SelectItem>
-                  <SelectItem value="billing">Billing</SelectItem>
-                  <SelectItem value="account">Account</SelectItem>
-                  <SelectItem value="content">Content</SelectItem>
-                  <SelectItem value="general">General</SelectItem>
+                  <SelectItem value="all">{t('support.all_categories')}</SelectItem>
+                  <SelectItem value="technical">{t('support.technical')}</SelectItem>
+                  <SelectItem value="billing">{t('support.billing')}</SelectItem>
+                  <SelectItem value="account">{t('support.account')}</SelectItem>
+                  <SelectItem value="content">{t('support.content')}</SelectItem>
+                  <SelectItem value="general">{t('support.general')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -408,15 +410,15 @@ const Support = () => {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="font-medium">{ticket.subject || 'No Subject'}</h3>
+                        <h3 className="font-medium">{ticket.subject || t('support.no_subject')}</h3>
                         <span className="text-sm text-muted-foreground">#{ticket.id}</span>
                       </div>
                       <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                        {ticket.description || 'No description'}
+                        {ticket.description || t('support.no_description')}
                       </p>
               <div className="flex items-center space-x-4 text-xs text-muted-foreground">
                 <span>{formatDate(ticket.created_at)}</span>
-                <span>{(ticket.replies?.length || 0)} message{(ticket.replies?.length || 0) !== 1 ? 's' : ''}</span>
+                <span>{(ticket.replies?.length || 0)} {(ticket.replies?.length || 0) !== 1 ? t('support.messages') : t('support.message')}</span>
               </div>
                     </div>
                     <div className="flex flex-col items-end space-y-2">
@@ -430,12 +432,12 @@ const Support = () => {
               {filteredTickets.length === 0 && (
                 <div className="text-center py-8">
                   <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No tickets found</h3>
+                  <h3 className="text-lg font-semibold mb-2">{t('support.no_tickets_found')}</h3>
                   <p className="text-muted-foreground mb-4">
-                    {searchTerm ? 'Try adjusting your search terms' : 'You haven\'t created any support tickets yet'}
+                    {searchTerm ? t('support.try_search') : t('support.no_tickets_yet')}
                   </p>
                   <Button onClick={() => setIsCreateTicketOpen(true)}>
-                    Create Your First Ticket
+                    {t('support.create_first')}
                   </Button>
                 </div>
               )}
@@ -447,27 +449,27 @@ const Support = () => {
         <div className="space-y-6">
           {/* Contact Info */}
           <Card className="p-6">
-            <h3 className="font-semibold mb-4">Contact Information</h3>
+            <h3 className="font-semibold mb-4">{t('support.contact_info')}</h3>
             <div className="space-y-4">
               <div className="flex items-center space-x-3">
                 <Mail className="h-4 w-4 text-muted-foreground" />
                 <div>
-                  <p className="text-sm font-medium">Email</p>
+                  <p className="text-sm font-medium">{t('support.email')}</p>
                   <p className="text-sm text-muted-foreground">support@sacrart.com</p>
                 </div>
               </div>
               <div className="flex items-center space-x-3">
                 <Phone className="h-4 w-4 text-muted-foreground" />
                 <div>
-                  <p className="text-sm font-medium">Phone</p>
+                  <p className="text-sm font-medium">{t('support.phone')}</p>
                   <p className="text-sm text-muted-foreground">+1 (555) 123-4567</p>
                 </div>
               </div>
               <div className="flex items-center space-x-3">
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <div>
-                  <p className="text-sm font-medium">Response Time</p>
-                  <p className="text-sm text-muted-foreground">Within 24 hours</p>
+                  <p className="text-sm font-medium">{t('support.response_time')}</p>
+                  <p className="text-sm text-muted-foreground">{t('support.within_24')}</p>
                 </div>
               </div>
             </div>
@@ -475,19 +477,19 @@ const Support = () => {
 
           {/* Support Hours */}
           <Card className="p-6">
-            <h3 className="font-semibold mb-4">Support Hours</h3>
+            <h3 className="font-semibold mb-4">{t('support.hours')}</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span>Monday - Friday</span>
-                <span>9:00 AM - 6:00 PM</span>
+                <span>{t('support.monday_friday')}</span>
+                <span>{t('support.time_9am_6pm')}</span>
               </div>
               <div className="flex justify-between">
-                <span>Saturday</span>
-                <span>10:00 AM - 4:00 PM</span>
+                <span>{t('support.saturday')}</span>
+                <span>{t('support.time_10am_4pm')}</span>
               </div>
               <div className="flex justify-between">
-                <span>Sunday</span>
-                <span>Closed</span>
+                <span>{t('support.sunday')}</span>
+                <span>{t('support.closed_label')}</span>
               </div>
             </div>
           </Card>
@@ -498,69 +500,69 @@ const Support = () => {
       <Dialog open={isCreateTicketOpen} onOpenChange={setIsCreateTicketOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Create Support Ticket</DialogTitle>
+            <DialogTitle>{t('support.create_ticket_title')}</DialogTitle>
             <DialogDescription>
-              Describe your issue and we'll get back to you as soon as possible.
+              {t('support.create_ticket_desc')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="subject">Subject</Label>
+              <Label htmlFor="subject">{t('support.subject')}</Label>
               <Input
                 id="subject"
                 value={ticketForm.subject}
                 onChange={(e) => setTicketForm(prev => ({ ...prev, subject: e.target.value }))}
-                placeholder="Brief description of your issue"
+                placeholder={t('support.brief_description')}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
+                <Label htmlFor="category">{t('support.category')}</Label>
                 <Select value={ticketForm.category} onValueChange={(value) => setTicketForm(prev => ({ ...prev, category: value as 'technical' | 'billing' | 'account' | 'content' | 'general' }))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="technical">Technical</SelectItem>
-                    <SelectItem value="billing">Billing</SelectItem>
-                    <SelectItem value="account">Account</SelectItem>
-                    <SelectItem value="content">Content</SelectItem>
-                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="technical">{t('support.technical')}</SelectItem>
+                    <SelectItem value="billing">{t('support.billing')}</SelectItem>
+                    <SelectItem value="account">{t('support.account')}</SelectItem>
+                    <SelectItem value="content">{t('support.content')}</SelectItem>
+                    <SelectItem value="general">{t('support.general')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="priority">Priority</Label>
+                <Label htmlFor="priority">{t('support.priority')}</Label>
                 <Select value={ticketForm.priority} onValueChange={(value) => setTicketForm(prev => ({ ...prev, priority: value as 'low' | 'medium' | 'high' | 'urgent' }))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
+                    <SelectItem value="low">{t('support.low')}</SelectItem>
+                    <SelectItem value="medium">{t('support.medium')}</SelectItem>
+                    <SelectItem value="high">{t('support.high')}</SelectItem>
+                    <SelectItem value="urgent">{t('support.urgent')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{t('support.description')}</Label>
               <Textarea
                 id="description"
                 value={ticketForm.description}
                 onChange={(e) => setTicketForm(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Please provide as much detail as possible about your issue..."
+                placeholder={t('support.provide_detail')}
                 className="min-h-[120px]"
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateTicketOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleCreateTicket} disabled={!ticketForm.subject || !ticketForm.description || loading}>
-              Create Ticket
+              {t('support.create_ticket_btn')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -571,8 +573,8 @@ const Support = () => {
         <DialogContent className="sm:max-w-[700px]">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
-              <span>{selectedTicket?.subject || 'No Subject'}</span>
-              <span className="text-sm text-muted-foreground">#{selectedTicket?.id || 'N/A'}</span>
+              <span>{selectedTicket?.subject || t('support.no_subject')}</span>
+              <span className="text-sm text-muted-foreground">#{selectedTicket?.id || t('support.na')}</span>
             </DialogTitle>
             <DialogDescription>
               <div className="flex items-center space-x-4 mt-2">
@@ -601,10 +603,10 @@ const Support = () => {
                         : 'bg-muted'
                     }`}>
                       <div className="flex items-center space-x-2 mb-1">
-                        <span className="text-xs font-medium">{reply.user?.name || 'Support'}</span>
+                        <span className="text-xs font-medium">{reply.user?.name || t('support.support_user')}</span>
                         <span className="text-xs opacity-70">{formatDate(reply.created_at || reply.updated_at)}</span>
                       </div>
-                      <p className="text-sm">{reply.message || 'No message content'}</p>
+                      <p className="text-sm">{reply.message || t('support.no_message_content')}</p>
                     </div>
                   </div>
                 ))}
@@ -614,18 +616,18 @@ const Support = () => {
               {selectedTicket.status !== 'closed' && selectedTicket.status !== 'resolved' && (
                 <div className="border-t pt-4">
                   <div className="space-y-2">
-                    <Label htmlFor="newMessage">Reply</Label>
+                    <Label htmlFor="newMessage">{t('support.reply')}</Label>
                     <Textarea
                       id="newMessage"
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
-                      placeholder="Type your message..."
+                      placeholder={t('support.type_message')}
                       className="min-h-[80px]"
                     />
                   </div>
                   <div className="flex justify-end mt-3">
                     <Button onClick={handleSendMessage} disabled={!newMessage.trim()}>
-                      Send Message
+                      {t('support.send_message')}
                     </Button>
                   </div>
                 </div>
@@ -639,25 +641,25 @@ const Support = () => {
                 variant="destructive" 
                 onClick={async () => {
                   if (!selectedTicket) return;
-                  if (!confirm('Delete this ticket? This action cannot be undone.')) return;
+                  if (!confirm(t('support.delete_confirm'))) return;
                   try {
                     const res = await supportTicketApi.delete(selectedTicket.id);
                     if (res.success) {
                       setTickets(prev => prev.filter(t => t.id !== selectedTicket.id));
                       setIsTicketDetailOpen(false);
                       setSelectedTicket(null);
-                      toast.success('Ticket deleted');
+                      toast.success(t('support.ticket_deleted'));
                     }
                   } catch (err: any) {
-                    toast.error(err.message || 'Failed to delete ticket');
+                    toast.error(err.message || t('support.failed_delete'));
                   }
                 }}
               >
-                Delete Ticket
+                {t('support.delete_ticket')}
               </Button>
             )}
             <Button variant="outline" onClick={() => setIsTicketDetailOpen(false)}>
-              Close
+              {t('support.close')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -37,6 +37,8 @@ import {
 import { toast } from 'sonner';
 import { supportTicketApi, SupportTicket } from '@/services/supportTicketApi';
 import { useSupportTickets } from '@/contexts/SupportTicketsContext';
+import { useLocale } from '@/hooks/useLocale';
+import { useTranslation } from 'react-i18next';
 import { 
   Dialog,
   DialogContent,
@@ -47,6 +49,8 @@ import {
 } from '@/components/ui/dialog';
 
 const SupportTickets = () => {
+  const { t } = useTranslation();
+  const { locale } = useLocale();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const { tickets, setTickets, selectedTicket, setSelectedTicket, updateTicket, appendReply } = useSupportTickets();
@@ -63,14 +67,14 @@ const SupportTickets = () => {
         setTickets(data);
       } catch (e) {
         console.error('Failed to load tickets', e);
-        toast.error('Failed to load tickets');
+        toast.error(t('admin.support_failed_load'));
         setTickets([]);
       } finally {
         setLoading(false);
       }
     };
     loadTickets();
-  }, []);
+  }, [locale]); // Refetch when locale changes
 
   const getPriorityIcon = (priority: string | undefined) => {
     if (!priority) return null;
@@ -181,11 +185,11 @@ const SupportTickets = () => {
         if (selectedTicket?.id === id) {
           setSelectedTicket({ ...selectedTicket, status: 'resolved' });
         }
-        toast.success('Ticket marked as resolved');
+        toast.success(t('admin.support_marked_resolved'));
       }
     } catch (e) {
       console.error('Failed to resolve ticket:', e);
-      toast.error('Failed to resolve ticket');
+      toast.error(t('admin.support_failed_resolve'));
     }
   };
 
@@ -197,11 +201,11 @@ const SupportTickets = () => {
         if (selectedTicket?.id === id) {
           setSelectedTicket({ ...selectedTicket, status: 'closed' });
         }
-        toast.success('Ticket closed');
+        toast.success(t('admin.support_closed'));
       }
     } catch (e) {
       console.error('Failed to close ticket:', e);
-      toast.error('Failed to close ticket');
+      toast.error(t('admin.support_failed_close'));
     }
   };
 
@@ -213,11 +217,11 @@ const SupportTickets = () => {
         if (selectedTicket?.id === id) {
           setSelectedTicket({ ...selectedTicket, status: 'open' });
         }
-        toast.success('Ticket reopened');
+        toast.success(t('admin.support_reopened'));
       }
     } catch (e) {
       console.error('Failed to reopen ticket:', e);
-      toast.error('Failed to reopen ticket');
+      toast.error(t('admin.support_failed_reopen'));
     }
   };
 
@@ -308,13 +312,9 @@ const SupportTickets = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Support / Tickets</h1>
-          <p className="text-muted-foreground">Manage user questions and support requests</p>
+          <h1 className="text-3xl font-bold">{t('admin.support_tickets')}</h1>
+          <p className="text-muted-foreground">{t('admin.support_manage_requests')}</p>
         </div>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Ticket
-        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -322,7 +322,7 @@ const SupportTickets = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Tickets</p>
+              <p className="text-sm text-muted-foreground">{t('admin.support_total_tickets')}</p>
               <p className="text-2xl font-bold">{stats.totalTickets}</p>
             </div>
             <MessageSquare className="h-8 w-8 text-primary" />
@@ -331,7 +331,7 @@ const SupportTickets = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Open Tickets</p>
+              <p className="text-sm text-muted-foreground">{t('admin.support_open_tickets')}</p>
               <p className="text-2xl font-bold text-red-600">{stats.openTickets}</p>
             </div>
             <AlertCircle className="h-8 w-8 text-red-500" />
@@ -340,7 +340,7 @@ const SupportTickets = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">In Progress</p>
+              <p className="text-sm text-muted-foreground">{t('admin.support_in_progress')}</p>
               <p className="text-2xl font-bold text-yellow-600">{stats.inProgressTickets}</p>
             </div>
             <Clock className="h-8 w-8 text-yellow-500" />
@@ -349,7 +349,7 @@ const SupportTickets = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Resolved</p>
+              <p className="text-sm text-muted-foreground">{t('admin.support_resolved_count')}</p>
               <p className="text-2xl font-bold text-green-600">{stats.resolvedTickets}</p>
             </div>
             <CheckCircle className="h-8 w-8 text-green-500" />
@@ -364,7 +364,7 @@ const SupportTickets = () => {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Search tickets..."
+                placeholder={t('admin.support_search_placeholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -376,25 +376,25 @@ const SupportTickets = () => {
               variant={selectedFilter === 'all' ? 'default' : 'outline'}
               onClick={() => setSelectedFilter('all')}
             >
-              All Tickets
+              {t('admin.support_all_tickets')}
             </Button>
             <Button
               variant={selectedFilter === 'open' ? 'default' : 'outline'}
               onClick={() => setSelectedFilter('open')}
             >
-              Open
+              {t('admin.support_open')}
             </Button>
             <Button
               variant={selectedFilter === 'in_progress' ? 'default' : 'outline'}
               onClick={() => setSelectedFilter('in_progress')}
             >
-              In Progress
+              {t('admin.support_in_progress')}
             </Button>
             <Button
               variant={selectedFilter === 'resolved' ? 'default' : 'outline'}
               onClick={() => setSelectedFilter('resolved')}
             >
-              Resolved
+              {t('admin.support_resolved')}
             </Button>
           </div>
         </div>
@@ -415,14 +415,14 @@ const SupportTickets = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Ticket</TableHead>
-              <TableHead>User</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Priority</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Assigned To</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="w-[70px]">Actions</TableHead>
+              <TableHead>{t('admin.support_table_ticket')}</TableHead>
+              <TableHead>{t('admin.support_table_user')}</TableHead>
+              <TableHead>{t('admin.support_table_category')}</TableHead>
+              <TableHead>{t('admin.support_table_priority')}</TableHead>
+              <TableHead>{t('admin.support_table_status_label')}</TableHead>
+              <TableHead>{t('admin.support_table_assigned_to')}</TableHead>
+              <TableHead>{t('admin.support_table_created')}</TableHead>
+              <TableHead className="w-[70px]">{t('admin.common_actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -430,9 +430,9 @@ const SupportTickets = () => {
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-8">
                   <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No tickets found</h3>
+                  <h3 className="text-lg font-semibold mb-2">{t('admin.support_no_tickets_found')}</h3>
                   <p className="text-muted-foreground">
-                    {searchTerm ? 'Try adjusting your search terms' : 'No support tickets have been created yet'}
+                    {searchTerm ? t('admin.support_try_search') : t('admin.support_no_tickets_yet')}
                   </p>
                 </TableCell>
               </TableRow>
@@ -441,7 +441,7 @@ const SupportTickets = () => {
               <TableRow key={ticket.id ?? `ticket-${index}`}>
                 <TableCell>
                   <div>
-                    <div className="font-medium break-words">{ticket.subject || 'No Subject'}</div>
+                    <div className="font-medium break-words">{ticket.subject || t('admin.support_no_subject')}</div>
                     <div className="text-sm text-muted-foreground">#{ticket.id}</div>
                   </div>
                 </TableCell>
@@ -461,7 +461,7 @@ const SupportTickets = () => {
                   {getStatusBadge(ticket.status)}
                 </TableCell>
                 <TableCell>
-                  <span className="text-sm">{ticket.assigned_user?.name || (ticket as any).assignedTo?.name || 'Unassigned'}</span>
+                  <span className="text-sm">{ticket.assigned_user?.name || (ticket as any).assignedTo?.name || t('admin.support_unassigned')}</span>
                 </TableCell>
                 <TableCell>
                   <div>
@@ -469,7 +469,7 @@ const SupportTickets = () => {
                       {ticket.created_at ? new Date(ticket.created_at).toLocaleDateString() : 'N/A'}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {(ticket.replies?.length || 0)} replies
+                      {(ticket.replies?.length || 0)} {t('admin.support_replies')}
                     </div>
                   </div>
                 </TableCell>
@@ -483,21 +483,21 @@ const SupportTickets = () => {
                     <DropdownMenuContent align="end" className="w-48 bg-gray-800 border border-gray-700 shadow-lg">
                       <DropdownMenuItem onClick={() => openDetail(ticket)} className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer">
                         <Eye className="mr-2 h-4 w-4" />
-                        View Details
+                        {t('admin.support_view_details')}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleResolve(ticket.id)} className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer">
                         <Reply className="mr-2 h-4 w-4" />
-                        Mark Resolved
+                        {t('admin.support_mark_resolved')}
                       </DropdownMenuItem>
                       {ticket.status === 'closed' ? (
                         <DropdownMenuItem onClick={() => handleReopen(ticket.id)} className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer">
                           <Tag className="mr-2 h-4 w-4" />
-                          Reopen
+                          {t('admin.support_reopen')}
                         </DropdownMenuItem>
                       ) : (
                         <DropdownMenuItem onClick={() => handleClose(ticket.id)} className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer">
                           <Tag className="mr-2 h-4 w-4" />
-                          Close
+                          {t('admin.support_close')}
                         </DropdownMenuItem>
                       )}
                     </DropdownMenuContent>

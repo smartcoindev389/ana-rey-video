@@ -32,11 +32,15 @@ import {
 } from 'lucide-react';
 import { faqApi, Faq, FaqCreateRequest, FaqUpdateRequest } from '@/services/faqApi';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLocale } from '@/hooks/useLocale';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 const FaqManagement = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
+  const { locale } = useLocale();
   const [faqs, setFaqs] = useState<Faq[]>([]);
   const [categories, setCategories] = useState<string[]>(['general', 'subscription', 'technical', 'content', 'billing']);
   const [loading, setLoading] = useState(true);
@@ -58,7 +62,7 @@ const FaqManagement = () => {
   useEffect(() => {
     fetchFaqs();
     fetchCategories();
-  }, []);
+  }, [locale]); // Refetch when locale changes
 
   const fetchFaqs = async () => {
     try {
@@ -133,7 +137,7 @@ const FaqManagement = () => {
   };
 
   const handleDeleteFaq = async (id: number) => {
-    if (window.confirm('Are you sure you want to delete this FAQ?')) {
+    if (window.confirm(t('admin.faq_delete_confirm'))) {
       try {
       if (user) {
         await faqApi.deleteFaq(id);
@@ -184,36 +188,36 @@ const FaqManagement = () => {
   // Category Management Functions
   const handleAddCategory = async () => {
     if (!newCategory.trim()) {
-      toast.error('Please enter a category name');
+      toast.error(t('admin.faq_enter_category'));
       return;
     }
     
     const categorySlug = newCategory.toLowerCase().replace(/\s+/g, '-');
     
     if (categories.includes(categorySlug)) {
-      toast.error('Category already exists');
+      toast.error(t('admin.faq_category_exists'));
       return;
     }
 
     try {
       setCategories([...categories, categorySlug]);
       setNewCategory('');
-      toast.success('Category added successfully');
+      toast.success(t('admin.faq_category_added'));
     } catch (error) {
-      toast.error('Failed to add category');
+      toast.error(t('admin.common_error'));
     }
   };
 
   const handleDeleteCategory = async (category: string) => {
-    if (!window.confirm(`Are you sure you want to delete the category "${category}"?`)) {
+    if (!window.confirm(t('admin.faq_delete_category_confirm', { category }))) {
       return;
     }
 
     try {
       setCategories(categories.filter(cat => cat !== category));
-      toast.success('Category deleted successfully');
+      toast.success(t('admin.faq_category_deleted'));
     } catch (error) {
-      toast.error('Failed to delete category');
+      toast.error(t('admin.common_error'));
     }
   };
 
@@ -224,14 +228,14 @@ const FaqManagement = () => {
 
   const handleSaveEditCategory = (oldCategory: string) => {
     if (!editCategoryValue.trim()) {
-      toast.error('Please enter a category name');
+      toast.error(t('admin.faq_enter_category'));
       return;
     }
 
     const newCategorySlug = editCategoryValue.toLowerCase().replace(/\s+/g, '-');
     
     if (categories.includes(newCategorySlug) && newCategorySlug !== oldCategory) {
-      toast.error('Category already exists');
+      toast.error(t('admin.faq_category_exists'));
       return;
     }
 
@@ -239,9 +243,9 @@ const FaqManagement = () => {
       setCategories(categories.map(cat => cat === oldCategory ? newCategorySlug : cat));
       setEditingCategory(null);
       setEditCategoryValue('');
-      toast.success('Category updated successfully');
+      toast.success(t('admin.faq_category_updated'));
     } catch (error) {
-      toast.error('Failed to update category');
+      toast.error(t('admin.common_error'));
     }
   };
 
@@ -263,8 +267,8 @@ const FaqManagement = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">FAQ Management</h1>
-          <p className="text-muted-foreground">Manage frequently asked questions and categories</p>
+          <h1 className="text-3xl font-bold">{t('admin.faq_management')}</h1>
+          <p className="text-muted-foreground">{t('admin.faq_manage_questions')}</p>
         </div>
       </div>
 
@@ -273,11 +277,11 @@ const FaqManagement = () => {
         <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="faqs" className="flex items-center">
             <List className="mr-2 h-4 w-4" />
-            FAQs
+            {t('admin.faq_tab_faqs')}
           </TabsTrigger>
           <TabsTrigger value="categories" className="flex items-center">
             <Folder className="mr-2 h-4 w-4" />
-            Categories
+            {t('admin.faq_tab_categories')}
           </TabsTrigger>
         </TabsList>
 
@@ -288,38 +292,38 @@ const FaqManagement = () => {
               <DialogTrigger asChild>
                 <Button onClick={() => resetForm()}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add FAQ
+                  {t('admin.faq_add')}
                 </Button>
               </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Create New FAQ</DialogTitle>
+              <DialogTitle>{t('admin.faq_create_new')}</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="question">Question</Label>
+                <Label htmlFor="question">{t('admin.faq_question')}</Label>
                 <Input
                   id="question"
                   value={formData.question}
                   onChange={(e) => setFormData({ ...formData, question: e.target.value })}
-                  placeholder="Enter the question"
+                  placeholder={t('admin.faq_placeholder_question')}
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="answer">Answer</Label>
+                <Label htmlFor="answer">{t('admin.faq_answer')}</Label>
                 <Textarea
                   id="answer"
                   value={formData.answer}
                   onChange={(e) => setFormData({ ...formData, answer: e.target.value })}
-                  placeholder="Enter the answer"
+                  placeholder={t('admin.faq_placeholder_answer')}
                   rows={4}
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="category">Category</Label>
+                <Label htmlFor="category">{t('admin.faq_category')}</Label>
                 <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
+                    <SelectValue placeholder={t('admin.faq_placeholder_category')} />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((category) => (
@@ -331,7 +335,7 @@ const FaqManagement = () => {
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="sort_order">Sort Order</Label>
+                <Label htmlFor="sort_order">{t('admin.faq_label_sort_order')}</Label>
                 <Input
                   id="sort_order"
                   type="number"
@@ -347,15 +351,15 @@ const FaqManagement = () => {
                   checked={formData.is_active}
                   onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                 />
-                <Label htmlFor="is_active">Active</Label>
+                <Label htmlFor="is_active">{t('admin.faq_active')}</Label>
               </div>
               <div className="flex justify-end space-x-2">
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                  Cancel
+                  {t('admin.common_cancel')}
                 </Button>
                 <Button onClick={handleCreateFaq}>
                   <Save className="mr-2 h-4 w-4" />
-                  Create FAQ
+                  {t('admin.faq_create')}
                 </Button>
               </div>
             </div>
@@ -367,16 +371,16 @@ const FaqManagement = () => {
       <div className="grid gap-4">
         {faqs.length === 0 && !loading ? (
           <Card className="p-8 text-center">
-            <h3 className="text-lg font-semibold mb-2">No FAQs Found</h3>
+            <h3 className="text-lg font-semibold mb-2">{t('admin.faq_no_found')}</h3>
             <p className="text-muted-foreground mb-4">
               {user ? 
-                "No FAQs are currently available. Create your first FAQ using the button above." :
-                "Authentication required to view FAQs."
+                t('admin.faq_no_available') :
+                t('admin.faq_auth_required')
               }
             </p>
             {!user && (
               <p className="text-sm text-red-500">
-                Please check your authentication status.
+                {t('admin.faq_check_auth')}
               </p>
             )}
           </Card>
@@ -388,7 +392,7 @@ const FaqManagement = () => {
                 <div className="flex items-center gap-2 mb-2">
                   <h3 className="font-semibold text-lg">{faq.question}</h3>
                   <Badge variant={faq.is_active ? "default" : "secondary"}>
-                    {faq.is_active ? "Active" : "Inactive"}
+                    {faq.is_active ? t('admin.faq_active') : t('admin.faq_inactive')}
                   </Badge>
                   <Badge variant="outline" className="capitalize">
                     {faq.category}
@@ -396,8 +400,8 @@ const FaqManagement = () => {
                 </div>
                 <p className="text-muted-foreground mb-2">{faq.answer}</p>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <span>Sort Order: {faq.sort_order}</span>
-                  <span>Created: {new Date(faq.created_at).toLocaleDateString()}</span>
+                  <span>{t('admin.faq_sort_order')} {faq.sort_order}</span>
+                  <span>{t('admin.faq_created')} {new Date(faq.created_at).toLocaleDateString()}</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -405,7 +409,7 @@ const FaqManagement = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => handleToggleStatus(faq)}
-                  title={faq.is_active ? "Deactivate" : "Activate"}
+                  title={faq.is_active ? t('admin.faq_deactivate') : t('admin.faq_activate')}
                 >
                   {faq.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
@@ -435,12 +439,12 @@ const FaqManagement = () => {
         {/* Categories Tab */}
         <TabsContent value="categories" className="space-y-6">
           <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-6">Category Management</h2>
+            <h2 className="text-xl font-semibold mb-6">{t('admin.faq_category_management')}</h2>
             <div className="space-y-6">
               {/* Add New Category */}
               <div className="flex items-center gap-2">
                 <Input
-                  placeholder="Enter new category name"
+                  placeholder={t('admin.faq_placeholder_new_category')}
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()}
@@ -448,14 +452,14 @@ const FaqManagement = () => {
                 />
                 <Button onClick={handleAddCategory}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Category
+                  {t('admin.faq_add_category')}
                 </Button>
               </div>
 
               {/* Categories List */}
               <div className="space-y-2">
                 <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-                  Existing Categories
+                  {t('admin.faq_existing_categories')}
                 </h3>
                 <div className="space-y-2">
                   {categories.map((category) => (
@@ -516,7 +520,7 @@ const FaqManagement = () => {
 
               {categories.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
-                  No categories available. Add your first category above.
+                  {t('admin.faq_no_categories')}
                 </div>
               )}
             </div>
@@ -528,33 +532,33 @@ const FaqManagement = () => {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Edit FAQ</DialogTitle>
+            <DialogTitle>{t('admin.faq_edit_title')}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="edit-question">Question</Label>
+              <Label htmlFor="edit-question">{t('admin.faq_question')}</Label>
               <Input
                 id="edit-question"
                 value={formData.question}
                 onChange={(e) => setFormData({ ...formData, question: e.target.value })}
-                placeholder="Enter the question"
+                placeholder={t('admin.faq_placeholder_question')}
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-answer">Answer</Label>
+              <Label htmlFor="edit-answer">{t('admin.faq_answer')}</Label>
               <Textarea
                 id="edit-answer"
                 value={formData.answer}
                 onChange={(e) => setFormData({ ...formData, answer: e.target.value })}
-                placeholder="Enter the answer"
+                placeholder={t('admin.faq_placeholder_answer')}
                 rows={4}
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-category">Category</Label>
+              <Label htmlFor="edit-category">{t('admin.faq_category')}</Label>
               <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
+                  <SelectValue placeholder={t('admin.faq_placeholder_category')} />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((category) => (
@@ -566,7 +570,7 @@ const FaqManagement = () => {
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-sort_order">Sort Order</Label>
+              <Label htmlFor="edit-sort_order">{t('admin.faq_label_sort_order')}</Label>
               <Input
                 id="edit-sort_order"
                 type="number"
@@ -582,15 +586,15 @@ const FaqManagement = () => {
                 checked={formData.is_active}
                 onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
               />
-              <Label htmlFor="edit-is_active">Active</Label>
+              <Label htmlFor="edit-is_active">{t('admin.faq_active')}</Label>
             </div>
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                Cancel
+                {t('admin.common_cancel')}
               </Button>
               <Button onClick={handleUpdateFaq}>
                 <Save className="mr-2 h-4 w-4" />
-                Update FAQ
+                {t('admin.common_save')}
               </Button>
             </div>
           </div>

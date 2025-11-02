@@ -47,12 +47,16 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { useLocale } from '@/hooks/useLocale';
 import { toast } from 'sonner';
 import { userProgressApi } from '@/services/userProgressApi';
 
 const Profile = () => {
   const { user, updateUser } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const { navigateWithLocale, locale } = useLocale();
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
@@ -153,10 +157,10 @@ const Profile = () => {
         });
       }
       
-      toast.success("Profile updated successfully");
+      toast.success(t('common.save'));
       setIsEditing(false);
     } catch (error) {
-      toast.error("Failed to update profile");
+      toast.error(t('common.update'));
     } finally {
       setLoading(false);
     }
@@ -233,9 +237,9 @@ const Profile = () => {
   if (!user) {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
-        <h1 className="text-2xl font-bold mb-4">Please sign in</h1>
+        <h1 className="text-2xl font-bold mb-4">{t('auth.sign_in')}</h1>
         <Button onClick={() => navigate('/auth')}>
-          Sign In
+          {t('auth.sign_in')}
         </Button>
       </div>
     );
@@ -245,8 +249,8 @@ const Profile = () => {
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">My Profile</h1>
-        <p className="text-muted-foreground">Manage your account settings and preferences</p>
+        <h1 className="text-3xl font-bold mb-2">{t('profile.title')}</h1>
+        <p className="text-muted-foreground">{t('profile.account_settings')}</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
@@ -255,7 +259,7 @@ const Profile = () => {
           {/* Profile Information */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold">Profile Information</h2>
+              <h2 className="text-xl font-semibold">{t('profile.personal_info')}</h2>
               <Button
                 variant={isEditing ? "default" : "outline"}
                 size="sm"
@@ -265,12 +269,12 @@ const Profile = () => {
                 {isEditing ? (
                   <>
                     <Save className="h-4 w-4 mr-2" />
-                    Save Changes
+                    {t('profile.save_changes')}
                   </>
                 ) : (
                   <>
                     <Edit className="h-4 w-4 mr-2" />
-                    Edit Profile
+                    {t('profile.edit_profile')}
                   </>
                 )}
               </Button>
@@ -413,7 +417,9 @@ const Profile = () => {
                 <Button 
                   variant="default" 
                   className="w-full justify-start bg-primary"
-                  onClick={() => navigate('/admin')}
+                  onClick={() => {
+                    navigate(`/${locale}/admin`);
+                  }}
                 >
                   <LayoutDashboard className="h-4 w-4 mr-2" />
                   Admin Panel
@@ -480,7 +486,7 @@ const Profile = () => {
                     <div
                       key={fav.id}
                       className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted cursor-pointer transition-colors"
-                      onClick={() => navigate(`/video/${fav.video.id}`)}
+                      onClick={() => navigateWithLocale(`/video/${fav.video.id}`)}
                     >
                       <div className="w-24 h-16 bg-gradient-to-br from-primary/20 to-primary/5 rounded relative overflow-hidden flex-shrink-0">
                         {fav.video.thumbnail_url && (

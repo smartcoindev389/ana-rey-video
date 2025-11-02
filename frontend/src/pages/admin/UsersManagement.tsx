@@ -55,8 +55,12 @@ import {
 } from 'lucide-react';
 import { userApi, User, UserStatistics } from '@/services/userApi';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
+import { useLocale } from '@/hooks/useLocale';
 
 const UsersManagement = () => {
+  const { t } = useTranslation();
+  const { locale } = useLocale();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [users, setUsers] = useState<User[]>([]);
@@ -98,7 +102,7 @@ const UsersManagement = () => {
   useEffect(() => {
     fetchUsers();
     fetchStatistics();
-  }, []);
+  }, [locale]); // Refetch when locale changes
 
   useEffect(() => {
     let filtered = users;
@@ -160,11 +164,17 @@ const UsersManagement = () => {
       inactive: 'secondary'
     } as const;
 
+    const statusLabels = {
+      active: t('admin.users_active'),
+      suspended: t('admin.users_suspended'),
+      inactive: t('admin.users_suspended')
+    };
+
     return (
       <Badge variant={variants[status as keyof typeof variants]}>
         {status === 'active' && <CheckCircle className="h-3 w-3 mr-1" />}
         {status === 'suspended' && <Ban className="h-3 w-3 mr-1" />}
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+        {statusLabels[status as keyof typeof statusLabels] || status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
     );
   };
@@ -195,7 +205,7 @@ const UsersManagement = () => {
       const response = await userApi.update(selectedUser.id, selectedUser);
       if (response.success) {
         setUsers(prev => prev.map(u => u.id === selectedUser.id ? response.data : u));
-        toast.success("User updated successfully");
+        toast.success(t('admin.users_updated_success'));
         setIsEditDialogOpen(false);
         setSelectedUser(null);
         fetchStatistics();
@@ -215,7 +225,7 @@ const UsersManagement = () => {
       const response = await userApi.create({ ...selectedUser, password: 'password123' });
       if (response.success) {
         setUsers(prev => [response.data, ...prev]);
-        toast.success("User created successfully");
+        toast.success(t('admin.users_created_success'));
         setIsAddDialogOpen(false);
         setSelectedUser(null);
         fetchStatistics();
@@ -232,7 +242,7 @@ const UsersManagement = () => {
       const response = await userApi.toggleStatus(userId);
       if (response.success) {
         setUsers(prev => prev.map(u => u.id === userId ? response.data : u));
-        toast.success("User status updated");
+        toast.success(t('admin.users_status_updated'));
         fetchStatistics();
       }
     } catch (error: any) {
@@ -241,7 +251,7 @@ const UsersManagement = () => {
   };
 
   const handleDeleteUser = async (userId: number) => {
-    if (!confirm("Are you sure you want to delete this user? This action cannot be undone.")) {
+    if (!confirm(t('admin.users_delete_confirm'))) {
       return;
     }
 
@@ -249,7 +259,7 @@ const UsersManagement = () => {
       const response = await userApi.delete(userId);
       if (response.success) {
         setUsers(prev => prev.filter(u => u.id !== userId));
-        toast.success("User deleted successfully");
+        toast.success(t('admin.users_deleted_success'));
         fetchStatistics();
       }
     } catch (error: any) {
@@ -262,7 +272,7 @@ const UsersManagement = () => {
       const response = await userApi.upgradeSubscription(userId, { subscription_type: subscriptionType });
       if (response.success) {
         setUsers(prev => prev.map(u => u.id === userId ? response.data : u));
-        toast.success(`User upgraded to ${subscriptionType} successfully`);
+        toast.success(t('admin.users_upgraded_success', { type: subscriptionType }));
         fetchStatistics();
       }
     } catch (error: any) {
@@ -290,8 +300,8 @@ const UsersManagement = () => {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Users Management</h1>
-          <p className="text-muted-foreground">Loading users...</p>
+          <h1 className="text-3xl font-bold">{t('admin.users_management')}</h1>
+          <p className="text-muted-foreground">{t('admin.users_loading')}</p>
         </div>
         <div className="space-y-4">
           {[...Array(5)].map((_, i) => (
@@ -319,17 +329,17 @@ const UsersManagement = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Users Management</h1>
-          <p className="text-muted-foreground">Manage user accounts and subscriptions</p>
+          <h1 className="text-3xl font-bold">{t('admin.users_management')}</h1>
+          <p className="text-muted-foreground">{t('admin.users_manage_accounts')}</p>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline" onClick={fetchUsers} disabled={isLoading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
+            {t('admin.users_refresh')}
           </Button>
           <Button onClick={handleAddUser}>
             <UserPlus className="mr-2 h-4 w-4" />
-            Add User
+            {t('admin.users_add_user')}
           </Button>
         </div>
       </div>
@@ -341,7 +351,7 @@ const UsersManagement = () => {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Search users..."
+                placeholder={t('admin.users_search_placeholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -353,28 +363,28 @@ const UsersManagement = () => {
               variant={selectedFilter === 'all' ? 'default' : 'outline'}
               onClick={() => setSelectedFilter('all')}
             >
-              All Users
+              {t('admin.users_all_users')}
             </Button>
             <Button
               variant={selectedFilter === 'premium' ? 'default' : 'outline'}
               onClick={() => setSelectedFilter('premium')}
             >
               <Crown className="mr-2 h-4 w-4" />
-              Premium
+              {t('admin.users_premium')}
             </Button>
             <Button
               variant={selectedFilter === 'basic' ? 'default' : 'outline'}
               onClick={() => setSelectedFilter('basic')}
             >
               <Star className="mr-2 h-4 w-4" />
-              Basic
+              {t('admin.users_basic')}
             </Button>
             <Button
               variant={selectedFilter === 'freemium' ? 'default' : 'outline'}
               onClick={() => setSelectedFilter('freemium')}
             >
               <Zap className="mr-2 h-4 w-4" />
-              Freemium
+              {t('admin.users_freemium')}
             </Button>
           </div>
         </div>
@@ -385,13 +395,13 @@ const UsersManagement = () => {
         <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Subscription</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Expires At</TableHead>
-                <TableHead>Joined</TableHead>
-                <TableHead className="w-[70px]">Actions</TableHead>
+                <TableHead>{t('admin.users_table_user')}</TableHead>
+                <TableHead>{t('admin.users_table_subscription')}</TableHead>
+                <TableHead>{t('admin.users_table_status')}</TableHead>
+                <TableHead>{t('admin.users_table_role')}</TableHead>
+                <TableHead>{t('admin.users_table_expires')}</TableHead>
+                <TableHead>{t('admin.users_table_joined')}</TableHead>
+                <TableHead className="w-[70px]">{t('admin.users_table_actions')}</TableHead>
               </TableRow>
             </TableHeader>
           <TableBody>
@@ -418,7 +428,7 @@ const UsersManagement = () => {
                 <TableCell>
                   <div className="flex items-center text-sm">
                     <Calendar className="h-4 w-4 mr-1 text-muted-foreground" />
-                    {user.subscription_expires_at ? formatDate(user.subscription_expires_at) : 'N/A'}
+                    {user.subscription_expires_at ? formatDate(user.subscription_expires_at) : t('admin.users_na')}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -435,14 +445,14 @@ const UsersManagement = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48 bg-gray-800 border border-gray-700 shadow-lg">
-                      <DropdownMenuLabel className="text-white font-semibold px-3 py-2">Actions</DropdownMenuLabel>
+                      <DropdownMenuLabel className="text-white font-semibold px-3 py-2">{t('admin.users_actions_label')}</DropdownMenuLabel>
                       <DropdownMenuSeparator className="bg-gray-700" />
                       <DropdownMenuItem 
                         onClick={() => handleEditUser(user)}
                         className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer"
                       >
                         <Edit className="mr-2 h-4 w-4" />
-                        Edit User
+                        {t('admin.users_edit')}
                       </DropdownMenuItem>
                       {user.subscription_type !== 'premium' && (
                         <DropdownMenuItem 
@@ -450,7 +460,7 @@ const UsersManagement = () => {
                           className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer"
                         >
                           <Crown className="mr-2 h-4 w-4" />
-                          Upgrade to Premium
+                          {t('admin.users_upgrade_premium')}
                         </DropdownMenuItem>
                       )}
                       {user.subscription_type === 'freemium' && (
@@ -459,7 +469,7 @@ const UsersManagement = () => {
                           className="text-gray-100 hover:text-white hover:bg-gray-700 px-3 py-2 cursor-pointer"
                         >
                           <Star className="mr-2 h-4 w-4" />
-                          Upgrade to Basic
+                          {t('admin.users_upgrade_basic')}
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuSeparator className="bg-gray-700" />
@@ -471,12 +481,12 @@ const UsersManagement = () => {
                           {user.subscription_expires_at && new Date(user.subscription_expires_at) < new Date() ? (
                             <>
                               <CheckCircle className="mr-2 h-4 w-4" />
-                              Activate User
+                              {t('admin.users_activate')}
                             </>
                           ) : (
                             <>
                               <Ban className="mr-2 h-4 w-4" />
-                              Suspend User
+                              {t('admin.users_suspend')}
                             </>
                           )}
                         </DropdownMenuItem>
@@ -486,7 +496,7 @@ const UsersManagement = () => {
                         className="text-red-400 hover:text-red-300 hover:bg-red-900/20 px-3 py-2 cursor-pointer"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
-                        Delete User
+                        {t('admin.users_delete')}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -502,7 +512,7 @@ const UsersManagement = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Users</p>
+              <p className="text-sm text-muted-foreground">{t('admin.users_total_users')}</p>
               <p className="text-2xl font-bold">{statistics?.total_users || users.length}</p>
             </div>
             <Users className="h-8 w-8 text-primary" />
@@ -511,7 +521,7 @@ const UsersManagement = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Premium Users</p>
+              <p className="text-sm text-muted-foreground">{t('admin.users_premium_users')}</p>
               <p className="text-2xl font-bold">{statistics?.premium_users || users.filter(u => u.subscription_type === 'premium').length}</p>
             </div>
             <Crown className="h-8 w-8 text-yellow-500" />

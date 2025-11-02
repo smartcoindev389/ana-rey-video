@@ -6,6 +6,8 @@ import { Card } from "@/components/ui/card";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTranslation } from "react-i18next";
+import { useLocale } from "@/hooks/useLocale";
 import logoImage from "@/assets/logo-transparente.png";
 
 const Auth = () => {
@@ -17,6 +19,8 @@ const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, user, isAuthenticated } = useAuth();
+  const { t } = useTranslation();
+  const { getPathWithLocale } = useLocale();
 
   // Handle email from navigation state or localStorage
   useEffect(() => {
@@ -39,7 +43,9 @@ const Auth = () => {
       if (user.is_admin) {
         navigate("/admin");
       } else {
-        navigate("/");
+        // Get locale from localStorage or default to 'en'
+        const locale = localStorage.getItem('i18nextLng') || 'en';
+        navigate(`/${locale}`);
       }
     }
   }, [isAuthenticated, user, navigate]);
@@ -56,22 +62,27 @@ const Auth = () => {
         console.log('Calling login function...');
                const loginResponse = await login(email, password);
                console.log('Login successful!');
-               toast.success("Login successful!");
+               toast.success(t('auth.login_successful'));
                
                // Check if user is admin and redirect accordingly
                if (loginResponse?.is_admin) {
-                 navigate("/admin");
+                 // Get locale from localStorage or default to 'en'
+                 const locale = localStorage.getItem('i18nextLng') || 'en';
+                 navigate(`/${locale}/admin`);
                } else {
-                 navigate("/");
+                 // Get locale from localStorage or default to 'en'
+                 const locale = localStorage.getItem('i18nextLng') || 'en';
+                 navigate(`/${locale}`);
                }
       } else {
         console.log('Redirecting to subscription page...');
-        // Redirect to subscription page for signup
-        navigate("/subscription", { state: { email, password, name } });
+        // Redirect to subscription page for signup with locale prefix
+        const locale = localStorage.getItem('i18nextLng') || 'en';
+        navigate(`/${locale}/subscription`, { state: { email, password, name } });
       }
     } catch (error) {
       console.error('Login error:', error);
-      const errorMessage = error instanceof Error ? error.message : "Authentication failed";
+      const errorMessage = error instanceof Error ? error.message : t('auth.authentication_failed');
       console.error('Error message:', errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -92,32 +103,32 @@ const Auth = () => {
               />
             </Link>
           <h2 className="text-2xl font-semibold mb-2">
-            {isLogin ? "Welcome Back" : "Create Account"}
+            {isLogin ? t('auth.welcome_back') : t('auth.create_account')}
           </h2>
           <p className="text-muted-foreground">
             {isLogin
-              ? "Sign in to continue your learning journey"
-              : "Join thousands of learners today"}
+              ? t('auth.sign_in_continue')
+              : t('auth.join_thousands')}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="name">{t('auth.name')}</Label>
               <Input
                 id="name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Enter your name"
+                placeholder={t('auth.name')}
                 required
               />
             </div>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t('auth.email')}</Label>
             <Input
               id="email"
               type="email"
@@ -129,7 +140,7 @@ const Auth = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t('auth.password')}</Label>
             <Input
               id="password"
               type="password"
@@ -147,7 +158,7 @@ const Auth = () => {
             size="lg"
             disabled={isLoading}
           >
-            {isLoading ? "Please wait..." : isLogin ? "Sign In" : "Continue to Plans"}
+            {isLoading ? t('common.loading') : isLogin ? t('auth.sign_in') : t('common.plans')}
           </Button>
         </form>
 
@@ -158,8 +169,8 @@ const Auth = () => {
             className="text-primary hover:underline"
           >
             {isLogin
-              ? "Don't have an account? Sign up"
-              : "Already have an account? Sign in"}
+              ? `${t('auth.dont_have_account')} ${t('auth.sign_up')}`
+              : `${t('auth.already_have_account')} ${t('auth.sign_in')}`}
           </button>
         </div>
       </Card>

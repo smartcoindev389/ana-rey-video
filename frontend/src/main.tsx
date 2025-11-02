@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import "./i18n/config";
 
 // Only import service worker in production or when explicitly enabled
 const registerSW = async () => {

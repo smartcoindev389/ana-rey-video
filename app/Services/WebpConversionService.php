@@ -318,6 +318,58 @@ class WebpConversionService
     }
 
     /**
+     * Copy a video file to a new location (for duplicating videos)
+     *
+     * @param string $sourcePath Relative path from storage/app/public/
+     * @param string|null $newFilename Optional new filename, otherwise generates UUID
+     * @return array
+     */
+    public function copyVideoFile(string $sourcePath, ?string $newFilename = null): array
+    {
+        $sourceFullPath = storage_path('app/public/' . $sourcePath);
+        
+        if (!file_exists($sourceFullPath)) {
+            throw new \Exception('Source video file does not exist: ' . $sourcePath);
+        }
+
+        // Generate new filename if not provided
+        if (!$newFilename) {
+            $extension = pathinfo($sourcePath, PATHINFO_EXTENSION);
+            $newFilename = Str::uuid() . '.' . $extension;
+        }
+
+        // Save to same directory
+        $directory = dirname($sourcePath);
+        if ($directory === '.') {
+            $directory = 'data_section/movie';
+        }
+        
+        $newPath = $directory . '/' . $newFilename;
+        $destinationFullPath = storage_path('app/public/' . $newPath);
+        $destinationDir = dirname($destinationFullPath);
+
+        // Ensure directory exists
+        if (!is_dir($destinationDir)) {
+            if (!mkdir($destinationDir, 0777, true)) {
+                throw new \Exception('Failed to create video directory: ' . $destinationDir);
+            }
+        }
+
+        // Copy the file
+        if (!copy($sourceFullPath, $destinationFullPath)) {
+            throw new \Exception('Failed to copy video file');
+        }
+
+        return [
+            'success' => true,
+            'path' => $newPath,
+            'url' => url('storage/' . $newPath),
+            'filename' => $newFilename,
+            'size' => filesize($destinationFullPath),
+        ];
+    }
+
+    /**
      * Delete a file
      *
      * @param string $path

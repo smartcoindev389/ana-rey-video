@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTranslation, Trans } from "react-i18next";
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
 import CourseRow from "@/components/CourseRow";
@@ -35,6 +36,7 @@ const newReleases = [
 const Index = () => {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -66,7 +68,13 @@ const Index = () => {
 
       <footer className="py-8 border-t border-white/10 px-4 md:px-8 bg-black">
         <div className="container mx-auto text-center text-gray-400 font-montserrat">
-          <p>© 2025 <span className="text-white font-semibold">SACRART</span> by Ana Rey. All rights reserved.</p>
+          <p>
+            <Trans
+              i18nKey="footer.copyright"
+              values={{ name: 'SACRART' }}
+              components={[<span key="sacrart" className="text-white font-semibold" />]}
+            />
+          </p>
         </div>
       </footer>
     </div>

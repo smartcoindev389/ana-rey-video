@@ -59,14 +59,18 @@ import {
   
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLocale } from '@/hooks/useLocale';
 import { seriesApi, videoApi, categoryApi, Series, Video, Category } from '@/services/videoApi';
 import FileUpload from '@/components/admin/FileUpload';
 
 // Using types from videoApi
 
 const ContentManagement = () => {
+  const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
+  const { locale } = useLocale();
   
   const [activeTab, setActiveTab] = useState('series');
   const [searchTerm, setSearchTerm] = useState('');
@@ -89,10 +93,11 @@ const ContentManagement = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedVideoFile, setSelectedVideoFile] = useState<File | null>(null);
   const [selectedIntroImageFile, setSelectedIntroImageFile] = useState<File | null>(null);
+  const [selectedCategoryImageFile, setSelectedCategoryImageFile] = useState<File | null>(null);
 
   useEffect(() => {
     fetchContent();
-  }, []);
+  }, [locale]); // Refetch when locale changes
 
   const fetchContent = async () => {
     try {
@@ -236,25 +241,75 @@ const ContentManagement = () => {
     );
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status?: string | null) => {
+    if (!status) {
+      return (
+        <Badge variant="secondary">
+          <EyeOff className="h-3 w-3 mr-1" />
+          {t('admin.content_draft')}
+        </Badge>
+      );
+    }
+
     const variants = {
       published: 'default',
       draft: 'secondary',
       archived: 'outline'
     } as const;
 
+    const statusLabels = {
+      published: t('admin.content_published'),
+      draft: t('admin.content_draft'),
+      archived: t('admin.content_archived')
+    };
+
     return (
-      <Badge variant={variants[status as keyof typeof variants]}>
+      <Badge variant={variants[status as keyof typeof variants] || 'secondary'}>
         {status === 'published' && <Eye className="h-3 w-3 mr-1" />}
         {status === 'draft' && <EyeOff className="h-3 w-3 mr-1" />}
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+        {statusLabels[status as keyof typeof statusLabels] || (status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown')}
       </Badge>
     );
   };
 
   const handleEditSeries = (serie: Series) => {
     console.log('Editing series:', serie);
-    setSelectedSeries(serie);
+    // Ensure all fields are properly mapped since series = category
+    // Map 'name' to 'title' if title is missing, and ensure all fields have values
+    const mappedSeries: Series = {
+      ...serie,
+      title: serie.title || serie.name || '',
+      name: serie.name || serie.title || '',
+      description: serie.description || '',
+      short_description: serie.short_description || '',
+      visibility: serie.visibility || 'freemium',
+      status: serie.status || 'draft',
+      category_id: serie.category_id || serie.id || 1,
+      instructor_id: serie.instructor_id || null,
+      thumbnail: serie.thumbnail || null,
+      cover_image: serie.cover_image || null,
+      trailer_url: serie.trailer_url || null,
+      meta_title: serie.meta_title || null,
+      meta_description: serie.meta_description || null,
+      meta_keywords: serie.meta_keywords || null,
+      video_count: serie.video_count || 0,
+      total_duration: serie.total_duration || 0,
+      total_views: serie.total_views || 0,
+      rating: serie.rating || '0',
+      rating_count: serie.rating_count || 0,
+      price: serie.price || '0',
+      is_free: serie.is_free ?? true,
+      published_at: serie.published_at || null,
+      featured_until: serie.featured_until || null,
+      is_featured: serie.is_featured ?? false,
+      sort_order: serie.sort_order || 0,
+      tags: serie.tags || null,
+      image: (serie as any)?.image || null,
+      created_at: serie.created_at || '',
+      updated_at: serie.updated_at || '',
+    };
+    setSelectedSeries(mappedSeries);
+    setSelectedCategoryImageFile(null);
     setIsSeriesDialogOpen(true);
   };
 
@@ -291,6 +346,7 @@ const ContentManagement = () => {
       created_at: '',
       updated_at: '',
     });
+    setSelectedCategoryImageFile(null);
     setIsSeriesDialogOpen(true);
   };
 
@@ -301,58 +357,276 @@ const ContentManagement = () => {
       setIsSubmitting(true);
       console.log('Saving series:', selectedSeries);
       
+      // Get original category name if updating (for fallback)
+      let originalName = '';
       if (selectedSeries.id && selectedSeries.id > 0) {
-        // Update existing series
-        console.log('Updating series with ID:', selectedSeries.id);
+        const originalCategory = categories.find(c => c.id === selectedSeries.id);
+        if (originalCategory) {
+          originalName = originalCategory.name || '';
+        }
+      }
+      
+      // Check if we need to use FormData for image upload
+      const needsFormData = selectedCategoryImageFile !== null;
+      
+      if (needsFormData) {
+        // Use FormData when there's an image file
+        const formData = new FormData();
         
-        // Prepare the data for update (only send fields that can be updated)
-        const updateData = {
-          title: selectedSeries.title,
-          description: selectedSeries.description,
-          short_description: selectedSeries.short_description,
-          visibility: selectedSeries.visibility,
-          status: selectedSeries.status,
-          category_id: selectedSeries.category_id,
-          thumbnail: selectedSeries.thumbnail,
-          cover_image: selectedSeries.cover_image,
-          trailer_url: selectedSeries.trailer_url,
-          meta_title: selectedSeries.meta_title,
-          meta_description: selectedSeries.meta_description,
-          meta_keywords: selectedSeries.meta_keywords,
-          price: selectedSeries.price,
-          is_free: selectedSeries.is_free,
-          is_featured: selectedSeries.is_featured,
-          featured_until: selectedSeries.featured_until,
-          tags: selectedSeries.tags,
-        };
+        // Map title to name since backend expects 'name' (category uses 'name', series uses 'title')
+        // Ensure we use name if available, otherwise title, fallback to original name, but never empty
+        let categoryName = (selectedSeries.name || selectedSeries.title || '').trim();
         
-        console.log('Update data being sent:', updateData);
-        const response = await seriesApi.update(selectedSeries.id, updateData);
-        console.log('Update response:', response);
+        // If name is empty and we're updating, use original name as fallback
+        if (!categoryName && selectedSeries.id && selectedSeries.id > 0 && originalName) {
+          categoryName = originalName.trim();
+        }
         
-        if (response.success) {
-          setSeries(prev => prev.map(s => s.id === selectedSeries.id ? response.data : s));
-          setFilteredSeries(prev => prev.map(s => s.id === selectedSeries.id ? response.data : s));
-          toast.success("Series updated successfully");
-          setIsSeriesDialogOpen(false);
-          setSelectedSeries(null);
+        console.log('FormData path - categoryName:', categoryName, 'selectedSeries.name:', selectedSeries.name, 'selectedSeries.title:', selectedSeries.title, 'originalName:', originalName);
+        
+        if (!categoryName) {
+          toast.error('Category name is required');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // Always append name field - it's required by backend
+        formData.append('name', categoryName);
+        
+        // Add essential category fields
+        if (selectedSeries.description) {
+          formData.append('description', selectedSeries.description);
+        }
+        if (selectedSeries.color) {
+          formData.append('color', selectedSeries.color);
+        }
+        if (selectedSeries.icon) {
+          formData.append('icon', selectedSeries.icon);
+        }
+        if (selectedSeries.sort_order !== undefined) {
+          formData.append('sort_order', selectedSeries.sort_order.toString());
+        }
+        if (selectedSeries.is_active !== undefined) {
+          formData.append('is_active', selectedSeries.is_active ? '1' : '0');
+        }
+        
+        // Add image file if selected
+        if (selectedCategoryImageFile) {
+          formData.append('image_file', selectedCategoryImageFile);
+        }
+        
+        if (selectedSeries.id && selectedSeries.id > 0) {
+          // Update using categoryApi since series are categories
+          // Note: categoryApi.update handles FormData with POST + _method=PUT for Laravel
+          console.log('Sending FormData update with name:', formData.get('name'));
+          // Log all FormData entries for debugging
+          const formDataEntries: string[] = [];
+          formData.forEach((value, key) => {
+            formDataEntries.push(`${key}: ${value instanceof File ? `[File: ${value.name}]` : value}`);
+          });
+          console.log('FormData entries:', formDataEntries);
+          const response = await categoryApi.update(selectedSeries.id, formData);
+          if (response.success) {
+            // Map category response to series format
+            const categoryData = response.data;
+            const seriesData: Series = {
+              ...categoryData,
+              title: categoryData.title || categoryData.name || '',
+              status: (categoryData as any).status || selectedSeries.status || 'draft',
+              visibility: (categoryData as any).visibility || selectedSeries.visibility || 'freemium',
+              video_count: (categoryData as any).video_count || selectedSeries.video_count || 0,
+              total_duration: (categoryData as any).total_duration || selectedSeries.total_duration || 0,
+              total_views: (categoryData as any).total_views || selectedSeries.total_views || 0,
+              category_id: categoryData.id,
+              instructor_id: (categoryData as any).instructor_id || selectedSeries.instructor_id || null,
+              thumbnail: (categoryData as any).thumbnail || selectedSeries.thumbnail || null,
+              cover_image: (categoryData as any).cover_image || selectedSeries.cover_image || null,
+              trailer_url: (categoryData as any).trailer_url || selectedSeries.trailer_url || null,
+              meta_title: (categoryData as any).meta_title || selectedSeries.meta_title || null,
+              meta_description: (categoryData as any).meta_description || selectedSeries.meta_description || null,
+              meta_keywords: (categoryData as any).meta_keywords || selectedSeries.meta_keywords || null,
+              rating: (categoryData as any).rating || selectedSeries.rating || '0',
+              rating_count: (categoryData as any).rating_count || selectedSeries.rating_count || 0,
+              price: (categoryData as any).price || selectedSeries.price || '0',
+              is_free: (categoryData as any).is_free ?? selectedSeries.is_free ?? true,
+              published_at: (categoryData as any).published_at || selectedSeries.published_at || null,
+              featured_until: (categoryData as any).featured_until || selectedSeries.featured_until || null,
+              is_featured: (categoryData as any).is_featured ?? selectedSeries.is_featured ?? false,
+              tags: (categoryData as any).tags || selectedSeries.tags || null,
+            } as Series;
+            setSeries(prev => prev.map(s => s.id === selectedSeries.id ? seriesData : s));
+            setFilteredSeries(prev => prev.map(s => s.id === selectedSeries.id ? seriesData : s));
+            toast.success(t('admin.content_series_updated'));
+            setIsSeriesDialogOpen(false);
+            setSelectedSeries(null);
+            setSelectedCategoryImageFile(null);
+          } else {
+            toast.error(response.message || "Failed to update series");
+          }
         } else {
-          toast.error(response.message || "Failed to update series");
+          // Create using categoryApi
+          const response = await categoryApi.create(formData);
+          if (response.success) {
+            // Map category response to series format since categories don't have all series fields
+            const categoryData = response.data;
+            const seriesData: Series = {
+              ...categoryData,
+              title: categoryData.title || categoryData.name || '',
+              status: (categoryData as any).status || 'draft',
+              visibility: (categoryData as any).visibility || 'freemium',
+              video_count: (categoryData as any).video_count || 0,
+              total_duration: (categoryData as any).total_duration || 0,
+              total_views: (categoryData as any).total_views || 0,
+              category_id: categoryData.id,
+              instructor_id: (categoryData as any).instructor_id || null,
+              thumbnail: (categoryData as any).thumbnail || null,
+              cover_image: (categoryData as any).cover_image || null,
+              trailer_url: (categoryData as any).trailer_url || null,
+              meta_title: (categoryData as any).meta_title || null,
+              meta_description: (categoryData as any).meta_description || null,
+              meta_keywords: (categoryData as any).meta_keywords || null,
+              rating: (categoryData as any).rating || '0',
+              rating_count: (categoryData as any).rating_count || 0,
+              price: (categoryData as any).price || '0',
+              is_free: (categoryData as any).is_free ?? true,
+              published_at: (categoryData as any).published_at || null,
+              featured_until: (categoryData as any).featured_until || null,
+              is_featured: (categoryData as any).is_featured ?? false,
+              tags: (categoryData as any).tags || null,
+            } as Series;
+            setSeries(prev => [seriesData, ...prev]);
+            setFilteredSeries(prev => [seriesData, ...prev]);
+            toast.success(t('admin.content_series_created'));
+            setIsSeriesDialogOpen(false);
+            setSelectedSeries(null);
+            setSelectedCategoryImageFile(null);
+          } else {
+            toast.error(response.message || "Failed to create series");
+          }
         }
       } else {
-        // Create new series
-        console.log('Creating new series');
-        const response = await seriesApi.create(selectedSeries);
-        console.log('Create response:', response);
+        // Use JSON when no image file
+        // Map title to name since backend CategoryController expects 'name'
+        // Ensure we use name if available, otherwise title, fallback to original name, but never empty
+        let categoryName = (selectedSeries.name || selectedSeries.title || '').trim();
         
-        if (response.success) {
-          setSeries(prev => [response.data, ...prev]);
-          setFilteredSeries(prev => [response.data, ...prev]);
-          toast.success("Series created successfully");
-          setIsSeriesDialogOpen(false);
-          setSelectedSeries(null);
+        // If name is empty and we're updating, use original name as fallback
+        if (!categoryName && selectedSeries.id && selectedSeries.id > 0 && originalName) {
+          categoryName = originalName.trim();
+        }
+        
+        console.log('JSON path - categoryName:', categoryName, 'selectedSeries.name:', selectedSeries.name, 'selectedSeries.title:', selectedSeries.title, 'originalName:', originalName);
+        
+        if (!categoryName) {
+          toast.error('Category name is required');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        if (selectedSeries.id && selectedSeries.id > 0) {
+          // Update existing category using categoryApi
+          const updateData: Partial<Category> = {
+            name: categoryName, // Already trimmed
+            description: selectedSeries.description || null,
+            color: (selectedSeries as any).color || null,
+            icon: (selectedSeries as any).icon || null,
+            sort_order: selectedSeries.sort_order || 0,
+            is_active: (selectedSeries as any).is_active ?? true,
+            image: (selectedSeries as any).image || null,
+          };
+          
+          console.log('Sending JSON update with data:', updateData);
+          const response = await categoryApi.update(selectedSeries.id, updateData);
+          if (response.success) {
+            // Map category response to series format
+            const categoryData = response.data;
+            const seriesData: Series = {
+              ...categoryData,
+              title: categoryData.title || categoryData.name || '',
+              status: (categoryData as any).status || selectedSeries.status || 'draft',
+              visibility: (categoryData as any).visibility || selectedSeries.visibility || 'freemium',
+              video_count: (categoryData as any).video_count || selectedSeries.video_count || 0,
+              total_duration: (categoryData as any).total_duration || selectedSeries.total_duration || 0,
+              total_views: (categoryData as any).total_views || selectedSeries.total_views || 0,
+              category_id: categoryData.id,
+              instructor_id: (categoryData as any).instructor_id || selectedSeries.instructor_id || null,
+              thumbnail: (categoryData as any).thumbnail || selectedSeries.thumbnail || null,
+              cover_image: (categoryData as any).cover_image || selectedSeries.cover_image || null,
+              trailer_url: (categoryData as any).trailer_url || selectedSeries.trailer_url || null,
+              meta_title: (categoryData as any).meta_title || selectedSeries.meta_title || null,
+              meta_description: (categoryData as any).meta_description || selectedSeries.meta_description || null,
+              meta_keywords: (categoryData as any).meta_keywords || selectedSeries.meta_keywords || null,
+              rating: (categoryData as any).rating || selectedSeries.rating || '0',
+              rating_count: (categoryData as any).rating_count || selectedSeries.rating_count || 0,
+              price: (categoryData as any).price || selectedSeries.price || '0',
+              is_free: (categoryData as any).is_free ?? selectedSeries.is_free ?? true,
+              published_at: (categoryData as any).published_at || selectedSeries.published_at || null,
+              featured_until: (categoryData as any).featured_until || selectedSeries.featured_until || null,
+              is_featured: (categoryData as any).is_featured ?? selectedSeries.is_featured ?? false,
+              tags: (categoryData as any).tags || selectedSeries.tags || null,
+            } as Series;
+            setSeries(prev => prev.map(s => s.id === selectedSeries.id ? seriesData : s));
+            setFilteredSeries(prev => prev.map(s => s.id === selectedSeries.id ? seriesData : s));
+            toast.success(t('admin.content_series_updated'));
+            setIsSeriesDialogOpen(false);
+            setSelectedSeries(null);
+          } else {
+            toast.error(response.message || "Failed to update series");
+          }
         } else {
-          toast.error(response.message || "Failed to create series");
+          // Create new category using categoryApi
+          if (!categoryName || categoryName.trim() === '') {
+            toast.error('Category name is required');
+            setIsSubmitting(false);
+            return;
+          }
+          
+          const createData: Partial<Category> = {
+            name: categoryName.trim(),
+            description: selectedSeries.description || null,
+            color: (selectedSeries as any).color || '#3B82F6',
+            icon: (selectedSeries as any).icon || null,
+            sort_order: selectedSeries.sort_order || 0,
+            image: (selectedSeries as any).image || null,
+          };
+          
+          const response = await categoryApi.create(createData);
+          if (response.success) {
+            // Map category response to series format since categories don't have all series fields
+            const categoryData = response.data;
+            const seriesData: Series = {
+              ...categoryData,
+              title: categoryData.title || categoryData.name || '',
+              status: (categoryData as any).status || 'draft',
+              visibility: (categoryData as any).visibility || 'freemium',
+              video_count: (categoryData as any).video_count || 0,
+              total_duration: (categoryData as any).total_duration || 0,
+              total_views: (categoryData as any).total_views || 0,
+              category_id: categoryData.id,
+              instructor_id: (categoryData as any).instructor_id || null,
+              thumbnail: (categoryData as any).thumbnail || null,
+              cover_image: (categoryData as any).cover_image || null,
+              trailer_url: (categoryData as any).trailer_url || null,
+              meta_title: (categoryData as any).meta_title || null,
+              meta_description: (categoryData as any).meta_description || null,
+              meta_keywords: (categoryData as any).meta_keywords || null,
+              rating: (categoryData as any).rating || '0',
+              rating_count: (categoryData as any).rating_count || 0,
+              price: (categoryData as any).price || '0',
+              is_free: (categoryData as any).is_free ?? true,
+              published_at: (categoryData as any).published_at || null,
+              featured_until: (categoryData as any).featured_until || null,
+              is_featured: (categoryData as any).is_featured ?? false,
+              tags: (categoryData as any).tags || null,
+            } as Series;
+            setSeries(prev => [seriesData, ...prev]);
+            setFilteredSeries(prev => [seriesData, ...prev]);
+            toast.success(t('admin.content_series_created'));
+            setIsSeriesDialogOpen(false);
+            setSelectedSeries(null);
+          } else {
+            toast.error(response.message || "Failed to create series");
+          }
         }
       }
     } catch (error: any) {
@@ -424,12 +698,12 @@ const ContentManagement = () => {
 
     // Validate required fields
     if (!selectedVideo.title?.trim()) {
-      toast.error("Title is required");
+      toast.error(t('admin.content_title_required'));
       return;
     }
     
     if (!selectedVideo.series_id) {
-      toast.error("Series is required");
+      toast.error(t('admin.content_series_required'));
       return;
     }
 
@@ -545,11 +819,11 @@ const ContentManagement = () => {
         if (selectedVideo.id) {
           setVideos(prev => prev.map(v => v.id === selectedVideo.id ? result.data : v));
           setFilteredVideos(prev => prev.map(v => v.id === selectedVideo.id ? result.data : v));
-          toast.success("Video updated successfully");
+          toast.success(t('admin.content_video_updated'));
         } else {
           setVideos(prev => [result.data, ...prev]);
           setFilteredVideos(prev => [result.data, ...prev]);
-          toast.success("Video created successfully");
+          toast.success(t('admin.content_video_created'));
         }
         setIsVideoDialogOpen(false);
         setSelectedVideo(null);
@@ -570,7 +844,7 @@ const ContentManagement = () => {
   };
 
   const handleDeleteSeries = async (seriesId: number) => {
-    if (!confirm("Are you sure you want to delete this series? This will also delete all associated videos.")) {
+    if (!confirm(t('admin.content_series_delete_confirm'))) {
       return;
     }
 
@@ -582,7 +856,7 @@ const ContentManagement = () => {
       if (response.success) {
         setSeries(prev => prev.filter(s => s.id !== seriesId));
         setFilteredSeries(prev => prev.filter(s => s.id !== seriesId));
-        toast.success("Series deleted successfully");
+        toast.success(t('admin.content_series_deleted'));
       } else {
         toast.error(response.message || "Failed to delete series");
       }
@@ -594,7 +868,7 @@ const ContentManagement = () => {
   };
 
   const handleDeleteVideo = async (videoId: number) => {
-    if (!confirm("Are you sure you want to delete this video?")) {
+    if (!confirm(t('admin.content_video_delete_confirm'))) {
       return;
     }
 
@@ -603,7 +877,7 @@ const ContentManagement = () => {
       if (response.success) {
         setVideos(prev => prev.filter(v => v.id !== videoId));
         setFilteredVideos(prev => prev.filter(v => v.id !== videoId));
-        toast.success("Video deleted successfully");
+        toast.success(t('admin.content_video_deleted'));
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to delete video");
@@ -617,10 +891,44 @@ const ContentManagement = () => {
     const newStatus = serie.status === 'published' ? 'draft' : 'published';
     
     try {
-      const response = await seriesApi.update(seriesId, { status: newStatus });
+      // Use categoryApi since series are categories
+      // Need to send name field as it's required by CategoryController
+      const updateData: Partial<Category> = {
+        name: serie.name || serie.title || '',
+        status: newStatus,
+      };
+      
+      const response = await categoryApi.update(seriesId, updateData);
       if (response.success) {
-        setSeries(prev => prev.map(s => s.id === seriesId ? response.data : s));
-        setFilteredSeries(prev => prev.map(s => s.id === seriesId ? response.data : s));
+        // Map category response to series format
+        const categoryData = response.data;
+        const seriesData: Series = {
+          ...categoryData,
+          title: categoryData.title || categoryData.name || '',
+          status: (categoryData as any).status || newStatus,
+          visibility: (categoryData as any).visibility || serie.visibility || 'freemium',
+          video_count: (categoryData as any).video_count || serie.video_count || 0,
+          total_duration: (categoryData as any).total_duration || serie.total_duration || 0,
+          total_views: (categoryData as any).total_views || serie.total_views || 0,
+          category_id: categoryData.id,
+          instructor_id: (categoryData as any).instructor_id || serie.instructor_id || null,
+          thumbnail: (categoryData as any).thumbnail || serie.thumbnail || null,
+          cover_image: (categoryData as any).cover_image || serie.cover_image || null,
+          trailer_url: (categoryData as any).trailer_url || serie.trailer_url || null,
+          meta_title: (categoryData as any).meta_title || serie.meta_title || null,
+          meta_description: (categoryData as any).meta_description || serie.meta_description || null,
+          meta_keywords: (categoryData as any).meta_keywords || serie.meta_keywords || null,
+          rating: (categoryData as any).rating || serie.rating || '0',
+          rating_count: (categoryData as any).rating_count || serie.rating_count || 0,
+          price: (categoryData as any).price || serie.price || '0',
+          is_free: (categoryData as any).is_free ?? serie.is_free ?? true,
+          published_at: (categoryData as any).published_at || serie.published_at || null,
+          featured_until: (categoryData as any).featured_until || serie.featured_until || null,
+          is_featured: (categoryData as any).is_featured ?? serie.is_featured ?? false,
+          tags: (categoryData as any).tags || serie.tags || null,
+        } as Series;
+        setSeries(prev => prev.map(s => s.id === seriesId ? seriesData : s));
+        setFilteredSeries(prev => prev.map(s => s.id === seriesId ? seriesData : s));
         toast.success(`Series ${newStatus === 'published' ? 'published' : 'unpublished'} successfully`);
       }
     } catch (error: any) {
@@ -659,8 +967,8 @@ const ContentManagement = () => {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Content Management</h1>
-          <p className="text-muted-foreground">Loading content...</p>
+          <h1 className="text-3xl font-bold">{t('admin.content_management')}</h1>
+          <p className="text-muted-foreground">{t('admin.common_loading')}</p>
         </div>
         <div className="space-y-4">
           {[...Array(5)].map((_, i) => (
@@ -688,23 +996,23 @@ const ContentManagement = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Content Management</h1>
-          <p className="text-muted-foreground">Manage your series and episodes</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">{t('admin.content_management')}</h1>
+          <p className="text-muted-foreground">{t('admin.content_management')}</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <Button variant="outline" onClick={fetchContent} disabled={isLoading} size="sm">
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
+            <span className="hidden sm:inline">{t('admin.common_refresh')}</span>
           </Button>
           <Button variant="outline" onClick={handleAddVideo} size="sm">
             <Plus className="mr-2 h-4 w-4" />
-            <span className="hidden sm:inline">Add Episode</span>
-            <span className="sm:hidden">Episode</span>
+            <span className="hidden sm:inline">{t('admin.content_add_episode')}</span>
+            <span className="sm:hidden">{t('admin.content_episode')}</span>
           </Button>
           <Button onClick={handleAddSeries} size="sm">
             <Plus className="mr-2 h-4 w-4" />
-            <span className="hidden sm:inline">Add Series</span>
-            <span className="sm:hidden">Series</span>
+            <span className="hidden sm:inline">{t('admin.content_add_series')}</span>
+            <span className="sm:hidden">{t('admin.content_series')}</span>
           </Button>
         </div>
       </div>
@@ -718,7 +1026,7 @@ const ContentManagement = () => {
           size="sm"
         >
           <Folder className="mr-2 h-4 w-4" />
-          <span className="hidden sm:inline">Series</span>
+          <span className="hidden sm:inline">{t('admin.content_series')}</span>
         </Button>
         <Button
           variant={activeTab === 'videos' ? 'default' : 'ghost'}
@@ -727,7 +1035,7 @@ const ContentManagement = () => {
           size="sm"
         >
           <VideoIcon className="mr-2 h-4 w-4" />
-          <span className="hidden sm:inline">Episodes</span>
+          <span className="hidden sm:inline">{t('admin.content_videos')}</span>
         </Button>
         
       </div>
@@ -737,7 +1045,7 @@ const ContentManagement = () => {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
-            placeholder={`Search ${activeTab}...`}
+            placeholder={t('admin.content_search_placeholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -754,13 +1062,13 @@ const ContentManagement = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[300px]">Series</TableHead>
-                    <TableHead className="w-[100px]">Episodes</TableHead>
-                    <TableHead className="w-[100px]">Duration</TableHead>
-                    <TableHead className="w-[120px]">Visibility</TableHead>
-                    <TableHead className="w-[120px]">Status</TableHead>
-                    <TableHead className="w-[120px]">Created</TableHead>
-                    <TableHead className="w-[70px]">Actions</TableHead>
+                    <TableHead className="min-w-[300px]">{t('admin.content_table_series')}</TableHead>
+                    <TableHead className="w-[100px]">{t('admin.content_table_episodes')}</TableHead>
+                    <TableHead className="w-[100px]">{t('admin.content_table_duration')}</TableHead>
+                    <TableHead className="w-[120px]">{t('admin.content_table_visibility')}</TableHead>
+                    <TableHead className="w-[120px]">{t('admin.content_table_status')}</TableHead>
+                    <TableHead className="w-[120px]">{t('admin.content_table_created')}</TableHead>
+                    <TableHead className="w-[70px]">{t('admin.content_table_actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -804,7 +1112,7 @@ const ContentManagement = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48 bg-white border border-gray-200 shadow-lg">
-                            <DropdownMenuLabel className="text-gray-900 font-semibold px-3 py-2">Actions</DropdownMenuLabel>
+                            <DropdownMenuLabel className="text-gray-900 font-semibold px-3 py-2">{t('admin.common_actions')}</DropdownMenuLabel>
                             <DropdownMenuSeparator className="bg-gray-200" />
                             <DropdownMenuItem 
                               onClick={() => handleEditSeries(serie)}
@@ -968,14 +1276,14 @@ const ContentManagement = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[250px]">Episode</TableHead>
-                    <TableHead className="w-[150px]">Series</TableHead>
-                    <TableHead className="w-[100px]">Duration</TableHead>
-                    <TableHead className="w-[100px]">Views</TableHead>
-                    <TableHead className="w-[120px]">Visibility</TableHead>
-                    <TableHead className="w-[120px]">Status</TableHead>
-                    <TableHead className="w-[120px]">Uploaded</TableHead>
-                    <TableHead className="w-[70px]">Actions</TableHead>
+                    <TableHead className="min-w-[250px]">{t('admin.content_table_episode')}</TableHead>
+                    <TableHead className="w-[150px]">{t('admin.content_table_series')}</TableHead>
+                    <TableHead className="w-[100px]">{t('admin.content_table_duration')}</TableHead>
+                    <TableHead className="w-[100px]">{t('admin.content_table_views')}</TableHead>
+                    <TableHead className="w-[120px]">{t('admin.content_table_visibility')}</TableHead>
+                    <TableHead className="w-[120px]">{t('admin.content_table_status')}</TableHead>
+                    <TableHead className="w-[120px]">{t('admin.content_table_uploaded')}</TableHead>
+                    <TableHead className="w-[70px]">{t('admin.content_table_actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1026,7 +1334,7 @@ const ContentManagement = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48 bg-white border border-gray-200 shadow-lg">
-                            <DropdownMenuLabel className="text-gray-900 font-semibold px-3 py-2">Actions</DropdownMenuLabel>
+                            <DropdownMenuLabel className="text-gray-900 font-semibold px-3 py-2">{t('admin.common_actions')}</DropdownMenuLabel>
                             <DropdownMenuSeparator className="bg-gray-200" />
                             <DropdownMenuItem 
                               onClick={() => handleEditVideo(video)}
@@ -1185,7 +1493,7 @@ const ContentManagement = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Series</p>
+              <p className="text-sm text-muted-foreground">{t('admin.content_total_series')}</p>
               <p className="text-2xl font-bold">{series?.length || 0}</p>
             </div>
             <Folder className="h-8 w-8 text-primary" />
@@ -1194,7 +1502,7 @@ const ContentManagement = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Episodes</p>
+              <p className="text-sm text-muted-foreground">{t('admin.content_total_episodes')}</p>
               <p className="text-2xl font-bold">{videos?.length || 0}</p>
             </div>
             <VideoIcon className="h-8 w-8 text-primary" />
@@ -1203,7 +1511,7 @@ const ContentManagement = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Views</p>
+              <p className="text-sm text-muted-foreground">{t('admin.content_total_views')}</p>
               <p className="text-2xl font-bold">{videos?.reduce((sum, video) => sum + (video?.views || 0), 0).toLocaleString() || '0'}</p>
             </div>
             <Eye className="h-8 w-8 text-primary" />
@@ -1212,7 +1520,7 @@ const ContentManagement = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Published</p>
+              <p className="text-sm text-muted-foreground">{t('admin.content_published_count')}</p>
               <p className="text-2xl font-bold">{videos?.filter(v => v?.status === 'published').length || 0}</p>
             </div>
             <Eye className="h-8 w-8 text-green-500" />
@@ -1223,48 +1531,54 @@ const ContentManagement = () => {
       
 
       {/* Edit Series Dialog */}
-      <Dialog open={isSeriesDialogOpen} onOpenChange={setIsSeriesDialogOpen}>
+      <Dialog open={isSeriesDialogOpen} onOpenChange={(open) => {
+        setIsSeriesDialogOpen(open);
+        if (!open) {
+          setSelectedSeries(null);
+          setSelectedCategoryImageFile(null);
+        }
+      }}>
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{selectedSeries?.id ? 'Edit Series' : 'Create New Series'}</DialogTitle>
+            <DialogTitle>{selectedSeries?.id ? t('admin.content_edit_series') : t('admin.content_create_series')}</DialogTitle>
             <DialogDescription>
-              {selectedSeries?.id ? 'Make changes to the series here.' : 'Fill in the details to create a new series.'} Click save when you're done.
+              {selectedSeries?.id ? t('admin.content_edit_series_desc') : t('admin.content_create_series_desc')} {t('admin.content_series_save_desc')}
             </DialogDescription>
           </DialogHeader>
           {selectedSeries && (
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="title" className="text-right">
-                  Title
+                  {t('admin.content_label_title')}
                 </Label>
                 <Input
                   id="title"
-                  value={selectedSeries.title}
-                  onChange={(e) => setSelectedSeries({...selectedSeries, title: e.target.value})}
+                  value={selectedSeries.title || selectedSeries.name || ''}
+                  onChange={(e) => setSelectedSeries({...selectedSeries, title: e.target.value, name: e.target.value})}
                   className="col-span-3"
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="description" className="text-right">
-                  Description
+                  {t('admin.content_label_description')}
                 </Label>
                 <Textarea
                   id="description"
-                  value={selectedSeries.description}
+                  value={selectedSeries.description || ''}
                   onChange={(e) => setSelectedSeries({...selectedSeries, description: e.target.value})}
                   className="col-span-3"
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="visibility" className="text-right">
-                  Visibility
+                  {t('admin.content_label_visibility')}
                 </Label>
                 <Select
-                  value={selectedSeries.visibility}
+                  value={selectedSeries.visibility || 'freemium'}
                   onValueChange={(value) => setSelectedSeries({...selectedSeries, visibility: value as 'freemium' | 'basic' | 'premium'})}
                 >
                   <SelectTrigger className="col-span-3">
-                    <SelectValue />
+                    <SelectValue placeholder="Select visibility" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="freemium">Freemium</SelectItem>
@@ -1275,14 +1589,14 @@ const ContentManagement = () => {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="status" className="text-right">
-                  Status
+                  {t('admin.content_label_status')}
                 </Label>
                 <Select
-                  value={selectedSeries.status}
+                  value={selectedSeries.status || 'draft'}
                   onValueChange={(value) => setSelectedSeries({...selectedSeries, status: value as 'draft' | 'published' | 'archived'})}
                 >
                   <SelectTrigger className="col-span-3">
-                    <SelectValue />
+                    <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="draft">Draft</SelectItem>
@@ -1290,6 +1604,21 @@ const ContentManagement = () => {
                     <SelectItem value="archived">Archived</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="categoryImage" className="text-right">
+                  Category Image
+                </Label>
+                <div className="col-span-3">
+                  <FileUpload
+                    type="image"
+                    label="Upload Category Image"
+                    accept="image/jpeg,image/png,image/jpg,image/webp"
+                    maxSize={10}
+                    onFileSelect={(file) => setSelectedCategoryImageFile(file)}
+                    currentFile={(selectedSeries as any)?.image || null}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -1360,7 +1689,7 @@ const ContentManagement = () => {
                   value={selectedVideo.intro_description || ''}
                   onChange={(e) => setSelectedVideo({...selectedVideo, intro_description: e.target.value})}
                   className="col-span-3"
-                  placeholder="Brief intro text for the video"
+                  placeholder={t('admin.content_placeholder_intro')}
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
@@ -1406,7 +1735,7 @@ const ContentManagement = () => {
                   onValueChange={(value) => setSelectedVideo({...selectedVideo, series_id: parseInt(value)})}
                 >
                   <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select a series" />
+                    <SelectValue placeholder={t('admin.content_label_select_series')} />
                   </SelectTrigger>
                   <SelectContent>
                     {series.map((serie) => (

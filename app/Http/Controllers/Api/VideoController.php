@@ -32,7 +32,7 @@ class VideoController extends Controller
     {
         $user = Auth::user();
         
-        $query = Video::with(['category', 'instructor']);
+        $query = Video::with(['category', 'instructor'])->withCount('comments');
 
         // Check if this is an admin request (admin routes)
         $isAdminRequest = $request->is('api/admin/*');
@@ -93,6 +93,10 @@ class VideoController extends Controller
             case 'episode':
                 $query->orderBy('episode_number', $sortOrder);
                 break;
+            case 'comments':
+            case 'reviews':
+                $query->orderBy('comments_count', $sortOrder);
+                break;
             default:
                 $query->orderBy('sort_order', $sortOrder)->orderBy('episode_number', $sortOrder);
         }
@@ -110,6 +114,56 @@ class VideoController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        // Pre-process request data - decode JSON strings for array fields
+        $requestData = $request->all();
+        
+        // Handle tags - decode if it's a JSON string
+        if ($request->has('tags') && is_string($request->get('tags'))) {
+            try {
+                $decoded = json_decode($request->get('tags'), true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $requestData['tags'] = $decoded;
+                } else {
+                    // If it's not valid JSON or not an array, try to parse as comma-separated string
+                    $tags = array_filter(array_map('trim', explode(',', $request->get('tags'))));
+                    $requestData['tags'] = !empty($tags) ? array_values($tags) : null;
+                }
+            } catch (\Exception $e) {
+                // If parsing fails, set to null
+                $requestData['tags'] = null;
+            }
+        }
+        
+        // Handle downloadable_resources - decode if it's a JSON string
+        if ($request->has('downloadable_resources') && is_string($request->get('downloadable_resources'))) {
+            try {
+                $decoded = json_decode($request->get('downloadable_resources'), true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $requestData['downloadable_resources'] = $decoded;
+                } else {
+                    $requestData['downloadable_resources'] = null;
+                }
+            } catch (\Exception $e) {
+                $requestData['downloadable_resources'] = null;
+            }
+        }
+        
+        // Handle streaming_urls - decode if it's a JSON string
+        if ($request->has('streaming_urls') && is_string($request->get('streaming_urls'))) {
+            try {
+                $decoded = json_decode($request->get('streaming_urls'), true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $requestData['streaming_urls'] = $decoded;
+                } else {
+                    $requestData['streaming_urls'] = null;
+                }
+            } catch (\Exception $e) {
+                $requestData['streaming_urls'] = null;
+            }
+        }
+        
+        // Merge the processed data back into the request
+        $request->merge($requestData);
 
         // var_dump($request->all());
         $validated = $request->validate([
@@ -351,6 +405,57 @@ class VideoController extends Controller
             ], 403);
         }
 
+        // Pre-process request data - decode JSON strings for array fields
+        $requestData = $request->all();
+        
+        // Handle tags - decode if it's a JSON string
+        if ($request->has('tags') && is_string($request->get('tags'))) {
+            try {
+                $decoded = json_decode($request->get('tags'), true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $requestData['tags'] = $decoded;
+                } else {
+                    // If it's not valid JSON or not an array, try to parse as comma-separated string
+                    $tags = array_filter(array_map('trim', explode(',', $request->get('tags'))));
+                    $requestData['tags'] = !empty($tags) ? array_values($tags) : null;
+                }
+            } catch (\Exception $e) {
+                // If parsing fails, set to null
+                $requestData['tags'] = null;
+            }
+        }
+        
+        // Handle downloadable_resources - decode if it's a JSON string
+        if ($request->has('downloadable_resources') && is_string($request->get('downloadable_resources'))) {
+            try {
+                $decoded = json_decode($request->get('downloadable_resources'), true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $requestData['downloadable_resources'] = $decoded;
+                } else {
+                    $requestData['downloadable_resources'] = null;
+                }
+            } catch (\Exception $e) {
+                $requestData['downloadable_resources'] = null;
+            }
+        }
+        
+        // Handle streaming_urls - decode if it's a JSON string
+        if ($request->has('streaming_urls') && is_string($request->get('streaming_urls'))) {
+            try {
+                $decoded = json_decode($request->get('streaming_urls'), true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $requestData['streaming_urls'] = $decoded;
+                } else {
+                    $requestData['streaming_urls'] = null;
+                }
+            } catch (\Exception $e) {
+                $requestData['streaming_urls'] = null;
+            }
+        }
+        
+        // Merge the processed data back into the request
+        $request->merge($requestData);
+        
         $validated = $request->validate([
             'title' => [
                 'sometimes',
@@ -378,7 +483,7 @@ class VideoController extends Controller
             'hls_url' => 'nullable|url|max:255',
             'dash_url' => 'nullable|url|max:255',
             'streaming_urls' => 'nullable|array',
-            'visibility' => 'sometimes|required|in:freemium,basic,premium',
+            'visibility' => 'nullable|in:freemium,basic,premium',
             'status' => 'nullable|in:draft,published,archived',
             'is_free' => 'nullable|boolean',
             'price' => 'nullable|numeric|min:0',
@@ -409,15 +514,15 @@ class VideoController extends Controller
                     'size' => $request->file('video_file')->getSize(),
                 ]);
                 
-                // Delete old video file if exists
-                if ($video->video_file_path) {
+                // Delete old video file if exists (and it's different from new one)
+                if ($video->video_file_path && $video->video_file_path !== $request->get('video_file_path')) {
                     $this->webpService->deleteFile($video->video_file_path);
                 }
 
                 $videoUploadResult = $this->webpService->saveVideo($request->file('video_file'));
                 $validated['video_file_path'] = $videoUploadResult['path'];
                 $validated['file_size'] = $videoUploadResult['size'];
-                $validated['video_format'] = pathinfo($videoUploadResult['filename'], PATHINFO_EXTENSION);
+                $validated['video_format'] = pathinfo($videoUploadResult['path'], PATHINFO_EXTENSION);
 
                 // Auto-calculate duration for updated file
                 try {
@@ -441,6 +546,50 @@ class VideoController extends Controller
                     'success' => false,
                     'message' => 'Failed to upload video file: ' . $e->getMessage(),
                 ], 500);
+            }
+        } elseif ($request->has('video_file_path')) {
+            // Handle video file path update (may include copying for duplicating videos)
+            $newPath = $request->get('video_file_path');
+            $originalPath = $video->video_file_path;
+            
+            // If the new path is the same as an existing video's path (copy scenario), copy the file
+            if ($newPath && $newPath !== $originalPath) {
+                // Check if another video uses this path (copy scenario)
+                $existingVideo = Video::where('video_file_path', $newPath)
+                    ->where('id', '!=', $video->id)
+                    ->first();
+                
+                if ($existingVideo && $originalPath) {
+                    // Copy from original video to new location
+                    try {
+                        \Log::info('Copying video file for duplicate', [
+                            'video_id' => $video->id,
+                            'from' => $originalPath,
+                            'existing_path' => $newPath,
+                        ]);
+                        
+                        $copyResult = $this->webpService->copyVideoFile($originalPath);
+                        $validated['video_file_path'] = $copyResult['path'];
+                        $validated['file_size'] = $copyResult['size'];
+                        $validated['video_format'] = pathinfo($copyResult['path'], PATHINFO_EXTENSION);
+                        
+                        \Log::info('Video file copied successfully', [
+                            'path' => $copyResult['path'],
+                        ]);
+                    } catch (\Exception $e) {
+                        \Log::error('Failed to copy video file', [
+                            'error' => $e->getMessage(),
+                        ]);
+                        // If copy fails, still try to use the provided path
+                        $validated['video_file_path'] = $newPath;
+                    }
+                } else {
+                    // Path is being changed to a new/different path, just use it
+                    $validated['video_file_path'] = $newPath;
+                }
+            } else {
+                // Path is the same, no change needed
+                // Don't override it in validated to keep original
             }
         } else {
             \Log::info('No new video file in update request', [
@@ -469,8 +618,8 @@ class VideoController extends Controller
             }
         }
 
-        // Update slug if title changed
-        if ($video->title !== $validated['title']) {
+        // Update slug if title changed (use raw original value to avoid translation issues)
+        if (isset($validated['title']) && $video->getRawOriginal('title') !== $validated['title']) {
             $validated['slug'] = Str::slug($validated['title']);
         }
 

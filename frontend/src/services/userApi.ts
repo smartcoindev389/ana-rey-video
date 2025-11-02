@@ -1,11 +1,18 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
+// Helper function to get locale from localStorage or default to 'en'
+const getLocale = (): string => {
+  return localStorage.getItem('i18nextLng') || 'en';
+};
+
 // Helper function to get auth headers
 const getAuthHeaders = (): HeadersInit => {
   const token = localStorage.getItem('auth_token');
+  const locale = getLocale();
   return {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
+    'Accept-Language': locale,
     'Authorization': token ? `Bearer ${token}` : '',
   };
 };

@@ -27,6 +27,8 @@ import { faqApi, Faq } from '@/services/faqApi';
 import { settingsApi } from '@/services/settingsApi';
 import { categoryApi, Category, seriesApi, videoApi } from '@/services/videoApi';
 import { feedbackApi, Feedback } from '@/services/feedbackApi';
+import { useTranslation } from 'react-i18next';
+import { useLocale } from '@/hooks/useLocale';
 import cover1 from '@/assets/cover1.webp';
 import cover2 from '@/assets/cover2.webp';
 import cover3 from '@/assets/cover3.webp';
@@ -56,125 +58,14 @@ const Home = () => {
   const [seriesLoading, setSeriesLoading] = useState(false);
   const [testimonials, setTestimonials] = useState<Feedback[]>([]);
   const [testimonialsLoading, setTestimonialsLoading] = useState(false);
+  const [featuredCourse, setFeaturedCourse] = useState<any>(null);
+  const [featuredCourses, setFeaturedCourses] = useState<any[]>([]);
+  const [featuredLoading, setFeaturedLoading] = useState(false);
   const tabContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
-
-  // Featured Course Data for Hero Section
-  const featuredCourse = {
-    id: 1,
-    title: "Master Classical Sculpture Techniques",
-    description: "Learn the fundamentals of classical sculpture from ancient techniques to modern applications. Perfect for beginners and intermediate artists.",
-    image: cover1,
-    category: "Sculpture",
-    duration: "12 hours",
-    rating: 4.9,
-    studentsCount: 15420,
-    instructor: "Ana Rey",
-    price: "$89",
-    isFree: false,
-    badge: "Featured"
-  };
-
-  // Course Categories Data
-  const courseCategories = [
-    {
-      id: 1,
-      title: "Classical Sculpture",
-      image: cover1,
-      courseCount: 24,
-      description: "Traditional sculpting techniques and classical forms",
-      category: "Sculpture"
-    },
-    {
-      id: 2,
-      title: "Contemporary Art",
-      image: cover2,
-      courseCount: 18,
-      description: "Modern artistic expressions and innovative approaches",
-      category: "Contemporary"
-    },
-    {
-      id: 3,
-      title: "Digital Art",
-      image: cover3,
-      courseCount: 32,
-      description: "3D modeling, digital sculpting, and virtual art",
-      category: "Digital"
-    },
-    {
-      id: 4,
-      title: "Art Restoration",
-      image: cover4,
-      courseCount: 15,
-      description: "Conservation techniques and restoration methods",
-      category: "Restoration"
-    }
-  ];
-
-  // Featured Courses Data for Second Carousel
-  const featuredCourses = [
-    {
-      id: 5,
-      title: "Advanced Marble Sculpting",
-      image: cover5,
-      duration: "8 hours",
-      rating: 4.8,
-      studentsCount: 3420,
-      instructor: "Ana Rey",
-      category: "Sculpture"
-    },
-    {
-      id: 6,
-      title: "Modern Clay Techniques",
-      image: cover6,
-      duration: "6 hours",
-      rating: 4.9,
-      studentsCount: 2890,
-      instructor: "Carlos Mendez",
-      category: "Contemporary"
-    },
-    {
-      id: 7,
-      title: "3D Digital Sculpting",
-      image: cover7,
-      duration: "10 hours",
-      rating: 4.7,
-      studentsCount: 4560,
-      instructor: "Sarah Chen",
-      category: "Digital"
-    },
-    {
-      id: 8,
-      title: "Classical Bust Restoration",
-      image: cover8,
-      duration: "12 hours",
-      rating: 4.9,
-      studentsCount: 1890,
-      instructor: "Marco Rossi",
-      category: "Restoration"
-    },
-    {
-      id: 9,
-      title: "Bronze Casting Masterclass",
-      image: cover1,
-      duration: "15 hours",
-      rating: 4.8,
-      studentsCount: 1230,
-      instructor: "Ana Rey",
-      category: "Sculpture"
-    },
-    {
-      id: 10,
-      title: "Abstract Form Creation",
-      image: cover2,
-      duration: "7 hours",
-      rating: 4.6,
-      studentsCount: 2100,
-      instructor: "Lisa Park",
-      category: "Contemporary"
-    }
-  ];
+  const { t } = useTranslation();
+  const { navigateWithLocale, getPathWithLocale, locale } = useLocale();
 
   const handleGetStarted = () => {
     if (email.trim()) {
@@ -187,12 +78,12 @@ const Home = () => {
   };
 
   const handleCourseClick = (courseId: number) => {
-    navigate(`/series/${courseId}`);
+    navigateWithLocale(`/series/${courseId}`);
   };
 
   const handleCategoryClick = (categoryId: number) => {
     setSelectedCategoryId(categoryId);
-    navigate(`/explore?category=${categoryId}`);
+    navigateWithLocale(`/explore?category=${categoryId}`);
   };
 
   const centerActiveTab = (tabIndex: number, instant: boolean = false) => {
@@ -465,17 +356,23 @@ const Home = () => {
           const videos = Array.isArray(videosData) ? videosData : [];
           
           // Transform videos to match the expected series format
-          const series = videos.map((video: any) => ({
-            id: video.id,
-            title: video.title,
-            subtitle: video.short_description || video.description || '',
-            image: video.thumbnail || video.intro_image || cover1,
-            videoCount: 1, // Each video is a single item
-            duration: `${Math.floor((video.duration || 0) / 60)}m`,
-            viewers: video.views || 0,
-            rating: parseFloat(video.rating || '0'),
-            visibility: video.visibility || 'freemium'
-          }));
+          const series = videos.map((video: any) => {
+            // Prioritize full URLs from model accessors, then fallback to raw paths
+            const imageUrl = video.intro_image_url 
+              || getImageUrl(video.intro_image || cover1);
+            
+            return {
+              id: video.id,
+              title: video.title,
+              subtitle: video.short_description || video.description || '',
+              image: imageUrl,
+              videoCount: 1, // Each video is a single item
+              duration: `${Math.floor((video.duration || 0) / 60)}m`,
+              viewers: video.views || 0,
+              rating: parseFloat(video.rating || '0'),
+              visibility: video.visibility || 'freemium'
+            };
+          });
           
           return { categoryId: category.id, series };
         } catch (error) {
@@ -496,6 +393,110 @@ const Home = () => {
       setSeriesLoading(false);
     }
   };
+
+  // Fetch Featured Videos (videos with most reviews/comments)
+  useEffect(() => {
+    const fetchFeaturedVideos = async () => {
+      setFeaturedLoading(true);
+      try {
+        // Fetch videos sorted by comment count (reviews), fallback to views if no comments
+        const response = await videoApi.getPublic({
+          status: 'published',
+          sort_by: 'reviews',
+          sort_order: 'desc',
+          per_page: 6
+        });
+        
+        const videosData = response.data?.data || response.data;
+        const videos = Array.isArray(videosData) ? videosData : [];
+        
+        if (videos.length > 0) {
+          // Use first video as featured course
+          const firstVideo = videos[0];
+          setFeaturedCourse({
+            id: firstVideo.id,
+            title: firstVideo.title,
+            description: firstVideo.short_description || firstVideo.description || '',
+            video: firstVideo, // Include full video object for preview
+            image: getImageUrl(firstVideo.thumbnail_url || firstVideo.intro_image_url || firstVideo.thumbnail || firstVideo.intro_image || cover1),
+            category: firstVideo.category?.name || 'Uncategorized',
+            duration: `${Math.floor((firstVideo.duration || 0) / 60)}m`,
+            rating: parseFloat(firstVideo.rating || '0'),
+            studentsCount: firstVideo.views || 0,
+            instructor: firstVideo.instructor?.name || 'Instructor',
+            comments_count: (firstVideo as any).comments_count || 0,
+            views: firstVideo.views || 0
+          });
+          
+          // Use remaining videos as featured courses
+          const remainingVideos = videos.slice(1).map((video: any) => ({
+            id: video.id,
+            title: video.title,
+            video: video, // Include full video object for preview
+            image: getImageUrl(video.thumbnail_url || video.intro_image_url || video.thumbnail || video.intro_image || cover1),
+            duration: `${Math.floor((video.duration || 0) / 60)}m`,
+            rating: parseFloat(video.rating || '0'),
+            studentsCount: video.views || 0,
+            instructor: video.instructor?.name || 'Instructor',
+            category: video.category?.name || 'Uncategorized',
+            comments_count: (video as any).comments_count || 0
+          }));
+          
+          setFeaturedCourses(remainingVideos);
+        } else {
+          // Fallback: Fetch videos sorted by views if no videos with comments
+          const fallbackResponse = await videoApi.getPublic({
+            status: 'published',
+            sort_by: 'views',
+            sort_order: 'desc',
+            per_page: 6
+          });
+          
+          const fallbackData = fallbackResponse.data?.data || fallbackResponse.data;
+          const fallbackVideos = Array.isArray(fallbackData) ? fallbackData : [];
+          
+          if (fallbackVideos.length > 0) {
+            const firstVideo = fallbackVideos[0];
+            setFeaturedCourse({
+              id: firstVideo.id,
+              title: firstVideo.title,
+              description: firstVideo.short_description || firstVideo.description || '',
+              video: firstVideo,
+              image: getImageUrl(firstVideo.thumbnail_url || firstVideo.intro_image_url || firstVideo.thumbnail || firstVideo.intro_image || cover1),
+              category: firstVideo.category?.name || 'Uncategorized',
+              duration: `${Math.floor((firstVideo.duration || 0) / 60)}m`,
+              rating: parseFloat(firstVideo.rating || '0'),
+              studentsCount: firstVideo.views || 0,
+              instructor: firstVideo.instructor?.name || 'Instructor',
+            comments_count: (firstVideo as any).comments_count || 0,
+            views: firstVideo.views || 0
+            });
+            
+            const remainingVideos = fallbackVideos.slice(1).map((video: any) => ({
+              id: video.id,
+              title: video.title,
+              video: video,
+              image: getImageUrl(video.thumbnail_url || video.intro_image_url || video.thumbnail || video.intro_image || cover1),
+              duration: `${Math.floor((video.duration || 0) / 60)}m`,
+              rating: parseFloat(video.rating || '0'),
+              studentsCount: video.views || 0,
+              instructor: video.instructor?.name || 'Instructor',
+              category: video.category?.name || 'Uncategorized',
+              comments_count: (video as any).comments_count || 0
+            }));
+            
+            setFeaturedCourses(remainingVideos);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching featured videos:', error);
+      } finally {
+        setFeaturedLoading(false);
+      }
+    };
+
+    fetchFeaturedVideos();
+  }, [locale]);
 
   // Fetch Testimonials
   useEffect(() => {
@@ -568,35 +569,75 @@ const Home = () => {
     );
   };
 
-  const SeriesCard = ({ series }: { series: any }) => (
-    <Card className="group cursor-pointer overflow-visible border-0 bg-transparent transform hover:scale-105 transition-all duration-300 hover:shadow-2xl" onClick={() => navigate(`/series/${series.id}`)}>
-      <div className="aspect-[3/2] bg-gradient-to-br from-gray-900 via-gray-800 to-gray-700 relative overflow-hidden rounded-lg shadow-lg">
-        {/* Background Image */}
-        <img
-          src={series.image}
-          alt={series.title}
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-        />
-        {/* Bottom Gradient Overlay - HBO Max Style */}
-        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/90 via-black/50 to-transparent"></div>
-        
-        {/* Series Title */}
-        <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
-          <h3 className="font-bold text-sm line-clamp-2 drop-shadow-lg group-hover:text-white transition-colors duration-300">
-            {series.title}
-          </h3>
-          {series.subtitle && (
-            <p className="text-xs text-white/80 mt-1 line-clamp-1">
-              {series.subtitle}
-            </p>
-          )}
+  // Helper to construct full URL if needed
+  const getImageUrl = (src: string) => {
+    if (!src) return cover1;
+    // If it's already a full URL or starts with /, return as is
+    if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/')) {
+      return src;
+    }
+    // If it's a relative path, construct full URL
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    return `${API_BASE_URL.replace('/api', '')}/${src.replace(/^\//, '')}`;
+  };
+
+  // Transform categories from database to courseCategories format
+  const courseCategories = categories.map((category) => {
+    // Get image from category's thumbnail or cover_image, fallback to default
+    const categoryImage = category.cover_image || category.thumbnail;
+    const imageUrl = categoryImage ? getImageUrl(categoryImage) : cover1;
+    
+    return {
+      id: category.id,
+      title: category.name,
+      image: imageUrl,
+      courseCount: (category as any).videos_count || 0,
+      description: category.description || category.short_description || '',
+      category: category.name
+    };
+  });
+
+  const SeriesCard = ({ series }: { series: any }) => {
+    const imageSrc = series.image || cover1;
+    const finalImageUrl = getImageUrl(imageSrc);
+
+    return (
+      <Card className="group cursor-pointer overflow-visible border-0 bg-transparent transform hover:scale-105 transition-all duration-300 hover:shadow-2xl" onClick={() => navigateWithLocale(`/series/${series.id}`)}>
+        <div className="aspect-[3/2] bg-gradient-to-br from-gray-900 via-gray-800 to-gray-700 relative overflow-hidden rounded-lg shadow-lg">
+          {/* Background Image */}
+          <img
+            src={finalImageUrl}
+            alt={series.title}
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+            onError={(e) => {
+              // Fallback to default cover if image fails to load
+              const target = e.target as HTMLImageElement;
+              if (target.src !== cover1) {
+                target.src = cover1;
+              }
+            }}
+          />
+          {/* Bottom Gradient Overlay - HBO Max Style */}
+          <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/90 via-black/50 to-transparent"></div>
+          
+          {/* Series Title */}
+          <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
+            <h3 className="font-bold text-sm line-clamp-2 drop-shadow-lg group-hover:text-white transition-colors duration-300">
+              {series.title}
+            </h3>
+            {series.subtitle && (
+              <p className="text-xs text-white/80 mt-1 line-clamp-1">
+                {series.subtitle}
+              </p>
+            )}
+          </div>
+          
+          {/* HBO Max Style Hover Effect */}
+          <div className="absolute inset-0 border-2 border-transparent group-hover:border-white/30 rounded-lg transition-all duration-300"></div>
         </div>
-        
-        {/* HBO Max Style Hover Effect */}
-        <div className="absolute inset-0 border-2 border-transparent group-hover:border-white/30 rounded-lg transition-all duration-300"></div>
-      </div>
-    </Card>
-  );
+      </Card>
+    );
+  };
 
   // Sample content for each category - HBO Max Style
   const sculptureSeries = [
@@ -695,7 +736,7 @@ const Home = () => {
       return (
         <section className="mb-16 lg:mb-20">
           <div className="flex items-center justify-center py-20">
-            <div className="text-gray-400 text-xl">Loading categories...</div>
+            <div className="text-gray-400 text-xl">{t('general.loading_categories')}</div>
           </div>
         </section>
       );
@@ -853,7 +894,7 @@ const Home = () => {
                     />
                   </div>
                   <p className="text-xl lg:text-2xl xl:text-3xl text-white/90 drop-shadow-lg font-light max-w-2xl mx-auto">
-                    {settingsLoading ? 'Loading...' : `${heroSettings.hero_cta_text || 'Start enjoying SACRART plans from only'} ${heroSettings.hero_price || '$9.99/month'}`}
+                    {settingsLoading ? t('common.loading') : `${heroSettings.hero_cta_text || t('hero.cta_text')} ${heroSettings.hero_price || '$9.99/month'}`}
                   </p>                 
                   </div>
 
@@ -863,9 +904,9 @@ const Home = () => {
                       <Button 
                         size="lg" 
                       className="bg-white text-black hover:bg-white/90 font-bold text-lg lg:text-xl px-12 lg:px-16 py-4 lg:py-5 rounded-md shadow-xl transition-all duration-300 hover:scale-105"
-                        onClick={() => navigate('/explore')}
+                        onClick={() => navigateWithLocale('/explore')}
                       >
-{settingsLoading ? 'Loading...' : (heroSettings.hero_cta_button_text || 'GET SACRART')}
+{settingsLoading ? t('common.loading') : (heroSettings.hero_cta_button_text || t('hero.cta_button'))}
                       </Button>
                   ) : (
                       <Button
@@ -873,7 +914,7 @@ const Home = () => {
                         size="lg"
                       className="bg-white text-black hover:bg-white/90 font-bold text-lg lg:text-xl px-12 lg:px-16 py-4 lg:py-5 rounded-md shadow-xl transition-all duration-300 hover:scale-105"
                       >
-{settingsLoading ? 'Loading...' : (heroSettings.hero_cta_button_text || 'GET SACRART')}
+{settingsLoading ? t('common.loading') : (heroSettings.hero_cta_button_text || t('hero.cta_button'))}
                       </Button>
                   )}
                 </div>
@@ -881,7 +922,7 @@ const Home = () => {
                 {/* Disclaimer */}
                 <div className="pt-8 lg:pt-12">
                   <p className="text-xs lg:text-sm text-white/70 max-w-4xl mx-auto leading-relaxed">
-                    {settingsLoading ? 'Loading...' : (heroSettings.hero_disclaimer || '*Requires subscription and the Premium add-on (its availability varies depending on the subscription provider). Automatic renewal unless canceled. Subject to Terms and Conditions. Content availability varies by plan. +18.')}
+                    {settingsLoading ? t('common.loading') : (heroSettings.hero_disclaimer || t('hero.disclaimer'))}
                   </p>
                 </div>
               </div>
@@ -891,14 +932,24 @@ const Home = () => {
       </section>
 
        {/* Course Hero Section - Two Part Layout */}
-       <CourseHeroSection
-         featuredCourse={featuredCourse}
-         courseCategories={courseCategories}
-         featuredCourses={featuredCourses}
-         onCourseClick={handleCourseClick}
-         onCategoryClick={handleCategoryClick}
-         selectedCategoryId={selectedCategoryId}
-       />
+       {featuredLoading ? (
+         <div className="py-16 lg:py-24 px-4 md:px-8 bg-[#141414]">
+           <div className="container mx-auto max-w-7xl">
+             <div className="flex items-center justify-center py-20">
+               <div className="text-gray-400 text-xl">{t('common.loading')}</div>
+             </div>
+           </div>
+         </div>
+       ) : featuredCourse ? (
+         <CourseHeroSection
+           featuredCourse={featuredCourse}
+           courseCategories={courseCategories}
+           featuredCourses={featuredCourses}
+           onCourseClick={handleCourseClick}
+           onCategoryClick={handleCategoryClick}
+           selectedCategoryId={selectedCategoryId}
+         />
+       ) : null}
 
       {/* Content Sections - HBO Max Style */}
       <div className="w-full px-4 md:px-8 lg:px-16 xl:px-24 2xl:px-32 pt-16 lg:pt-20 pb-12 lg:pb-20">
@@ -911,19 +962,19 @@ const Home = () => {
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             <div className="space-y-6">
               <h2 className="text-3xl lg:text-5xl font-bold text-white font-playfair">
-                {heroSettings.about_title || 'About SACRART'}
+                {heroSettings.about_title || t('about.title')}
               </h2>
               <p className="text-lg lg:text-xl text-gray-400 font-montserrat leading-relaxed">
-                {heroSettings.about_description || 'SACRART is the premier platform for classical and contemporary sculpting education. Our mission is to preserve and teach traditional art techniques while embracing modern innovations in the field of sculpture and restoration.'}
+                {heroSettings.about_description || t('about.description')}
               </p>
               <div className="grid grid-cols-2 gap-6 pt-4">
                 <div className="text-center">
                   <div className="text-3xl lg:text-4xl font-bold text-primary mb-2">50+</div>
-                  <div className="text-gray-400 font-montserrat">Expert Instructors</div>
+                  <div className="text-gray-400 font-montserrat">{t('about.expert_instructors')}</div>
                 </div>
                 <div className="text-center">
                   <div className="text-3xl lg:text-4xl font-bold text-primary mb-2">1000+</div>
-                  <div className="text-gray-400 font-montserrat">Master Classes</div>
+                  <div className="text-gray-400 font-montserrat">{t('about.master_classes')}</div>
                 </div>
               </div>
             </div>
@@ -948,21 +999,21 @@ const Home = () => {
         <div className="container mx-auto px-4 lg:px-8">
           <div className="text-center mb-12 lg:mb-16">
             <h2 className="text-3xl lg:text-5xl font-bold mb-4 font-playfair text-white">
-              {heroSettings.testimonial_title || 'What Our Students Say'}
+              {heroSettings.testimonial_title || t('testimonials.title')}
             </h2>
             <p className="text-lg lg:text-xl text-gray-400 max-w-3xl mx-auto font-montserrat">
-              {heroSettings.testimonial_subtitle || 'Discover how SACRART has transformed the artistic journey of our community members.'}
+              {heroSettings.testimonial_subtitle || t('testimonials.subtitle')}
             </p>
           </div>
 
           {testimonialsLoading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-gray-400">Loading testimonials...</p>
+              <p className="text-gray-400">{t('testimonials.loading')}</p>
             </div>
           ) : testimonials.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-400">No testimonials available yet.</p>
+              <p className="text-gray-400">{t('testimonials.no_testimonials')}</p>
             </div>
           ) : (
             <div className="overflow-hidden">
@@ -983,16 +1034,16 @@ const Home = () => {
                       {testimonial.user?.avatar ? (
                         <img
                           src={testimonial.user.avatar}
-                          alt={testimonial.user?.name || 'User'}
+                          alt={testimonial.user?.name || t('general.user')}
                           className="w-12 h-12 rounded-full object-cover mr-4"
                         />
                       ) : (
                         <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mr-4">
-                          <span className="text-primary font-semibold">{(testimonial.user?.name || 'U').charAt(0).toUpperCase()}</span>
+                          <span className="text-primary font-semibold">{(testimonial.user?.name || t('general.user')).charAt(0).toUpperCase()}</span>
                         </div>
                       )}
                       <div>
-                        <h4 className="text-white font-semibold font-montserrat">{testimonial.user?.name || 'Anonymous'}</h4>
+                        <h4 className="text-white font-semibold font-montserrat">{testimonial.user?.name || t('general.anonymous')}</h4>
                       </div>
                     </div>
                     <p className="text-gray-300 leading-relaxed font-montserrat mb-4">
@@ -1027,10 +1078,10 @@ const Home = () => {
         <div className="container mx-auto px-4 lg:px-8">
           <div className="text-center mb-12 lg:mb-16">
             <h2 className="text-3xl lg:text-5xl font-bold mb-4 font-playfair text-white">
-              Choose Your Plan
+              {t('plans.title')}
             </h2>
             <p className="text-lg lg:text-xl text-gray-400 max-w-3xl mx-auto font-montserrat">
-              Select the perfect plan to unlock unlimited access to our exclusive sculpting and restoration content.
+              {t('plans.subtitle')}
             </p>
           </div>
 
@@ -1038,93 +1089,93 @@ const Home = () => {
             {/* Freemium Plan */}
             <div className="bg-gray-900/50 rounded-xl p-8 lg:p-10 border border-white/10 hover:border-primary/50 transition-all duration-300 hover:shadow-2xl backdrop-blur-sm">
               <div className="text-center mb-8">
-                <h3 className="text-2xl font-bold mb-2 text-white font-montserrat">Freemium</h3>
-                <div className="text-4xl font-bold text-white mb-2 font-montserrat">Free</div>
-                <p className="text-gray-400 font-montserrat">Perfect for getting started</p>
+                <h3 className="text-2xl font-bold mb-2 text-white font-montserrat">{t('plans.freemium')}</h3>
+                <div className="text-4xl font-bold text-white mb-2 font-montserrat">{t('plans.free')}</div>
+                <p className="text-gray-400 font-montserrat">{t('plans.perfect_for_getting_started')}</p>
               </div>
               <ul className="space-y-4 mb-8">
                 <li className="flex items-center text-gray-300 font-montserrat">
                   <Check className="h-5 w-5 text-primary mr-3 flex-shrink-0" />
-                  <span>Access to basic content</span>
+                  <span>{t('features.access_basic_content')}</span>
                 </li>
                 <li className="flex items-center text-gray-300 font-montserrat">
                   <Check className="h-5 w-5 text-primary mr-3 flex-shrink-0" />
-                  <span>Community support</span>
+                  <span>{t('features.community_support')}</span>
                 </li>
                 <li className="flex items-center text-gray-300 font-montserrat">
                   <Check className="h-5 w-5 text-primary mr-3 flex-shrink-0" />
-                  <span>Mobile app access</span>
+                  <span>{t('features.mobile_app_access')}</span>
                 </li>
               </ul>
               <Button variant="outline" className="w-full bg-white/10 border-white/30 text-white hover:bg-white/20 hover:border-white font-semibold" onClick={() => navigate('/auth')}>
-                Get Started Free
+                {t('plans.get_started_free')}
               </Button>
             </div>
 
             {/* Basic Plan */}
             <div className="bg-gray-900/50 rounded-xl p-8 lg:p-10 border-2 border-primary relative hover:shadow-2xl transition-all duration-300 backdrop-blur-sm transform hover:scale-105">
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                <Badge className="bg-primary text-white px-4 py-1 font-semibold">Most Popular</Badge>
+                <Badge className="bg-primary text-white px-4 py-1 font-semibold">{t('plans.most_popular')}</Badge>
               </div>
               <div className="text-center mb-8">
-                <h3 className="text-2xl font-bold mb-2 text-white font-montserrat">Basic</h3>
-                <div className="text-4xl font-bold text-white mb-2 font-montserrat">$19<span className="text-lg text-gray-400">/month</span></div>
-                <p className="text-gray-400 font-montserrat">For art enthusiasts</p>
+                <h3 className="text-2xl font-bold mb-2 text-white font-montserrat">{t('plans.basic')}</h3>
+                <div className="text-4xl font-bold text-white mb-2 font-montserrat">$19<span className="text-lg text-gray-400">{t('plans.per_month')}</span></div>
+                <p className="text-gray-400 font-montserrat">{t('plans.for_art_enthusiasts')}</p>
               </div>
               <ul className="space-y-4 mb-8">
                 <li className="flex items-center text-gray-300 font-montserrat">
                   <Check className="h-5 w-5 text-primary mr-3 flex-shrink-0" />
-                  <span>Everything in Freemium</span>
+                  <span>{t('features.everything_in_freemium')}</span>
                 </li>
                 <li className="flex items-center text-gray-300 font-montserrat">
                   <Check className="h-5 w-5 text-primary mr-3 flex-shrink-0" />
-                  <span>Advanced techniques</span>
+                  <span>{t('features.advanced_techniques')}</span>
                 </li>
                 <li className="flex items-center text-gray-300 font-montserrat">
                   <Check className="h-5 w-5 text-primary mr-3 flex-shrink-0" />
-                  <span>Downloadable resources</span>
+                  <span>{t('features.downloadable_resources')}</span>
                 </li>
                 <li className="flex items-center text-gray-300 font-montserrat">
                   <Check className="h-5 w-5 text-primary mr-3 flex-shrink-0" />
-                  <span>Priority support</span>
+                  <span>{t('features.priority_support')}</span>
                 </li>
               </ul>
               <Button className="w-full bg-primary hover:bg-primary/90 text-white font-semibold" onClick={() => navigate('/subscription')}>
-                Start Basic Plan
+                {t('plans.start_basic_plan')}
               </Button>
             </div>
 
             {/* Premium Plan */}
             <div className="bg-gray-900/50 rounded-xl p-8 lg:p-10 border border-white/10 hover:border-primary/50 transition-all duration-300 hover:shadow-2xl backdrop-blur-sm">
               <div className="text-center mb-8">
-                <h3 className="text-2xl font-bold mb-2 text-white font-montserrat">Premium</h3>
-                <div className="text-4xl font-bold text-white mb-2 font-montserrat">$39<span className="text-lg text-gray-400">/month</span></div>
-                <p className="text-gray-400 font-montserrat">For professionals</p>
+                <h3 className="text-2xl font-bold mb-2 text-white font-montserrat">{t('plans.premium')}</h3>
+                <div className="text-4xl font-bold text-white mb-2 font-montserrat">$39<span className="text-lg text-gray-400">{t('plans.per_month')}</span></div>
+                <p className="text-gray-400 font-montserrat">{t('plans.for_professionals')}</p>
               </div>
               <ul className="space-y-4 mb-8">
                 <li className="flex items-center text-gray-300 font-montserrat">
                   <Check className="h-5 w-5 text-primary mr-3 flex-shrink-0" />
-                  <span>Everything in Basic</span>
+                  <span>{t('features.everything_in_basic')}</span>
                 </li>
                 <li className="flex items-center text-gray-300 font-montserrat">
                   <Check className="h-5 w-5 text-primary mr-3 flex-shrink-0" />
-                  <span>1-on-1 mentoring sessions</span>
+                  <span>{t('features.one_on_one_mentoring')}</span>
                 </li>
                 <li className="flex items-center text-gray-300 font-montserrat">
                   <Check className="h-5 w-5 text-primary mr-3 flex-shrink-0" />
-                  <span>Exclusive masterclasses</span>
+                  <span>{t('features.exclusive_masterclasses')}</span>
                 </li>
                 <li className="flex items-center text-gray-300 font-montserrat">
                   <Check className="h-5 w-5 text-primary mr-3 flex-shrink-0" />
-                  <span>Certification programs</span>
+                  <span>{t('features.certification_programs')}</span>
                 </li>
                 <li className="flex items-center text-gray-300 font-montserrat">
                   <Check className="h-5 w-5 text-primary mr-3 flex-shrink-0" />
-                  <span>24/7 premium support</span>
+                  <span>{t('features.premium_support_24_7')}</span>
                 </li>
               </ul>
               <Button variant="outline" className="w-full bg-white/10 border-white/30 text-white hover:bg-white/20 hover:border-white font-semibold" onClick={() => navigate('/subscription')}>
-                Go Premium
+                {t('plans.go_premium')}
               </Button>
             </div>
           </div>
@@ -1136,10 +1187,10 @@ const Home = () => {
         <div className="container mx-auto px-4 lg:px-8">
           <div className="text-center mb-12 lg:mb-16">
             <h2 className="text-3xl lg:text-5xl font-bold mb-4 font-playfair text-white">
-              Frequently Asked Questions
+              {t('faq.title')}
             </h2>
             <p className="text-lg lg:text-xl text-gray-400 max-w-3xl mx-auto font-montserrat">
-              Everything you need to know about SACRART and our content.
+              {t('faq.subtitle')}
             </p>
           </div>
 
@@ -1147,13 +1198,13 @@ const Home = () => {
             {faqLoading ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-gray-400">Loading FAQs...</p>
+                <p className="text-gray-400">{t('faq.loading')}</p>
               </div>
             ) : (
               Object.entries(faqs).map(([category, categoryFaqs]) => (
                 <div key={category} className="mb-12">
                   <h3 className="text-2xl font-bold text-white mb-6 font-playfair capitalize">
-                    {category.replace('_', ' ')} FAQs
+                    {category.replace('_', ' ')} {t('faq.faqs')}
                   </h3>
                   <div className="space-y-4">
                     {categoryFaqs.map((faq: Faq) => (

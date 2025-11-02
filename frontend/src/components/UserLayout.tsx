@@ -29,46 +29,44 @@ import {
 import logoImage from '@/assets/logo-transparente.png';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation, Trans } from 'react-i18next';
+import { useLanguage } from '@/hooks/useLanguage';
+import { useLocale } from '@/hooks/useLocale';
 
 const UserLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [language, setLanguage] = useState('EN');
   const location = useLocation();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const { currentLanguage, changeLanguage } = useLanguage();
+  const { getPathWithLocale, pathname } = useLocale();
 
   const handleLogout = async () => {
     await logout();
-    navigate('/');
+    navigate(getPathWithLocale('/'));
   };
 
-  const handleLanguageChange = (langCode: string) => {
-    setLanguage(langCode);
-    // Here you would typically implement actual language switching logic
-    // For now, we'll just update the state
-    console.log('Language changed to:', langCode);
+  const handleLanguageChange = async (langCode: string) => {
+    const locale = langCode.toLowerCase();
+    await changeLanguage(locale);
   };
 
   const menuItems = [
-    { path: '/', icon: Home, label: 'Home', exact: true },
-    { path: '/explore', icon: Search, label: 'Browse' },
-    { path: '/library', icon: Play, label: 'Continue Watching' },
-    { path: '/subscription', icon: CreditCard, label: 'Plans' },
-    { path: '/support', icon: HelpCircle, label: 'Support' },
+    { path: '/', icon: Home, label: t('common.home'), exact: true },
+    { path: '/explore', icon: Search, label: t('common.browse') },
+    { path: '/library', icon: Play, label: t('common.continue_watching') },
+    { path: '/subscription', icon: CreditCard, label: t('common.plans') },
+    { path: '/support', icon: HelpCircle, label: t('common.support') },
   ];
 
   const isActive = (path: string, exact = false) => {
+    const currentPath = pathname;
     if (exact) {
-      return location.pathname === path;
+      return currentPath === path;
     }
-    return location.pathname.startsWith(path);
+    return currentPath.startsWith(path);
   };
-
-  const languages = [
-    { code: 'EN', name: 'English', flag: '🇺🇸' },
-    { code: 'ES', name: 'Español', flag: '🇪🇸' },
-    { code: 'PT', name: 'Português', flag: '🇵🇹' },
-  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -84,7 +82,7 @@ const UserLayout = () => {
       <header className="fixed top-0 left-0 right-0 z-50 glass-nav transition-all duration-300">
         <div className="container mx-auto px-4 lg:px-8 h-16 lg:h-18 flex items-center justify-between">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-all duration-300 hover:scale-105">
+          <Link to={getPathWithLocale("/")} className="flex items-center space-x-2 hover:opacity-80 transition-all duration-300 hover:scale-105">
             <img 
               src={logoImage} 
               alt="SACRART Logo" 
@@ -100,7 +98,7 @@ const UserLayout = () => {
                 return (
                   <Link
                     key={item.path}
-                    to={item.path}
+                    to={getPathWithLocale(item.path)}
                     className={`flex items-center space-x-2 text-sm font-medium transition-all duration-300 relative group ${
                       isActive(item.path, item.exact)
                         ? 'text-white font-semibold'
@@ -125,12 +123,16 @@ const UserLayout = () => {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="flex items-center space-x-2 min-w-[60px] justify-center text-white/90 hover:text-white hover:bg-white/10">
                   <Globe className="h-4 w-4" />
-                  <span className="text-sm w-6 text-center">{language}</span>
+                  <span className="text-sm w-6 text-center">{currentLanguage.toUpperCase()}</span>
                   <ChevronDown className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-black/95 border-white/20 text-white">
-                {languages.map((lang) => (
+                {[
+                  { code: 'EN', name: 'English', flag: '🇺🇸' },
+                  { code: 'ES', name: 'Español', flag: '🇪🇸' },
+                  { code: 'PT', name: 'Português', flag: '🇵🇹' },
+                ].map((lang) => (
                   <DropdownMenuItem
                     key={lang.code}
                     onClick={() => handleLanguageChange(lang.code)}
@@ -138,7 +140,7 @@ const UserLayout = () => {
                   >
                     <span>{lang.flag}</span>
                     <span>{lang.name}</span>
-                    {language === lang.code && (
+                    {currentLanguage.toUpperCase() === lang.code && (
                       <span className="ml-auto text-primary">✓</span>
                     )}
                   </DropdownMenuItem>
@@ -149,7 +151,7 @@ const UserLayout = () => {
             {/* User Menu */}
             {user ? (
               <div className="flex items-center space-x-3">
-                <Link to="/profile">
+                <Link to={getPathWithLocale("/profile")}>
                   <Button variant="ghost" size="sm" className="flex items-center space-x-2 text-white/90 hover:text-white hover:bg-white/10">
                     <User className="h-4 w-4" />
                     <span className="hidden sm:inline">{user.name}</span>
@@ -163,12 +165,12 @@ const UserLayout = () => {
               <div className="flex items-center space-x-2">
                 <Link to="/auth">
                   <Button variant="ghost" size="sm" className="text-white/90 hover:text-white hover:bg-white/10">
-                    Login
+                    {t('common.sign_in')}
                   </Button>
                 </Link>
                 <Link to="/auth">
                   <Button size="sm" className="bg-primary hover:bg-primary/90 text-white font-semibold">
-                    Sign Up
+                    {t('auth.sign_up')}
                   </Button>
                 </Link>
               </div>
@@ -194,7 +196,7 @@ const UserLayout = () => {
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         <div className="flex items-center justify-between h-16 px-6 border-b">
-          <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+          <Link to={getPathWithLocale("/")} className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
             <img 
               src={logoImage} 
               alt="SACRART Logo" 
@@ -215,16 +217,16 @@ const UserLayout = () => {
             {menuItems.map((item) => {
               const Icon = item.icon;
               return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 relative ${
-                    isActive(item.path, item.exact)
-                      ? 'bg-primary text-primary-foreground font-semibold shadow-sm'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  }`}
-                  onClick={() => setSidebarOpen(false)}
-                >
+                  <Link
+                    key={item.path}
+                    to={getPathWithLocale(item.path)}
+                    className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 relative ${
+                      isActive(item.path, item.exact)
+                        ? 'bg-primary text-primary-foreground font-semibold shadow-sm'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    }`}
+                    onClick={() => setSidebarOpen(false)}
+                  >
                   <Icon className={`mr-3 h-5 w-5 ${isActive(item.path, item.exact) ? 'text-primary-foreground' : ''}`} />
                   {item.label}
                   {isActive(item.path, item.exact) && (
@@ -251,7 +253,7 @@ const UserLayout = () => {
               className="w-full"
             >
               <LogOut className="mr-2 h-4 w-4" />
-              Logout
+              {t('common.logout')}
             </Button>
           </div>
         )}
@@ -268,24 +270,24 @@ const UserLayout = () => {
           <div className="text-center">
             {/* Call to Action Section */}
             <div className="py-12 md:py-16">
-              <h2 className="text-2xl md:text-3xl font-bold text-white mb-3 font-montserrat">
-                Ready to start watching?
-              </h2>
-              <p className="text-base md:text-lg text-gray-400 mb-8 max-w-2xl mx-auto font-montserrat">
-                Join thousands of art enthusiasts discovering incredible sculpting and restoration content.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Link to="/explore">
-                  <Button size="lg" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white font-semibold px-8">
-                    Browse All Videos
-                  </Button>
-                </Link>
-                <Link to="/subscription">
-                  <Button variant="outline" size="lg" className="w-full sm:w-auto bg-white/10 border-white/30 text-white hover:bg-white/20 hover:border-white font-semibold px-8">
-                    View Pricing Plans
-                  </Button>
-                </Link>
-              </div>
+                  <h2 className="text-2xl md:text-3xl font-bold text-white mb-3 font-montserrat">
+                    {t('footer.ready_to_start')}
+                  </h2>
+                  <p className="text-base md:text-lg text-gray-400 mb-8 max-w-2xl mx-auto font-montserrat">
+                    {t('footer.join_description')}
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <Link to={getPathWithLocale("/explore")}>
+                      <Button size="lg" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white font-semibold px-8">
+                        {t('footer.browse_all_videos')}
+                      </Button>
+                    </Link>
+                    <Link to="/subscription">
+                      <Button variant="outline" size="lg" className="w-full sm:w-auto bg-white/10 border-white/30 text-white hover:bg-white/20 hover:border-white font-semibold px-8">
+                        {t('footer.view_pricing_plans')}
+                      </Button>
+                    </Link>
+                  </div>
             </div>
 
             {/* Social Media Icons */}
@@ -343,7 +345,11 @@ const UserLayout = () => {
 
             {/* Copyright */}
             <p className="text-sm text-gray-500 pb-8 font-montserrat">
-              © 2025 <span className="text-white font-semibold">SACRART</span> by Ana Rey. All rights reserved.
+                <Trans
+                  i18nKey="footer.copyright"
+                  values={{ name: 'SACRART' }}
+                  components={[<span key="sacrart" className="text-white font-semibold" />]}
+                />
             </p>
           </div>
         </div>

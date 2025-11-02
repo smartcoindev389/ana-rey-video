@@ -24,12 +24,14 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useLocale } from '@/hooks/useLocale';
+import { useTranslation } from 'react-i18next';
 import { categoryApi, videoApi } from '@/services/videoApi';
 import { userProgressApi } from '@/services/userProgressApi';
 import { toast } from 'sonner';
 
 const SeriesDetail = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id, locale } = useParams<{ id: string; locale?: string }>();
   const [category, setCategory] = useState<any | null>(null);
   const [videos, setVideos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +40,8 @@ const SeriesDetail = () => {
   const [isFavorite, setIsFavorite] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { navigateWithLocale } = useLocale();
+  const { t } = useTranslation();
 
   useEffect(() => {
     const fetchCategoryData = async () => {
@@ -88,7 +92,7 @@ const SeriesDetail = () => {
         
       } catch (error: any) {
         console.error('Error loading category data:', error);
-        toast.error('Failed to load category details');
+        toast.error(t('seriesDetail.failed_load_category'));
         setCategory(null);
         setVideos([]);
       } finally {
@@ -142,8 +146,8 @@ const SeriesDetail = () => {
   };
 
   const getUpgradeMessage = (videoVisibility: string) => {
-    if (videoVisibility === 'basic') return 'Upgrade to Basic or Premium';
-    if (videoVisibility === 'premium') return 'Upgrade to Premium';
+    if (videoVisibility === 'basic') return t('seriesDetail.upgrade_basic_premium');
+    if (videoVisibility === 'premium') return t('seriesDetail.upgrade_premium');
     return '';
   };
 
@@ -171,9 +175,9 @@ const SeriesDetail = () => {
   if (!category) {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
-        <h1 className="text-2xl font-bold mb-4">Category not found</h1>
-        <Button onClick={() => navigate('/explore')}>
-          Browse All Categories
+        <h1 className="text-2xl font-bold mb-4">{t('seriesDetail.category_not_found')}</h1>
+        <Button onClick={() => navigateWithLocale('/explore')}>
+          {t('seriesDetail.browse_all_categories')}
         </Button>
       </div>
     );
@@ -209,7 +213,7 @@ const SeriesDetail = () => {
             </div>
             <Button size="lg" className="flex items-center">
               <Play className="h-4 w-4 mr-2" />
-              Start Watching
+              {t('seriesDetail.start_watching')}
             </Button>
           </div>
         </div>
@@ -246,7 +250,7 @@ const SeriesDetail = () => {
                       return isNaN(num) ? '0.0' : num.toFixed(1);
                     })()}</span>
                   </div>
-                  <div className="text-sm text-muted-foreground">({category.rating_count || 0} reviews)</div>
+                  <div className="text-sm text-muted-foreground">({category.rating_count || 0} {t('seriesDetail.reviews')})</div>
                 </div>
               </div>
             </div>
@@ -255,7 +259,7 @@ const SeriesDetail = () => {
             <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
               <div className="flex items-center">
                 <Play className="h-4 w-4 mr-1" />
-                {category.video_count || 0} Episodes
+                {category.video_count || 0} {t('seriesDetail.episodes')}
               </div>
               <div className="flex items-center">
                 <Clock className="h-4 w-4 mr-1" />
@@ -263,11 +267,11 @@ const SeriesDetail = () => {
               </div>
               <div className="flex items-center">
                 <Users className="h-4 w-4 mr-1" />
-                {category.total_views || 0} Viewers
+                {category.total_views || 0} {t('seriesDetail.viewers')}
               </div>
               <div className="flex items-center">
                 <Calendar className="h-4 w-4 mr-1" />
-                Created {category.created_at ? new Date(category.created_at).toLocaleDateString() : 'N/A'}
+                {t('seriesDetail.created')} {category.created_at ? new Date(category.created_at).toLocaleDateString() : t('seriesDetail.na')}
               </div>
             </div>
           </div>
@@ -275,16 +279,16 @@ const SeriesDetail = () => {
           {/* Episodes */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold">Episodes</h2>
+              <h2 className="text-xl font-semibold">{t('seriesDetail.episodes')}</h2>
               <div className="text-sm text-muted-foreground">
-                {videos.length} episodes • {formatDuration(category.total_duration || 0)}
+                {videos.length} {t('seriesDetail.episodes_lower')} • {formatDuration(category.total_duration || 0)}
               </div>
             </div>
 
             <div className="space-y-3">
               {videosToShow.length === 0 ? (
                 <div className="text-sm text-muted-foreground text-center py-6">
-                  No episodes yet. Please check back soon.
+                  {t('seriesDetail.no_episodes')}
                 </div>
               ) : (
               videosToShow.map((video, index) => {
@@ -299,7 +303,7 @@ const SeriesDetail = () => {
                         ? 'hover:bg-muted cursor-pointer' 
                         : 'bg-muted/50 cursor-not-allowed opacity-75'
                     }`}
-                    onClick={() => hasAccess && navigate(`/video/${video.id}`)}
+                    onClick={() => hasAccess && navigateWithLocale(`/video/${video.id}`)}
                   >
                     <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted mr-4">
                       {isCompleted ? (
@@ -320,7 +324,7 @@ const SeriesDetail = () => {
                         </div>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">
-                        {video.description || 'Episode content'}
+                        {video.description || t('seriesDetail.episode_content')}
                       </p>
                     </div>
 
@@ -345,70 +349,70 @@ const SeriesDetail = () => {
           <Card className="p-6">
             <div className="space-y-4">
               <div className="text-center">
-                <div className="text-2xl font-bold mb-1">{category.visibility === 'freemium' ? 'Free' : category.visibility === 'basic' ? 'Basic Plan' : 'Premium Plan'}</div>
+                <div className="text-2xl font-bold mb-1">{category.visibility === 'freemium' ? t('seriesDetail.free') : category.visibility === 'basic' ? t('seriesDetail.basic_plan') : t('seriesDetail.premium_plan')}</div>
                 <div className="text-sm text-muted-foreground">
-                  {category.visibility === 'freemium' ? 'Always free' : 'Monthly subscription'}
+                  {category.visibility === 'freemium' ? t('seriesDetail.always_free') : t('seriesDetail.monthly_subscription')}
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Button className="w-full" size="lg">
                   <Play className="h-4 w-4 mr-2" />
-                  {user ? 'Continue Watching' : 'Start Watching'}
+                  {user ? t('seriesDetail.continue_watching') : t('seriesDetail.start_watching')}
                 </Button>
                 {!user && (
                   <Button variant="outline" className="w-full">
-                    Sign Up to Access
+                    {t('seriesDetail.sign_up_access')}
                   </Button>
                 )}
               </div>
 
               <div className="text-xs text-muted-foreground text-center">
-                30-day money-back guarantee
+                {t('seriesDetail.money_back_guarantee')}
               </div>
             </div>
           </Card>
 
           {/* Series Includes */}
           <Card className="p-6">
-            <h3 className="font-semibold mb-4">This series includes:</h3>
+            <h3 className="font-semibold mb-4">{t('seriesDetail.series_includes')}</h3>
             <div className="space-y-3 text-sm">
               <div className="flex items-center">
                 <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                {category.video_count || 0} episodes
+                {category.video_count || 0} {t('seriesDetail.episodes_lower')}
               </div>
               <div className="flex items-center">
                 <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                {formatDuration(category.total_duration || 0)} of content
+                {formatDuration(category.total_duration || 0)} {t('seriesDetail.of_content')}
               </div>
               <div className="flex items-center">
                 <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                Behind-the-scenes content
+                {t('seriesDetail.behind_scenes')}
               </div>
               <div className="flex items-center">
                 <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                HD streaming quality
+                {t('seriesDetail.hd_quality')}
               </div>
               <div className="flex items-center">
                 <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                Lifetime access
+                {t('seriesDetail.lifetime_access')}
               </div>
             </div>
           </Card>
 
           {/* Artist */}
           <Card className="p-6">
-            <h3 className="font-semibold mb-4">Featured Artist</h3>
+            <h3 className="font-semibold mb-4">{t('seriesDetail.featured_artist')}</h3>
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
                 <User className="h-6 w-6 text-primary" />
               </div>
               <div>
                 <div className="font-medium">Ana Rey</div>
-                <div className="text-sm text-muted-foreground">Master Sculptor & Artist</div>
+                <div className="text-sm text-muted-foreground">{t('seriesDetail.master_sculptor')}</div>
                 <div className="flex items-center mt-1">
                   <Star className="h-3 w-3 text-yellow-500 mr-1" />
-                  <span className="text-sm">4.9 artist rating</span>
+                  <span className="text-sm">4.9 {t('seriesDetail.artist_rating')}</span>
                 </div>
               </div>
             </div>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Services\WebpConversionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
@@ -11,6 +12,12 @@ use Illuminate\Validation\Rule;
 
 class CategoryController extends Controller
 {
+    protected $webpService;
+
+    public function __construct(WebpConversionService $webpService)
+    {
+        $this->webpService = $webpService;
+    }
     /**
      * Display a listing of categories.
      */
@@ -64,8 +71,26 @@ class CategoryController extends Controller
             'description' => 'nullable|string',
             'color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'icon' => 'nullable|string|max:255',
+            'image_file' => 'nullable|file|image|mimes:jpeg,png,jpg,webp,gif|max:10240',
+            'image' => 'nullable|string|max:255',
             'sort_order' => 'nullable|integer|min:0',
         ]);
+
+        // Handle image file upload
+        if ($request->hasFile('image_file')) {
+            try {
+                $imageUploadResult = $this->webpService->convertToWebP(
+                    $request->file('image_file'),
+                    'data_section/image'
+                );
+                $validated['image'] = $imageUploadResult['path'];
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to upload category image: ' . $e->getMessage(),
+                ], 500);
+            }
+        }
 
         // Generate slug if not provided
         $validated['slug'] = Str::slug($validated['name']);
@@ -112,9 +137,29 @@ class CategoryController extends Controller
             'description' => 'nullable|string',
             'color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'icon' => 'nullable|string|max:255',
+            'image_file' => 'nullable|file|image|mimes:jpeg,png,jpg,webp,gif|max:10240',
+            'image' => 'nullable|string|max:255',
             'is_active' => 'nullable|boolean',
+            'status' => 'nullable|in:draft,published,archived',
+            'visibility' => 'nullable|in:freemium,basic,premium',
             'sort_order' => 'nullable|integer|min:0',
         ]);
+
+        // Handle image file upload
+        if ($request->hasFile('image_file')) {
+            try {
+                $imageUploadResult = $this->webpService->convertToWebP(
+                    $request->file('image_file'),
+                    'data_section/image'
+                );
+                $validated['image'] = $imageUploadResult['path'];
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to upload category image: ' . $e->getMessage(),
+                ], 500);
+            }
+        }
 
         // Update slug if name changed
         if ($category->name !== $validated['name']) {

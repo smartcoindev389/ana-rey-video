@@ -20,12 +20,19 @@ export interface VideoComment {
   replies?: VideoComment[];
 }
 
+// Helper function to get locale from localStorage or default to 'en'
+const getLocale = (): string => {
+  return localStorage.getItem('i18nextLng') || 'en';
+};
+
 // Helper function to get auth headers
 const getAuthHeaders = (): HeadersInit => {
   const token = localStorage.getItem('auth_token');
+  const locale = getLocale();
   return {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
+    'Accept-Language': locale,
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
   };
 };

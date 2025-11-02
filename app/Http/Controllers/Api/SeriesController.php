@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Services\WebpConversionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
@@ -12,6 +13,12 @@ use Illuminate\Support\Facades\Auth;
 
 class SeriesController extends Controller
 {
+    protected $webpService;
+
+    public function __construct(WebpConversionService $webpService)
+    {
+        $this->webpService = $webpService;
+    }
     /**
      * Display a listing of series (using categories table).
      */
@@ -85,6 +92,8 @@ class SeriesController extends Controller
             'short_description' => 'nullable|string',
             'color' => 'nullable|string|max:7',
             'icon' => 'nullable|string|max:255',
+            'image_file' => 'nullable|file|image|mimes:jpeg,png,jpg,webp,gif|max:10240',
+            'image' => 'nullable|string|max:255',
             'is_active' => 'nullable|boolean',
             'status' => 'nullable|in:draft,published,archived',
             'visibility' => 'nullable|in:freemium,basic,premium',
@@ -101,6 +110,22 @@ class SeriesController extends Controller
             'featured_until' => 'nullable|date',
             'tags' => 'nullable|json',
         ]);
+
+        // Handle image file upload
+        if ($request->hasFile('image_file')) {
+            try {
+                $imageUploadResult = $this->webpService->convertToWebP(
+                    $request->file('image_file'),
+                    'data_section/image'
+                );
+                $validated['image'] = $imageUploadResult['path'];
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to upload category image: ' . $e->getMessage(),
+                ], 500);
+            }
+        }
 
         // Map title to name if name is not provided (for frontend compatibility)
         if (!isset($validated['name']) && isset($validated['title'])) {
@@ -179,6 +204,8 @@ class SeriesController extends Controller
             'short_description' => 'nullable|string',
             'color' => 'nullable|string|max:7',
             'icon' => 'nullable|string|max:255',
+            'image_file' => 'nullable|file|image|mimes:jpeg,png,jpg,webp,gif|max:10240',
+            'image' => 'nullable|string|max:255',
             'is_active' => 'nullable|boolean',
             'status' => 'nullable|in:draft,published,archived',
             'visibility' => 'nullable|in:freemium,basic,premium',
@@ -195,6 +222,22 @@ class SeriesController extends Controller
             'featured_until' => 'nullable|date',
             'tags' => 'nullable|json',
         ]);
+
+        // Handle image file upload
+        if ($request->hasFile('image_file')) {
+            try {
+                $imageUploadResult = $this->webpService->convertToWebP(
+                    $request->file('image_file'),
+                    'data_section/image'
+                );
+                $validated['image'] = $imageUploadResult['path'];
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to upload category image: ' . $e->getMessage(),
+                ], 500);
+            }
+        }
         
         // Map title to name if name is not provided (for frontend compatibility)
         if (!isset($validated['name']) && isset($validated['title'])) {

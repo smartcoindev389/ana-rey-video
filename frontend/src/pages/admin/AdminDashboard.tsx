@@ -19,13 +19,18 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { analyticsApi } from '@/services/analyticsApi';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
+import { useLocale } from '@/hooks/useLocale';
 
 const AdminDashboard = () => {
+  const { t } = useTranslation();
+  const { getPathWithLocale } = useLocale();
   const [overview, setOverview] = useState<any>(null);
   const [subscriptionStats, setSubscriptionStats] = useState<any>(null);
   const [topVideos, setTopVideos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { locale } = useLocale();
 
   useEffect(() => {
     const fetchAnalytics = async () => {
@@ -56,7 +61,7 @@ const AdminDashboard = () => {
     };
 
     fetchAnalytics();
-  }, []);
+  }, [locale]); // Refetch when locale changes
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -75,8 +80,8 @@ const AdminDashboard = () => {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Loading analytics...</p>
+          <h1 className="text-3xl font-bold">{t('admin.dashboard')}</h1>
+          <p className="text-muted-foreground">{t('admin.loading_analytics')}</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(6)].map((_, i) => (
@@ -97,52 +102,52 @@ const AdminDashboard = () => {
 
   const stats = [
     {
-      title: 'Total Users',
+      title: t('admin.total_users'),
       value: formatNumber(overview.total_users || 0),
       change: overview.user_growth_percentage ? `${overview.user_growth_percentage > 0 ? '+' : ''}${overview.user_growth_percentage}%` : 'N/A',
       changeType: (overview.user_growth_percentage || 0) >= 0 ? 'positive' as const : 'negative' as const,
       icon: Users,
-      description: 'From last month'
+      description: t('admin.from_last_month')
     },
     {
-      title: 'Active Subscriptions',
+      title: t('admin.active_subscriptions'),
       value: formatNumber(overview.active_subscriptions || 0),
       change: 'N/A',
       changeType: 'positive' as const,
       icon: UserCheck,
-      description: 'Currently active'
+      description: t('admin.currently_active')
     },
     {
-      title: 'Total Revenue',
+      title: t('admin.total_revenue'),
       value: formatCurrency(overview.total_revenue || 0),
       change: overview.revenue_growth_percentage ? `${overview.revenue_growth_percentage > 0 ? '+' : ''}${overview.revenue_growth_percentage}%` : 'N/A',
       changeType: (overview.revenue_growth_percentage || 0) >= 0 ? 'positive' as const : 'negative' as const,
       icon: DollarSign,
-      description: 'This month'
+      description: t('admin.this_month')
     },
     {
-      title: 'Video Views',
+      title: t('admin.video_views'),
       value: formatNumber(overview.total_views || 0),
       change: 'N/A',
       changeType: 'positive' as const,
       icon: Eye,
-      description: 'All time'
+      description: t('admin.all_time')
     },
     {
-      title: 'Total Videos',
+      title: t('admin.total_videos'),
       value: formatNumber(overview.total_videos || 0),
       change: 'N/A',
       changeType: 'positive' as const,
       icon: Video,
-      description: 'Content library'
+      description: t('admin.content_library')
     },
     {
-      title: 'Total Categories',
+      title: t('admin.total_categories'),
       value: formatNumber(overview.total_categories || 0),
       change: 'N/A',
       changeType: 'positive' as const,
       icon: Star,
-      description: 'Content categories'
+      description: t('admin.content_categories')
     }
   ];
 
@@ -172,8 +177,8 @@ const AdminDashboard = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Overview of your platform performance</p>
+          <h1 className="text-3xl font-bold">{t('admin.dashboard')}</h1>
+          <p className="text-muted-foreground">{t('admin.overview_performance')}</p>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline" size="sm">
@@ -319,7 +324,7 @@ const AdminDashboard = () => {
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold">Recent Activity</h3>
-            <Button variant="outline" size="sm">View All</Button>
+            <Button variant="outline" size="sm">{t('admin.dashboard_view_all')}</Button>
           </div>
           <div className="space-y-4">
             {recentActivities.map((activity, index) => (
@@ -338,7 +343,7 @@ const AdminDashboard = () => {
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold">Top Performing Videos</h3>
-            <Button variant="outline" size="sm">View All</Button>
+            <Button variant="outline" size="sm">{t('admin.dashboard_view_all')}</Button>
           </div>
           <div className="space-y-4">
             {topVideos.length > 0 ? (
@@ -374,23 +379,23 @@ const AdminDashboard = () => {
 
       {/* Quick Actions */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
+        <h3 className="text-lg font-semibold mb-4">{t('admin.dashboard_quick_actions')}</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/admin/users')}>
+          <Button variant="outline" className="h-20 flex-col" onClick={() => navigate(getPathWithLocale('/admin/users'))}>
             <Users className="h-6 w-6 mb-2" />
-            <span className="text-sm">Add User</span>
+            <span className="text-sm">{t('admin.dashboard_add_user')}</span>
           </Button>
-          <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/admin/content')}>
+          <Button variant="outline" className="h-20 flex-col" onClick={() => navigate(getPathWithLocale('/admin/content'))}>
             <Video className="h-6 w-6 mb-2" />
-            <span className="text-sm">Upload Video</span>
+            <span className="text-sm">{t('admin.dashboard_upload_video')}</span>
           </Button>
-          <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/admin/plans')}>
+          <Button variant="outline" className="h-20 flex-col" onClick={() => navigate(getPathWithLocale('/admin/plans'))}>
             <CreditCard className="h-6 w-6 mb-2" />
-            <span className="text-sm">Create Plan</span>
+            <span className="text-sm">{t('admin.dashboard_create_plan')}</span>
           </Button>
-          <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/admin/coupons')}>
+          <Button variant="outline" className="h-20 flex-col" onClick={() => navigate(getPathWithLocale('/admin/coupons'))}>
             <Gift className="h-6 w-6 mb-2" />
-            <span className="text-sm">Add Coupon</span>
+            <span className="text-sm">{t('admin.dashboard_add_coupon')}</span>
           </Button>
         </div>
       </Card>

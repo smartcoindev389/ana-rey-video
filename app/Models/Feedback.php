@@ -5,9 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\Video;
+use App\Traits\HasTranslations;
 
 class Feedback extends Model
 {
+    use HasTranslations;
     protected $fillable = [
         'user_id',
         'video_id',
@@ -159,5 +161,28 @@ class Feedback extends Model
     public function scopeUrgent($query)
     {
         return $query->where('priority', 'urgent');
+    }
+
+    /**
+     * Get translatable fields for this model
+     */
+    protected function getTranslatableFields(): array
+    {
+        return ['description'];
+    }
+
+    /**
+     * Get description in current locale
+     */
+    public function getDescriptionAttribute($value): ?string
+    {
+        $locale = app()->getLocale();
+        if ($locale === 'en') {
+            return $value;
+        }
+        // Use raw attribute to avoid recursion
+        $rawValue = $this->attributes['description'] ?? $value;
+        $translation = $this->getTranslation('description', $locale);
+        return $translation ?: $rawValue;
     }
 }

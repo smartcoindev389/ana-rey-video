@@ -17,6 +17,13 @@ interface CourseHeroSectionProps {
     price: string;
     isFree: boolean;
     badge?: string;
+    video?: {
+      video_url_full?: string;
+      thumbnail_url?: string;
+      intro_image_url?: string;
+      thumbnail?: string;
+      intro_image?: string;
+    };
   };
   courseCategories: Array<{
     id: number;
@@ -35,6 +42,13 @@ interface CourseHeroSectionProps {
     studentsCount: number;
     instructor: string;
     category: string;
+    video?: {
+      video_url_full?: string;
+      thumbnail_url?: string;
+      intro_image_url?: string;
+      thumbnail?: string;
+      intro_image?: string;
+    };
   }>;
   onCourseClick: (courseId: number) => void;
   onCategoryClick: (categoryId: number) => void;
@@ -198,15 +212,71 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
             </h1>
           </div>
           
-          {/* Right Side - Featured Course Image */}
+          {/* Right Side - Featured Course Video Preview */}
           <div className="relative">
-            <div className="aspect-[16/10] rounded-lg overflow-hidden shadow-2xl">
-              <img
-                src={featuredCourse.image}
-                alt={featuredCourse.title}
-                className="w-full h-full object-cover"
-              />
+            <div className="aspect-[16/10] rounded-lg overflow-hidden shadow-2xl group">
+              {featuredCourse.video?.video_url_full ? (
+                <>
+                  {/* Always show image as poster */}
+                  <img
+                    src={featuredCourse.image || featuredCourse.video?.thumbnail_url || featuredCourse.video?.intro_image_url || featuredCourse.video?.thumbnail || featuredCourse.video?.intro_image}
+                    alt={featuredCourse.title}
+                    className="w-full h-full object-cover absolute inset-0"
+                    onError={(e) => {
+                      // If image fails, try to construct URL from relative path
+                      const target = e.target as HTMLImageElement;
+                      const src = target.src;
+                      if (!src.startsWith('http') && !src.startsWith('/')) {
+                        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+                        target.src = `${API_BASE_URL.replace('/api', '')}/storage/${src}`;
+                      }
+                    }}
+                  />
+                  {/* Video overlay - plays on hover for 15 seconds */}
+                  <video
+                    src={featuredCourse.video.video_url_full}
+                    className="w-full h-full object-cover absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                    muted
+                    playsInline
+                    preload="metadata"
+                    onMouseEnter={(e) => {
+                      const video = e.currentTarget;
+                      video.currentTime = 0;
+                      video.play().catch(() => {});
+                      // Pause after 15 seconds or at video end, whichever comes first
+                      setTimeout(() => {
+                        if (video.currentTime < 15) {
+                          video.pause();
+                        }
+                      }, 15000);
+                    }}
+                    onMouseLeave={(e) => {
+                      const video = e.currentTarget;
+                      video.pause();
+                      video.currentTime = 0;
+                    }}
+                    onTimeUpdate={(e) => {
+                      // Pause when reaching 15 seconds
+                      if (e.currentTarget.currentTime >= 15) {
+                        e.currentTarget.pause();
+                      }
+                    }}
+                  />
+                </>
+              ) : (
+                <img
+                  src={featuredCourse.image}
+                  alt={featuredCourse.title}
+                  className="w-full h-full object-cover"
+                />
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+              {/* Play Button Overlay */}
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                <div className="bg-white/20 backdrop-blur-sm rounded-full p-4">
+                  <Play className="w-12 h-12 text-white fill-white ml-1" />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -315,45 +385,110 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
                 ref={coursesCarouselRef}
                 className={`flex space-x-8 overflow-x-auto hide-scrollbar py-4 ${shouldCenterCourses ? 'justify-center' : ''}`}
               >
-                {featuredCourses.map((course) => (
-                  <div
-                    key={course.id}
-                    onClick={() => onCourseClick(course.id)}
-                    className="group cursor-pointer transition-all duration-300 hover:scale-105 flex-shrink-0 w-56 md:w-64 lg:w-72"
-                  >
-                    <div className="aspect-[3/4] rounded-xl overflow-hidden shadow-2xl relative">
-                      <img
-                        src={course.image}
-                        alt={course.title}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                      
-                      {/* Course Info */}
-                      <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                        <div className="flex items-center justify-between mb-3">
-                          <Badge variant="secondary" className="bg-blue-600/80 text-white border-0 px-3 py-1 text-sm font-semibold">
-                            {course.category}
-                          </Badge>
-                          <div className="flex items-center space-x-1 text-sm">
-                            <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                            <span className="font-semibold">{course.rating}</span>
+                {featuredCourses.map((course) => {
+                  const CourseCardPreview = () => {
+                    const videoRef = useRef<HTMLVideoElement>(null);
+                    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+                    const handleMouseEnter = () => {
+                      if (videoRef.current && course.video?.video_url_full) {
+                        const video = videoRef.current;
+                        video.currentTime = 0;
+                        video.play().catch(() => {});
+                        
+                        // Clear any existing timeout
+                        if (timeoutRef.current) {
+                          clearTimeout(timeoutRef.current);
+                        }
+                        
+                        // Set timeout to pause after 15 seconds
+                        timeoutRef.current = setTimeout(() => {
+                          if (video && !video.paused) {
+                            video.pause();
+                          }
+                        }, 15000);
+                      }
+                    };
+
+                    const handleMouseLeave = () => {
+                      if (videoRef.current) {
+                        const video = videoRef.current;
+                        video.pause();
+                        video.currentTime = 0;
+                        
+                        // Clear timeout if mouse leaves before 15 seconds
+                        if (timeoutRef.current) {
+                          clearTimeout(timeoutRef.current);
+                          timeoutRef.current = null;
+                        }
+                      }
+                    };
+
+                    return (
+                      <div
+                        className="group transition-all duration-300 hover:scale-105 flex-shrink-0 w-56 md:w-64 lg:w-72"
+                        onMouseEnter={handleMouseEnter}
+                        onMouseLeave={handleMouseLeave}
+                      >
+                        <div className="aspect-[3/4] rounded-xl overflow-hidden shadow-2xl relative group/card">
+                          {/* Video - Always visible (shows first frame), plays on hover */}
+                          {course.video?.video_url_full && (
+                            <video
+                              ref={videoRef}
+                              src={course.video.video_url_full}
+                              poster={course.image || course.video?.thumbnail_url || course.video?.intro_image_url || course.video?.thumbnail || course.video?.intro_image}
+                              className="absolute inset-0 w-full h-full object-cover"
+                              muted
+                              playsInline
+                              preload="auto"
+                              onLoadedData={(e) => {
+                                // Ensure first frame is shown (like playing state)
+                                e.currentTarget.currentTime = 0.1;
+                                e.currentTarget.pause();
+                              }}
+                              onTimeUpdate={(e) => {
+                                // Pause when reaching 15 seconds
+                                if (e.currentTarget.currentTime >= 15) {
+                                  e.currentTarget.pause();
+                                  if (timeoutRef.current) {
+                                    clearTimeout(timeoutRef.current);
+                                    timeoutRef.current = null;
+                                  }
+                                }
+                              }}
+                            />
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                          
+                          {/* Course Info */}
+                          <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                            <div className="flex items-center justify-between mb-3">
+                              <Badge variant="secondary" className="bg-blue-600/80 text-white border-0 px-3 py-1 text-sm font-semibold">
+                                {course.category}
+                              </Badge>
+                              <div className="flex items-center space-x-1 text-sm">
+                                <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                                <span className="font-semibold">{course.rating}</span>
+                              </div>
+                            </div>
+                            <h3 className="font-bold text-xl md:text-2xl mb-2 group-hover:text-white transition-colors line-clamp-2">
+                              {course.title}
+                            </h3>
+                            <div className="flex items-center justify-between text-sm text-gray-300">
+                              <span className="font-medium">{course.instructor}</span>
+                              <span className="font-medium">{course.duration}</span>
+                            </div>
                           </div>
-                        </div>
-                        <h3 className="font-bold text-xl md:text-2xl mb-2 group-hover:text-white transition-colors line-clamp-2">
-                          {course.title}
-                        </h3>
-                        <div className="flex items-center justify-between text-sm text-gray-300">
-                          <span className="font-medium">{course.instructor}</span>
-                          <span className="font-medium">{course.duration}</span>
+                          
+                          {/* Hover Effect */}
+                          {/* <div className="absolute inset-0 border-2 border-transparent group-hover:border-white/30 rounded-xl transition-all duration-300" /> */}
                         </div>
                       </div>
-                      
-                      {/* Hover Effect */}
-                      <div className="absolute inset-0 border-2 border-transparent group-hover:border-white/30 rounded-xl transition-all duration-300" />
-                    </div>
-                  </div>
-                ))}
+                    );
+                  };
+
+                  return <CourseCardPreview key={course.id} />;
+                })}
               </div>
               
               {/* Right Arrow */}

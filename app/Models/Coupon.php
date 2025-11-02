@@ -5,9 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Carbon\Carbon;
+use App\Traits\HasTranslations;
 
 class Coupon extends Model
 {
+    use HasTranslations;
     protected $fillable = [
         'code',
         'name',
@@ -201,5 +203,43 @@ class Coupon extends Model
     public function scopeExpired($query)
     {
         return $query->where('valid_until', '<', now());
+    }
+
+    /**
+     * Get translatable fields for this model
+     */
+    protected function getTranslatableFields(): array
+    {
+        return ['name', 'description'];
+    }
+
+    /**
+     * Get name attribute with translation
+     */
+    public function getNameAttribute($value): ?string
+    {
+        $locale = app()->getLocale();
+        if ($locale === 'en') {
+            return $value;
+        }
+        // Use raw attribute to avoid recursion
+        $rawValue = $this->attributes['name'] ?? $value;
+        $translation = $this->getTranslation('name', $locale);
+        return $translation ?: $rawValue;
+    }
+
+    /**
+     * Get description attribute with translation
+     */
+    public function getDescriptionAttribute($value): ?string
+    {
+        $locale = app()->getLocale();
+        if ($locale === 'en') {
+            return $value;
+        }
+        // Use raw attribute to avoid recursion
+        $rawValue = $this->attributes['description'] ?? $value;
+        $translation = $this->getTranslation('description', $locale);
+        return $translation ?: $rawValue;
     }
 }

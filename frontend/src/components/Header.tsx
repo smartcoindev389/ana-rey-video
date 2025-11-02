@@ -1,17 +1,20 @@
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useLanguage } from "@/hooks/useLanguage";
+import { useLocale } from "@/hooks/useLocale";
 import logoTransparente from "@/assets/logo-transparente.png";
 
 const Header = () => {
   const navigate = useNavigate();
-  const [selectedLanguage, setSelectedLanguage] = useState("EN");
+  const { t } = useTranslation();
+  const { currentLanguage, changeLanguage } = useLanguage();
+  const { getPathWithLocale } = useLocale();
 
-  const handleLanguageChange = (language: string) => {
-    setSelectedLanguage(language);
-    // Here you would typically implement language switching logic
-    console.log("Language changed to:", language);
+  const handleLanguageChange = async (language: string) => {
+    const locale = language.toLowerCase();
+    await changeLanguage(locale);
   };
 
   return (
@@ -22,24 +25,24 @@ const Header = () => {
             src={logoTransparente} 
             alt="SACRART" 
             className="h-12 md:h-14 w-auto cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => navigate("/")}
+            onClick={() => navigate(getPathWithLocale("/"))}
           />
           
           <nav className="hidden md:flex items-center gap-6">
-            <a href="/" className="text-sm font-medium text-white/90 hover:text-white transition-colors font-montserrat hover:scale-105 duration-300">
-              Home
+            <a href={getPathWithLocale("/")} className="text-sm font-medium text-white/90 hover:text-white transition-colors font-montserrat hover:scale-105 duration-300">
+              {t('common.home')}
             </a>
             <a href="#series" className="text-sm font-medium text-white/90 hover:text-white transition-colors font-montserrat hover:scale-105 duration-300">
-              Series
+              {t('general.series')}
             </a>
             <a href="#pricing" className="text-sm font-medium text-white/90 hover:text-white transition-colors font-montserrat hover:scale-105 duration-300">
-              Plans
+              {t('common.plans')}
             </a>
           </nav>
         </div>
 
         <div className="flex items-center gap-3">
-          <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
+          <Select value={currentLanguage.toUpperCase()} onValueChange={handleLanguageChange}>
             <SelectTrigger className="w-16 h-8 bg-transparent border-white/20 text-white font-montserrat text-sm hover:border-white/40 transition-colors">
               <SelectValue />
             </SelectTrigger>
@@ -63,13 +66,13 @@ const Header = () => {
             onClick={() => navigate("/auth")}
             className="text-white/90 hover:text-white hover:bg-white/10 font-montserrat transition-all duration-300"
           >
-            Sign In
+            {t('common.sign_in')}
           </Button>
           <Button 
             onClick={() => navigate("/auth")}
             className="bg-primary hover:bg-primary/90 text-white font-semibold px-6 transition-all duration-300 hover:scale-105 shadow-lg"
           >
-            Get Started
+            {t('common.get_started')}
           </Button>
         </div>
       </div>

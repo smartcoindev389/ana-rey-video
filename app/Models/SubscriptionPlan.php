@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Traits\HasTranslations;
 
 class SubscriptionPlan extends Model
 {
+    use HasTranslations;
     protected $fillable = [
         'name',
         'display_name',
@@ -64,5 +66,43 @@ class SubscriptionPlan extends Model
     public function scopeOrdered($query)
     {
         return $query->orderBy('sort_order');
+    }
+
+    /**
+     * Get translatable fields for this model
+     */
+    protected function getTranslatableFields(): array
+    {
+        return ['display_name', 'description'];
+    }
+
+    /**
+     * Get display name attribute with translation
+     */
+    public function getDisplayNameAttribute($value): ?string
+    {
+        $locale = app()->getLocale();
+        if ($locale === 'en') {
+            return $value;
+        }
+        // Use raw attribute to avoid recursion
+        $rawValue = $this->attributes['display_name'] ?? $value;
+        $translation = $this->getTranslation('display_name', $locale);
+        return $translation ?: $rawValue;
+    }
+
+    /**
+     * Get description attribute with translation
+     */
+    public function getDescriptionAttribute($value): ?string
+    {
+        $locale = app()->getLocale();
+        if ($locale === 'en') {
+            return $value;
+        }
+        // Use raw attribute to avoid recursion
+        $rawValue = $this->attributes['description'] ?? $value;
+        $translation = $this->getTranslation('description', $locale);
+        return $translation ?: $rawValue;
     }
 }

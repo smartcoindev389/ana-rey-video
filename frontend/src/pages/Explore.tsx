@@ -36,6 +36,8 @@ import { videoApi, Video } from '@/services/videoApi';
 import { userProgressApi } from '@/services/userProgressApi';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
+import { useLocale } from '@/hooks/useLocale';
 import { toast } from 'sonner';
 
 const Explore = () => {
@@ -54,6 +56,8 @@ const Explore = () => {
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useTranslation();
+  const { navigateWithLocale } = useLocale();
 
   useEffect(() => {
     // Fetch from backend API
@@ -237,16 +241,16 @@ const Explore = () => {
   const durations = ['all', 'short', 'medium', 'long'];
   const ratings = ['all', 'high', 'medium', 'low'];
   const sortOptions = [
-    { value: 'popular', label: 'Most Popular' },
-    { value: 'newest', label: 'Newest First' },
-    { value: 'oldest', label: 'Oldest First' },
-    { value: 'title', label: 'Alphabetical' },
-    { value: 'rating', label: 'Highest Rated' },
-    { value: 'duration', label: 'Duration' }
+    { value: 'popular', label: t('explore.popular') },
+    { value: 'newest', label: t('explore.newest') },
+    { value: 'oldest', label: t('explore.oldest') },
+    { value: 'title', label: t('explore.title_sort') },
+    { value: 'rating', label: t('explore.rating') },
+    { value: 'duration', label: t('explore.duration') }
   ];
 
   const GridCard = ({ item }: { item: Video }) => (
-    <Card className="group cursor-pointer overflow-visible streaming-card border-0 bg-transparent transform hover:scale-105 transition-all duration-300 hover:shadow-2xl hover:z-50" onClick={() => navigate(`/video/${item.id}`)}>
+    <Card className="group cursor-pointer overflow-visible streaming-card border-0 bg-transparent transform hover:scale-105 transition-all duration-300 hover:shadow-2xl hover:z-50" onClick={() => navigateWithLocale(`/video/${item.id}`)}>
       <div className="aspect-video bg-gradient-to-br from-gray-900 via-gray-800 to-gray-700 relative rounded-md overflow-hidden">
         {/* Background with scale effect */}
         <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-700 to-gray-600 transition-transform duration-500"></div>
@@ -295,7 +299,7 @@ const Explore = () => {
               onClick={async (e) => { 
                 e.stopPropagation();
                 if (!user) {
-                  toast.error('Please sign in to add favorites');
+                  toast.error(t('video.please_sign_in_favorites'));
                   return;
                 }
                 try {
@@ -309,10 +313,10 @@ const Explore = () => {
                       newFavorites.delete(item.id);
                     }
                     setFavorites(newFavorites);
-                    toast.success(isFavoriteNow ? 'Added to favorites' : 'Removed from favorites');
+                    toast.success(isFavoriteNow ? t('video.added_to_favorites') : t('video.removed_from_favorites'));
                   }
                 } catch (error: any) {
-                  toast.error(error.message || 'Failed to update favorites');
+                  toast.error(error.message || t('video.failed_update_favorites'));
                 }
               }}
             >
@@ -320,7 +324,7 @@ const Explore = () => {
             </button>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{item.short_description || item.description || 'No description'}</p>
+        <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{item.short_description || item.description || t('explore.no_description')}</p>
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center">
             <Clock className="h-3 w-3 mr-1" />
@@ -336,7 +340,7 @@ const Explore = () => {
   );
 
   const ListCard = ({ item }: { item: Video }) => (
-    <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/video/${item.id}`)}>
+    <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigateWithLocale(`/video/${item.id}`)}>
       <div className="flex">
         <div className="w-48 aspect-video bg-gradient-to-br from-primary/20 to-primary/5 relative">
           <div className="absolute inset-0 flex items-center justify-center">
@@ -350,7 +354,7 @@ const Explore = () => {
             <h3 className="font-semibold text-lg">{item.title}</h3>
             {getVisibilityBadge(item.visibility)}
           </div>
-          <p className="text-muted-foreground mb-4 line-clamp-2">{item.short_description || item.description || 'No description'}</p>
+          <p className="text-muted-foreground mb-4 line-clamp-2">{item.short_description || item.description || t('explore.no_description')}</p>
           <div className="flex items-center space-x-6 text-sm text-muted-foreground">
             <div className="flex items-center">
               <Clock className="h-4 w-4 mr-1" />
@@ -358,12 +362,12 @@ const Explore = () => {
             </div>
             <div className="flex items-center">
               <Eye className="h-4 w-4 mr-1" />
-              {item.views || 0} views
+              {item.views || 0} {t('explore.views')}
             </div>
             {item.rating && parseFloat(item.rating) > 0 && (
               <div className="flex items-center">
                 <Star className="h-4 w-4 mr-1" />
-                {parseFloat(item.rating).toFixed(1)} rating
+                {parseFloat(item.rating).toFixed(1)} {t('explore.rating_label')}
               </div>
             )}
           </div>
@@ -396,8 +400,8 @@ const Explore = () => {
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Browse Collection</h1>
-        <p className="text-muted-foreground">Discover incredible art and sculpting videos from master craftspeople</p>
+        <h1 className="text-3xl font-bold mb-2">{t('explore.title')}</h1>
+        <p className="text-muted-foreground">{t('explore.subtitle')}</p>
       </div>
 
       {/* Quick Filter Buttons */}
@@ -409,7 +413,7 @@ const Explore = () => {
             onClick={() => setSelectedCategory('all')}
           >
             <Sparkles className="h-4 w-4 mr-1" />
-            All Videos
+            {t('explore.all_videos')}
           </Button>
           <Button
             variant={selectedCategory === 'sculpting' ? 'default' : 'outline'}
@@ -417,7 +421,7 @@ const Explore = () => {
             onClick={() => setSelectedCategory('sculpting')}
           >
             <Target className="h-4 w-4 mr-1" />
-            Sculpting
+            {t('explore.sculpting')}
           </Button>
           <Button
             variant={selectedCategory === 'restoration' ? 'default' : 'outline'}
@@ -425,7 +429,7 @@ const Explore = () => {
             onClick={() => setSelectedCategory('restoration')}
           >
             <Award className="h-4 w-4 mr-1" />
-            Restoration
+            {t('explore.restoration')}
           </Button>
           <Button
             variant={selectedVisibility === 'freemium' ? 'default' : 'outline'}
@@ -433,7 +437,7 @@ const Explore = () => {
             onClick={() => setSelectedVisibility('freemium')}
           >
             <Zap className="h-4 w-4 mr-1" />
-            Free Content
+            {t('explore.free_content')}
           </Button>
           <Button
             variant={selectedSort === 'popular' ? 'default' : 'outline'}
@@ -441,7 +445,7 @@ const Explore = () => {
             onClick={() => setSelectedSort('popular')}
           >
             <TrendingUp className="h-4 w-4 mr-1" />
-            Trending
+            {t('explore.trending')}
           </Button>
         </div>
       </div>
@@ -452,7 +456,7 @@ const Explore = () => {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
-            placeholder="Search videos, artists, or techniques..."
+            placeholder={t('explore.search_placeholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -463,10 +467,10 @@ const Explore = () => {
         <div className="flex flex-wrap gap-4">
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
             <SelectTrigger className="w-48">
-              <SelectValue placeholder="Category" />
+              <SelectValue placeholder={t('explore.category')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
+              <SelectItem value="all">{t('explore.all_categories')}</SelectItem>
               {categories.slice(1).map((category) => (
                 <SelectItem key={category} value={category}>
                   {category.charAt(0).toUpperCase() + category.slice(1).replace('-', ' ')}
@@ -477,19 +481,19 @@ const Explore = () => {
 
           <Select value={selectedVisibility} onValueChange={setSelectedVisibility}>
             <SelectTrigger className="w-48">
-              <SelectValue placeholder="Access Level" />
+              <SelectValue placeholder={t('explore.access_level')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Access Levels</SelectItem>
-              <SelectItem value="freemium">Free</SelectItem>
-              <SelectItem value="basic">Basic</SelectItem>
-              <SelectItem value="premium">Premium</SelectItem>
+              <SelectItem value="all">{t('explore.all_access_levels')}</SelectItem>
+              <SelectItem value="freemium">{t('library.free')}</SelectItem>
+              <SelectItem value="basic">{t('library.basic')}</SelectItem>
+              <SelectItem value="premium">{t('library.premium')}</SelectItem>
             </SelectContent>
           </Select>
 
           <Select value={selectedSort} onValueChange={setSelectedSort}>
             <SelectTrigger className="w-48">
-              <SelectValue placeholder="Sort by" />
+              <SelectValue placeholder={t('explore.sort_by')} />
             </SelectTrigger>
             <SelectContent>
               {sortOptions.map((option) => (
@@ -507,9 +511,9 @@ const Explore = () => {
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
             >
               <SlidersHorizontal className="h-4 w-4 mr-2" />
-              Advanced
+              {t('explore.advanced')}
             </Button>
-            <span className="text-sm text-muted-foreground">View:</span>
+            <span className="text-sm text-muted-foreground">{t('explore.view')}</span>
             <Button
               variant={viewMode === 'grid' ? 'default' : 'ghost'}
               size="sm"
@@ -532,37 +536,37 @@ const Explore = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
             <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Difficulty Level" />
+                <SelectValue placeholder={t('explore.difficulty_level')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Levels</SelectItem>
-                <SelectItem value="beginner">Beginner</SelectItem>
-                <SelectItem value="intermediate">Intermediate</SelectItem>
-                <SelectItem value="advanced">Advanced</SelectItem>
+                <SelectItem value="all">{t('explore.all_levels')}</SelectItem>
+                <SelectItem value="beginner">{t('explore.beginner')}</SelectItem>
+                <SelectItem value="intermediate">{t('explore.intermediate')}</SelectItem>
+                <SelectItem value="advanced">{t('explore.advanced')}</SelectItem>
               </SelectContent>
             </Select>
 
             <Select value={selectedDuration} onValueChange={setSelectedDuration}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Duration" />
+                <SelectValue placeholder={t('explore.duration')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Durations</SelectItem>
-                <SelectItem value="short">Short (&lt; 1 hour)</SelectItem>
-                <SelectItem value="medium">Medium (1-10 hours)</SelectItem>
-                <SelectItem value="long">Long (&gt; 10 hours)</SelectItem>
+                <SelectItem value="all">{t('explore.all_durations')}</SelectItem>
+                <SelectItem value="short">{t('explore.short')}</SelectItem>
+                <SelectItem value="medium">{t('explore.medium')}</SelectItem>
+                <SelectItem value="long">{t('explore.long')}</SelectItem>
               </SelectContent>
             </Select>
 
             <Select value={selectedRating} onValueChange={setSelectedRating}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Rating" />
+                <SelectValue placeholder={t('explore.rating')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Ratings</SelectItem>
-                <SelectItem value="high">High (4.5+)</SelectItem>
-                <SelectItem value="medium">Medium (3.5-4.5)</SelectItem>
-                <SelectItem value="low">Low (&lt; 3.5)</SelectItem>
+                <SelectItem value="all">{t('explore.all_ratings')}</SelectItem>
+                <SelectItem value="high">{t('explore.high')}</SelectItem>
+                <SelectItem value="medium">{t('explore.medium_rating')}</SelectItem>
+                <SelectItem value="low">{t('explore.low')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -573,12 +577,12 @@ const Explore = () => {
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <p className="text-muted-foreground">
-            Showing {filteredVideos.length} of {videos.length} videos
+            {t('explore.showing')} {filteredVideos.length} {t('explore.of')} {videos.length} {t('explore.videos')}
           </p>
           <div className="flex items-center space-x-2">
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm text-muted-foreground">
-              {selectedSort === 'popular' ? 'Sorted by popularity' : `Sorted by ${sortOptions.find(opt => opt.value === selectedSort)?.label.toLowerCase()}`}
+              {selectedSort === 'popular' ? t('explore.sorted_by_popularity') : `${t('explore.sorted_by')} ${sortOptions.find(opt => opt.value === selectedSort)?.label.toLowerCase()}`}
             </span>
           </div>
         </div>
@@ -607,9 +611,9 @@ const Explore = () => {
           <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
             <Search className="h-12 w-12 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">No videos found</h3>
+          <h3 className="text-lg font-semibold mb-2">{t('explore.no_videos')}</h3>
           <p className="text-muted-foreground mb-4">
-            Try adjusting your search terms or filters
+            {t('explore.try_different_filters')}
           </p>
           <Button onClick={() => {
             setSearchTerm('');
@@ -617,7 +621,7 @@ const Explore = () => {
             setSelectedVisibility('all');
             setSelectedSort('popular');
           }}>
-            Clear Filters
+            {t('explore.clear_filters')}
           </Button>
         </div>
       )}

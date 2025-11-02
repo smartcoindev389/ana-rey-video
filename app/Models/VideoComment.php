@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Traits\HasTranslations;
 
 class VideoComment extends Model
 {
-    use HasFactory;
+    use HasFactory, HasTranslations;
 
     protected $fillable = [
         'video_id',
@@ -128,5 +129,28 @@ class VideoComment extends Model
     public function scopeNewest($query)
     {
         return $query->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Get translatable fields for this model
+     */
+    protected function getTranslatableFields(): array
+    {
+        return ['comment'];
+    }
+
+    /**
+     * Get comment in current locale
+     */
+    public function getCommentAttribute($value): ?string
+    {
+        $locale = app()->getLocale();
+        if ($locale === 'en') {
+            return $value;
+        }
+        // Use raw attribute to avoid recursion
+        $rawValue = $this->attributes['comment'] ?? $value;
+        $translation = $this->getTranslation('comment', $locale);
+        return $translation ?: $rawValue;
     }
 }

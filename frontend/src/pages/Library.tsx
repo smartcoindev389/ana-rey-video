@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { useLocale } from '@/hooks/useLocale';
 import { userProgressApi, UserProgress } from '@/services/userProgressApi';
 import { categoryApi } from '@/services/videoApi';
 import { toast } from 'sonner';
@@ -38,6 +40,8 @@ const Library = () => {
   const [totalWatchTime, setTotalWatchTime] = useState<number>(0);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const { navigateWithLocale } = useLocale();
 
   useEffect(() => {
     const fetchLibraryData = async () => {
@@ -83,7 +87,7 @@ const Library = () => {
         
       } catch (error: any) {
         console.error('Error loading library data:', error);
-        toast.error('Failed to load library data');
+        toast.error(t('library.failed_load_library'));
         setMyCategories([]);
         setContinueWatching([]);
         setWatchHistory([]);
@@ -142,7 +146,7 @@ const Library = () => {
     };
 
     return (
-      <Card className="group cursor-pointer overflow-hidden hover:shadow-lg transition-all duration-300" onClick={() => navigate(`/category/${category.id}`)}>
+      <Card className="group cursor-pointer overflow-hidden hover:shadow-lg transition-all duration-300" onClick={() => navigateWithLocale(`/category/${category.id}`)}>
         <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/5 relative">
           {category.cover_image ? (
             <img src={category.cover_image} alt={category.name} className="w-full h-full object-cover" />
@@ -163,7 +167,7 @@ const Library = () => {
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <div className="flex items-center">
               <Play className="h-3 w-3 mr-1" />
-              {category.video_count || 0} episodes
+              {category.video_count || 0} {t('library.episodes')}
             </div>
             <div className="flex items-center">
               <Clock className="h-3 w-3 mr-1" />
@@ -190,9 +194,9 @@ const Library = () => {
       const diffHours = Math.floor(diffMins / 60);
       const diffDays = Math.floor(diffHours / 24);
       
-      if (diffMins < 60) return `${diffMins} minutes ago`;
-      if (diffHours < 24) return `${diffHours} hours ago`;
-      return `${diffDays} days ago`;
+      if (diffMins < 60) return `${diffMins} ${t('library.minutes_ago')}`;
+      if (diffHours < 24) return `${diffHours} ${t('library.hours_ago')}`;
+      return `${diffDays} ${t('library.days_ago')}`;
     };
 
     if (!item.video || !item.video_id) {
@@ -200,16 +204,16 @@ const Library = () => {
     }
 
     const categoryId = item.video?.category_id || item.category_id;
-    const categoryName = item.video?.category?.name || item.category?.name || 'Category';
+    const categoryName = item.video?.category?.name || item.category?.name || t('library.category');
 
     return (
-      <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/video/${item.video_id}`)}>
+      <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigateWithLocale(`/video/${item.video_id}`)}>
         <div className="flex">
           <div className="w-32 aspect-video bg-gradient-to-br from-primary/20 to-primary/5 relative overflow-hidden">
             {item.video?.intro_image_url || item.video?.intro_image || item.video?.thumbnail_url || item.video?.thumbnail ? (
               <img 
                 src={item.video.intro_image_url || item.video.intro_image || item.video.thumbnail_url || item.video.thumbnail} 
-                alt={item.video?.title || 'Video'} 
+                alt={item.video?.title || t('library.video')} 
                 className="w-full h-full object-cover" 
               />
             ) : (
@@ -224,13 +228,13 @@ const Library = () => {
             </div>
           </div>
           <div className="flex-1 p-4">
-            <h3 className="font-medium text-sm mb-1 line-clamp-2">{item.video?.title || 'Untitled Video'}</h3>
+            <h3 className="font-medium text-sm mb-1 line-clamp-2">{item.video?.title || t('library.untitled_video')}</h3>
             {categoryId ? (
               <p 
                 className="text-xs text-muted-foreground mb-2 hover:text-primary transition-colors cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
-                  navigate(`/category/${categoryId}?filter=progress`);
+                  navigateWithLocale(`/category/${categoryId}?filter=progress`);
                 }}
               >
                 {categoryName}
@@ -273,10 +277,10 @@ const Library = () => {
   if (!user) {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
-        <h1 className="text-2xl font-bold mb-4">Sign in to continue watching</h1>
-        <p className="text-muted-foreground mb-6">Access your series, continue watching, and track your progress.</p>
+        <h1 className="text-2xl font-bold mb-4">{t('library.sign_in_continue')}</h1>
+        <p className="text-muted-foreground mb-6">{t('library.sign_in_description')}</p>
         <Button onClick={() => navigate('/auth')}>
-          Sign In
+          {t('common.sign_in')}
         </Button>
       </div>
     );
@@ -286,8 +290,8 @@ const Library = () => {
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Continue Watching</h1>
-        <p className="text-muted-foreground">Pick up where you left off</p>
+        <h1 className="text-3xl font-bold mb-2">{t('library.title')}</h1>
+        <p className="text-muted-foreground">{t('library.pick_up')}</p>
       </div>
 
       {/* Continue Watching Section - grouped by series/category with per-series rows */}
@@ -296,10 +300,10 @@ const Library = () => {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-2">
               <Play className="h-5 w-5 text-primary" />
-              <h2 className="text-2xl font-bold">Continue Watching</h2>
+              <h2 className="text-2xl font-bold">{t('library.continue_watching')}</h2>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/library')}>
-              View All
+            <Button variant="ghost" size="sm" onClick={() => navigateWithLocale('/library')}>
+              {t('library.view_all')}
             </Button>
           </div>
 
@@ -314,8 +318,8 @@ const Library = () => {
                 <>
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-lg font-semibold">In-progress Videos</h3>
-                      <Button variant="link" className="px-0" onClick={() => navigate('/library')}>View all</Button>
+                      <h3 className="text-lg font-semibold">{t('library.in_progress')}</h3>
+                      <Button variant="link" className="px-0" onClick={() => navigateWithLocale('/library')}>{t('library.view_all')}</Button>
                     </div>
                     <div className="flex gap-4 overflow-x-auto pb-2">
                       {items.map((item: any) => (
@@ -331,7 +335,7 @@ const Library = () => {
 
             // Fallback if no items
             return (
-              <div className="text-sm text-muted-foreground">No in-progress videos yet.</div>
+              <div className="text-sm text-muted-foreground">{t('library.no_in_progress')}</div>
             );
           })()}
 
@@ -349,13 +353,13 @@ const Library = () => {
 
             const rows = Object.entries(grouped);
             if (rows.length === 0) return (
-              <div className="text-sm text-muted-foreground">No in-progress videos yet.</div>
+              <div className="text-sm text-muted-foreground">{t('library.no_in_progress')}</div>
             );
 
             return rows.map(([cidStr, items]) => {
               const cid = Number(cidStr);
               const first = (items as any[])[0];
-              const seriesName = first?.video?.category?.name || first?.category?.name || 'Series';
+              const seriesName = first?.video?.category?.name || first?.category?.name || t('library.series');
               const cover = first?.video?.category?.cover_image || null;
 
               return (
@@ -372,8 +376,8 @@ const Library = () => {
                       </div>
                       <h3 className="text-lg font-semibold">{seriesName}</h3>
                     </div>
-                    <Button variant="link" className="px-0" onClick={() => navigate(`/category/${cid}?filter=progress`)}>
-                      View series
+                      <Button variant="link" className="px-0" onClick={() => navigateWithLocale(`/category/${cid}?filter=progress`)}>
+                      {t('library.view_series')}
                     </Button>
                   </div>
 
@@ -397,12 +401,12 @@ const Library = () => {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-2">
             <Play className="h-5 w-5 text-primary" />
-            <h2 className="text-2xl font-bold">My Series</h2>
+            <h2 className="text-2xl font-bold">{t('library.my_series')}</h2>
           </div>
           <div className="flex items-center space-x-2">
             <Button variant="ghost" size="sm">
               <Filter className="h-4 w-4 mr-1" />
-              Filter
+              {t('library.filter')}
             </Button>
             <div className="flex items-center space-x-1">
               <Button
@@ -428,7 +432,7 @@ const Library = () => {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
-              placeholder="Search your series..."
+              placeholder={t('library.search_placeholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -440,7 +444,7 @@ const Library = () => {
               size="sm"
               onClick={() => setSelectedFilter('all')}
             >
-              All
+              {t('library.all')}
             </Button>
             <Button
               variant={selectedFilter === 'freemium' ? 'default' : 'outline'}
@@ -448,7 +452,7 @@ const Library = () => {
               onClick={() => setSelectedFilter('freemium')}
             >
               <Zap className="h-3 w-3 mr-1" />
-              Free
+              {t('library.free')}
             </Button>
             <Button
               variant={selectedFilter === 'basic' ? 'default' : 'outline'}
@@ -456,7 +460,7 @@ const Library = () => {
               onClick={() => setSelectedFilter('basic')}
             >
               <Star className="h-3 w-3 mr-1" />
-              Basic
+              {t('library.basic')}
             </Button>
             <Button
               variant={selectedFilter === 'premium' ? 'default' : 'outline'}
@@ -464,7 +468,7 @@ const Library = () => {
               onClick={() => setSelectedFilter('premium')}
             >
               <Crown className="h-3 w-3 mr-1" />
-              Premium
+              {t('library.premium')}
             </Button>
           </div>
         </div>
@@ -481,12 +485,12 @@ const Library = () => {
             <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
               <BookOpen className="h-12 w-12 text-muted-foreground" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">No series found</h3>
+            <h3 className="text-lg font-semibold mb-2">{t('library.no_series_found')}</h3>
             <p className="text-muted-foreground mb-4">
-              {searchTerm ? 'Try adjusting your search terms' : 'Start exploring series to build your collection'}
+              {searchTerm ? t('library.try_search') : t('library.start_exploring')}
             </p>
-            <Button onClick={() => navigate('/explore')}>
-              Browse Series
+            <Button onClick={() => navigateWithLocale('/explore')}>
+              {t('library.browse_series')}
             </Button>
           </div>
         )}
@@ -498,29 +502,29 @@ const Library = () => {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-2">
               <Clock className="h-5 w-5 text-primary" />
-              <h2 className="text-2xl font-bold">Watch History</h2>
+              <h2 className="text-2xl font-bold">{t('library.watch_history')}</h2>
             </div>
             <Button variant="ghost" size="sm">
-              Clear History
+              {t('library.clear_history')}
             </Button>
           </div>
           <div className="space-y-3">
             {watchHistory.map((item: UserProgress) => (
-              <Card key={item.id} className="p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/video/${item.video_id}`)}>
+              <Card key={item.id} className="p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigateWithLocale(`/video/${item.video_id}`)}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                       <CheckCircle className="h-6 w-6 text-green-500" />
                     </div>
                     <div>
-                      <h3 className="font-medium">{item.video?.title || 'Untitled Video'}</h3>
-                      <p className="text-sm text-muted-foreground">{item.category?.name || item.video?.category?.name || 'Category'}</p>
+                      <h3 className="font-medium">{item.video?.title || t('library.untitled_video')}</h3>
+                      <p className="text-sm text-muted-foreground">{item.category?.name || item.video?.category?.name || t('library.category')}</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm text-muted-foreground">{Math.floor((item.video?.duration || 0) / 60)}m</div>
                     <div className="text-xs text-muted-foreground">
-                      {item.completed_at ? new Date(item.completed_at).toLocaleDateString() : 'Recently'}
+                      {item.completed_at ? new Date(item.completed_at).toLocaleDateString() : t('library.recently')}
                     </div>
                   </div>
                 </div>
@@ -535,7 +539,7 @@ const Library = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Series</p>
+              <p className="text-sm text-muted-foreground">{t('library.total_series')}</p>
               <p className="text-2xl font-bold">{myCategories.length}</p>
             </div>
             <Play className="h-8 w-8 text-primary" />
@@ -544,7 +548,7 @@ const Library = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">In Progress</p>
+              <p className="text-sm text-muted-foreground">{t('library.in_progress_stat')}</p>
               <p className="text-2xl font-bold">{continueWatching.length}</p>
             </div>
             <Play className="h-8 w-8 text-blue-500" />
@@ -553,7 +557,7 @@ const Library = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Completed</p>
+              <p className="text-sm text-muted-foreground">{t('library.completed')}</p>
               <p className="text-2xl font-bold">{watchHistory.length}</p>
             </div>
             <CheckCircle className="h-8 w-8 text-green-500" />
@@ -562,7 +566,7 @@ const Library = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Hours</p>
+              <p className="text-sm text-muted-foreground">{t('library.total_hours')}</p>
               <p className="text-2xl font-bold">{(totalWatchTime / 3600).toFixed(1)}</p>
             </div>
             <Clock className="h-8 w-8 text-purple-500" />

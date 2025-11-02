@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Traits\HasTranslations;
 
 class Category extends Model
 {
-    use HasFactory;
+    use HasFactory, HasTranslations;
 
     protected $fillable = [
         'name',
@@ -18,6 +19,7 @@ class Category extends Model
         'short_description',
         'color',
         'icon',
+        'image',
         'is_active',
         'sort_order',
         // Series fields
@@ -208,5 +210,88 @@ class Category extends Model
             default:
                 return false;
         }
+    }
+
+    /**
+     * Get translatable fields for this model
+     */
+    protected function getTranslatableFields(): array
+    {
+        return ['name', 'description', 'short_description', 'meta_title', 'meta_description'];
+    }
+
+    /**
+     * Get name in current locale
+     */
+    public function getNameAttribute($value): ?string
+    {
+        $locale = app()->getLocale();
+        if ($locale === 'en') {
+            return $value;
+        }
+        // Use raw attribute to avoid recursion
+        $rawValue = $this->attributes['name'] ?? $value;
+        $translation = $this->getTranslation('name', $locale);
+        return $translation ?: $rawValue;
+    }
+
+    /**
+     * Get description in current locale
+     */
+    public function getDescriptionAttribute($value): ?string
+    {
+        $locale = app()->getLocale();
+        if ($locale === 'en') {
+            return $value;
+        }
+        // Use raw attribute to avoid recursion
+        $rawValue = $this->attributes['description'] ?? $value;
+        $translation = $this->getTranslation('description', $locale);
+        return $translation ?: $rawValue;
+    }
+
+    /**
+     * Get short_description in current locale
+     */
+    public function getShortDescriptionAttribute($value): ?string
+    {
+        $locale = app()->getLocale();
+        if ($locale === 'en') {
+            return $value;
+        }
+        // Use raw attribute to avoid recursion
+        $rawValue = $this->attributes['short_description'] ?? $value;
+        $translation = $this->getTranslation('short_description', $locale);
+        return $translation ?: $rawValue;
+    }
+
+    /**
+     * Get meta_title in current locale
+     */
+    public function getMetaTitleAttribute($value): ?string
+    {
+        $locale = app()->getLocale();
+        if ($locale === 'en') {
+            return $value;
+        }
+        // Use raw attribute to avoid recursion
+        $rawValue = $this->attributes['meta_title'] ?? $value;
+        $translation = $this->getTranslation('meta_title', $locale);
+        return $translation ?: $rawValue;
+    }
+
+    /**
+     * Get meta_description in current locale
+     */
+    public function getMetaDescriptionAttribute($value): ?string
+    {
+        $locale = app()->getLocale();
+        if ($locale === 'en') {
+            return $value;
+        }
+        // Use raw attribute to avoid recursion
+        $rawValue = $this->attributes['meta_description'] ?? $value;
+        $translation = $this->getTranslation('meta_description', $locale);
+        return $translation ?: $rawValue;
     }
 }

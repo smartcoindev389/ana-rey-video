@@ -45,44 +45,53 @@ import {
   Copy,
   Settings
 } from 'lucide-react';
-import { generateMockPlans, MockSubscriptionPlan } from '@/services/mockData';
+import { subscriptionPlanApi, SubscriptionPlan, SubscriptionPlanCreateRequest } from '@/services/subscriptionPlanApi';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
+import { useLocale } from '@/hooks/useLocale';
 
 const SubscriptionPlans = () => {
+  const { t } = useTranslation();
+  const { locale } = useLocale();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingPlan, setEditingPlan] = useState<MockSubscriptionPlan | null>(null);
-  const [plans, setPlans] = useState<MockSubscriptionPlan[]>([]);
+  const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [newPlan, setNewPlan] = useState<Partial<MockSubscriptionPlan>>({
+  const [newPlan, setNewPlan] = useState<Partial<SubscriptionPlanCreateRequest>>({
     name: 'freemium',
-    displayName: '',
+    display_name: '',
     description: '',
     price: 0,
-    billingCycle: 'monthly',
-    duration: 30,
+    duration_days: 30,
     features: [],
-    maxDevices: 1,
-    videoQuality: 'SD',
-    downloadableContent: false,
+    max_devices: 1,
+    video_quality: 'SD',
+    downloadable_content: false,
     certificates: false,
-    prioritySupport: false,
-    adFree: false,
-    isActive: true,
-    sortOrder: 1
+    priority_support: false,
+    ad_free: false,
+    is_active: true,
+    sort_order: 1
   });
 
   useEffect(() => {
-    // Simulate API call
     const fetchPlans = async () => {
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const mockPlans = generateMockPlans();
-      setPlans(mockPlans);
-      setIsLoading(false);
+      try {
+        const response = await subscriptionPlanApi.getAll();
+        const plansData = response.data?.data || response.data || [];
+        setPlans(Array.isArray(plansData) ? plansData : []);
+      } catch (error: any) {
+        console.error('Failed to fetch plans:', error);
+        toast.error(error?.message || t('admin.common_error'));
+        setPlans([]);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     fetchPlans();
-  }, []);
+  }, [locale]);
 
   const getPlanIcon = (planName: string) => {
     switch (planName.toLowerCase()) {
@@ -97,71 +106,119 @@ const SubscriptionPlans = () => {
     }
   };
 
-  const togglePlanStatus = (planId: number) => {
-    setPlans(prev => prev.map(plan => 
-      plan.id === planId 
-        ? { ...plan, isActive: !plan.isActive }
-        : plan
-    ));
-    toast.success("Plan status updated");
+  const togglePlanStatus = async (planId: number) => {
+    try {
+      const response = await subscriptionPlanApi.toggleStatus(planId);
+      const updatedPlan = response.data;
+      setPlans(prev => prev.map(plan => 
+        plan.id === planId ? updatedPlan : plan
+      ));
+      toast.success(t('admin.plans_status_updated'));
+    } catch (error: any) {
+      console.error('Failed to toggle plan status:', error);
+      toast.error(error?.message || t('admin.common_error'));
+    }
   };
 
-  const handleEditPlan = (plan: MockSubscriptionPlan) => {
+  const handleEditPlan = (plan: SubscriptionPlan) => {
     setEditingPlan(plan);
     setIsDialogOpen(true);
   };
 
-  const handleSavePlan = () => {
-    if (editingPlan) {
-      setPlans(prev => prev.map(plan => 
-        plan.id === editingPlan.id ? editingPlan : plan
-      ));
-      toast.success("Plan updated successfully");
-    } else {
-      // Create new plan
-      const newPlanData = {
-        ...newPlan,
-        id: Math.max(...plans.map(p => p.id)) + 1,
-        features: newPlan.features || []
-      } as MockSubscriptionPlan;
-      setPlans(prev => [...prev, newPlanData]);
-      toast.success("Plan created successfully");
+  const handleSavePlan = async () => {
+    try {
+      if (editingPlan) {
+        const response = await subscriptionPlanApi.update(editingPlan.id, {
+          name: editingPlan.name,
+          display_name: editingPlan.display_name,
+          description: editingPlan.description,
+          price: editingPlan.price,
+          duration_days: editingPlan.duration_days,
+          features: editingPlan.features,
+          max_devices: editingPlan.max_devices,
+          video_quality: editingPlan.video_quality,
+          downloadable_content: editingPlan.downloadable_content,
+          certificates: editingPlan.certificates,
+          priority_support: editingPlan.priority_support,
+          ad_free: editingPlan.ad_free,
+          is_active: editingPlan.is_active,
+          sort_order: editingPlan.sort_order,
+        });
+        const updatedPlan = response.data;
+        setPlans(prev => prev.map(plan => 
+          plan.id === editingPlan.id ? updatedPlan : plan
+        ));
+        toast.success(t('admin.plans_updated'));
+      } else {
+        const response = await subscriptionPlanApi.create(newPlan as SubscriptionPlanCreateRequest);
+        const createdPlan = response.data;
+        setPlans(prev => [...prev, createdPlan]);
+        toast.success(t('admin.plans_created'));
+      }
+      setIsDialogOpen(false);
+      setEditingPlan(null);
+      setNewPlan({
+        name: 'freemium',
+        display_name: '',
+        description: '',
+        price: 0,
+        duration_days: 30,
+        features: [],
+        max_devices: 1,
+        video_quality: 'SD',
+        downloadable_content: false,
+        certificates: false,
+        priority_support: false,
+        ad_free: false,
+        is_active: true,
+        sort_order: 1
+      });
+    } catch (error: any) {
+      console.error('Failed to save plan:', error);
+      toast.error(error?.message || t('admin.common_error'));
     }
-    setIsDialogOpen(false);
-    setEditingPlan(null);
-    setNewPlan({
-      name: 'freemium',
-      displayName: '',
-      description: '',
-      price: 0,
-      billingCycle: 'monthly',
-      duration: 30,
-      features: [],
-      maxDevices: 1,
-      videoQuality: 'SD',
-      downloadableContent: false,
-      certificates: false,
-      prioritySupport: false,
-      adFree: false,
-      isActive: true,
-      sortOrder: 1
-    });
   };
 
-  const handleDeletePlan = (planId: number) => {
-    setPlans(prev => prev.filter(plan => plan.id !== planId));
-    toast.success("Plan deleted successfully");
+  const handleDeletePlan = async (planId: number) => {
+    if (!confirm(t('admin.common_confirm'))) {
+      return;
+    }
+    try {
+      await subscriptionPlanApi.delete(planId);
+      setPlans(prev => prev.filter(plan => plan.id !== planId));
+      toast.success(t('admin.plans_deleted'));
+    } catch (error: any) {
+      console.error('Failed to delete plan:', error);
+      toast.error(error?.message || t('admin.common_error'));
+    }
   };
 
-  const handleDuplicatePlan = (plan: MockSubscriptionPlan) => {
-    const duplicatedPlan = {
-      ...plan,
-      id: Math.max(...plans.map(p => p.id)) + 1,
-      displayName: `${plan.displayName} (Copy)`,
-      name: `${plan.name}_copy`
-    };
-    setPlans(prev => [...prev, duplicatedPlan]);
-    toast.success("Plan duplicated successfully");
+  const handleDuplicatePlan = async (plan: SubscriptionPlan) => {
+    try {
+      const duplicatedData: SubscriptionPlanCreateRequest = {
+        name: `${plan.name}_copy`,
+        display_name: `${plan.display_name} (Copy)`,
+        description: plan.description,
+        price: plan.price,
+        duration_days: plan.duration_days,
+        features: plan.features || [],
+        max_devices: plan.max_devices,
+        video_quality: plan.video_quality,
+        downloadable_content: plan.downloadable_content,
+        certificates: plan.certificates,
+        priority_support: plan.priority_support,
+        ad_free: plan.ad_free,
+        is_active: plan.is_active,
+        sort_order: plan.sort_order,
+      };
+      const response = await subscriptionPlanApi.create(duplicatedData);
+      const duplicatedPlan = response.data;
+      setPlans(prev => [...prev, duplicatedPlan]);
+      toast.success(t('admin.plans_duplicated'));
+    } catch (error: any) {
+      console.error('Failed to duplicate plan:', error);
+      toast.error(error?.message || t('admin.common_error'));
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -176,8 +233,8 @@ const SubscriptionPlans = () => {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Subscription Plans</h1>
-          <p className="text-muted-foreground">Loading plans...</p>
+          <h1 className="text-3xl font-bold">{t('admin.plans_management')}</h1>
+          <p className="text-muted-foreground">{t('admin.plans_loading')}</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(3)].map((_, i) => (
@@ -204,29 +261,29 @@ const SubscriptionPlans = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Subscription Plans</h1>
-          <p className="text-muted-foreground">Manage your subscription plans and pricing</p>
+          <h1 className="text-3xl font-bold">{t('admin.plans_management')}</h1>
+          <p className="text-muted-foreground">{t('admin.plans_manage_pricing')}</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
-              Create Plan
+              {t('admin.plans_create_plan')}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>
-                {editingPlan ? 'Edit Plan' : 'Create New Plan'}
+                {editingPlan ? t('admin.plans_edit_plan') : t('admin.plans_create_new')}
               </DialogTitle>
               <DialogDescription>
-                Configure your subscription plan details and features.
+                {t('admin.plans_configure')}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="name">Plan Name</Label>
+                  <Label htmlFor="name">{t('admin.plans_plan_name')}</Label>
                   <Select 
                     value={editingPlan?.name || newPlan.name} 
                     onValueChange={(value: 'freemium' | 'basic' | 'premium') => {
@@ -241,34 +298,34 @@ const SubscriptionPlans = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="freemium">Freemium</SelectItem>
-                      <SelectItem value="basic">Basic</SelectItem>
-                      <SelectItem value="premium">Premium</SelectItem>
+                      <SelectItem value="freemium">{t('admin.users_freemium')}</SelectItem>
+                      <SelectItem value="basic">{t('admin.users_basic')}</SelectItem>
+                      <SelectItem value="premium">{t('admin.users_premium')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="displayName">Display Name</Label>
+                  <Label htmlFor="display_name">{t('admin.plans_display_name')}</Label>
                   <Input 
-                    id="displayName" 
-                    placeholder="e.g., Premium Plan"
-                    value={editingPlan?.displayName || newPlan.displayName}
+                    id="display_name" 
+                    placeholder={t('admin.plans_display_name_placeholder')}
+                    value={editingPlan?.display_name || newPlan.display_name || ''}
                     onChange={(e) => {
                       if (editingPlan) {
-                        setEditingPlan({...editingPlan, displayName: e.target.value});
+                        setEditingPlan({...editingPlan, display_name: e.target.value});
                       } else {
-                        setNewPlan({...newPlan, displayName: e.target.value});
+                        setNewPlan({...newPlan, display_name: e.target.value});
                       }
                     }}
                   />
                 </div>
               </div>
               <div>
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description">{t('admin.plans_description')}</Label>
                 <Textarea 
                   id="description" 
-                  placeholder="Plan description..."
-                  value={editingPlan?.description || newPlan.description}
+                  placeholder={t('admin.plans_description_placeholder')}
+                  value={editingPlan?.description || newPlan.description || ''}
                   onChange={(e) => {
                     if (editingPlan) {
                       setEditingPlan({...editingPlan, description: e.target.value});
@@ -278,15 +335,15 @@ const SubscriptionPlans = () => {
                   }}
                 />
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="price">Price ($)</Label>
+                  <Label htmlFor="price">{t('admin.plans_price')}</Label>
                   <Input 
                     id="price" 
                     type="number" 
                     step="0.01" 
-                    placeholder="19.99"
-                    value={editingPlan?.price || newPlan.price}
+                    placeholder={t('admin.plans_price_placeholder')}
+                    value={editingPlan?.price || newPlan.price || 0}
                     onChange={(e) => {
                       const price = parseFloat(e.target.value) || 0;
                       if (editingPlan) {
@@ -298,39 +355,18 @@ const SubscriptionPlans = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="billingCycle">Billing Cycle</Label>
-                  <Select 
-                    value={editingPlan?.billingCycle || newPlan.billingCycle} 
-                    onValueChange={(value: 'monthly' | 'yearly') => {
-                      if (editingPlan) {
-                        setEditingPlan({...editingPlan, billingCycle: value});
-                      } else {
-                        setNewPlan({...newPlan, billingCycle: value});
-                      }
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="monthly" className="text-white hover:text-white hover:bg-gray-700">Monthly</SelectItem>
-                      <SelectItem value="yearly" className="text-white hover:text-white hover:bg-gray-700">Yearly</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="duration">Duration (days)</Label>
+                  <Label htmlFor="duration_days">{t('admin.plans_duration')}</Label>
                   <Input 
-                    id="duration" 
+                    id="duration_days" 
                     type="number" 
-                    placeholder="30"
-                    value={editingPlan?.duration || newPlan.duration}
+                    placeholder={t('admin.plans_duration_placeholder')}
+                    value={editingPlan?.duration_days || newPlan.duration_days || 30}
                     onChange={(e) => {
-                      const duration = parseInt(e.target.value) || null;
+                      const duration_days = parseInt(e.target.value) || 30;
                       if (editingPlan) {
-                        setEditingPlan({...editingPlan, duration});
+                        setEditingPlan({...editingPlan, duration_days});
                       } else {
-                        setNewPlan({...newPlan, duration});
+                        setNewPlan({...newPlan, duration_days});
                       }
                     }}
                   />
@@ -338,31 +374,31 @@ const SubscriptionPlans = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="maxDevices">Max Devices</Label>
+                  <Label htmlFor="max_devices">{t('admin.plans_max_devices')}</Label>
                   <Input 
-                    id="maxDevices" 
+                    id="max_devices" 
                     type="number" 
-                    placeholder="3"
-                    value={editingPlan?.maxDevices || newPlan.maxDevices}
+                    placeholder={t('admin.plans_max_devices_placeholder')}
+                    value={editingPlan?.max_devices || newPlan.max_devices || 1}
                     onChange={(e) => {
-                      const maxDevices = parseInt(e.target.value) || 1;
+                      const max_devices = parseInt(e.target.value) || 1;
                       if (editingPlan) {
-                        setEditingPlan({...editingPlan, maxDevices});
+                        setEditingPlan({...editingPlan, max_devices});
                       } else {
-                        setNewPlan({...newPlan, maxDevices});
+                        setNewPlan({...newPlan, max_devices});
                       }
                     }}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="videoQuality">Video Quality</Label>
+                  <Label htmlFor="video_quality">{t('admin.plans_video_quality')}</Label>
                   <Select 
-                    value={editingPlan?.videoQuality || newPlan.videoQuality} 
+                    value={editingPlan?.video_quality || newPlan.video_quality || 'SD'} 
                     onValueChange={(value: 'SD' | 'HD' | '4K') => {
                       if (editingPlan) {
-                        setEditingPlan({...editingPlan, videoQuality: value});
+                        setEditingPlan({...editingPlan, video_quality: value});
                       } else {
-                        setNewPlan({...newPlan, videoQuality: value});
+                        setNewPlan({...newPlan, video_quality: value});
                       }
                     }}
                   >
@@ -378,26 +414,26 @@ const SubscriptionPlans = () => {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Features</Label>
+                <Label>{t('admin.plans_features')}</Label>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex items-center space-x-2">
                     <Switch 
-                      id="downloadableContent"
-                      checked={editingPlan?.downloadableContent || newPlan.downloadableContent}
+                      id="downloadable_content"
+                      checked={editingPlan?.downloadable_content || newPlan.downloadable_content || false}
                       onCheckedChange={(checked) => {
                         if (editingPlan) {
-                          setEditingPlan({...editingPlan, downloadableContent: checked});
+                          setEditingPlan({...editingPlan, downloadable_content: checked});
                         } else {
-                          setNewPlan({...newPlan, downloadableContent: checked});
+                          setNewPlan({...newPlan, downloadable_content: checked});
                         }
                       }}
                     />
-                    <Label htmlFor="downloadableContent">Downloadable Content</Label>
+                    <Label htmlFor="downloadable_content">{t('admin.plans_downloadable_content')}</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Switch 
                       id="certificates"
-                      checked={editingPlan?.certificates || newPlan.certificates}
+                      checked={editingPlan?.certificates || newPlan.certificates || false}
                       onCheckedChange={(checked) => {
                         if (editingPlan) {
                           setEditingPlan({...editingPlan, certificates: checked});
@@ -406,51 +442,51 @@ const SubscriptionPlans = () => {
                         }
                       }}
                     />
-                    <Label htmlFor="certificates">Certificates</Label>
+                    <Label htmlFor="certificates">{t('admin.plans_certificates')}</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Switch 
-                      id="prioritySupport"
-                      checked={editingPlan?.prioritySupport || newPlan.prioritySupport}
+                      id="priority_support"
+                      checked={editingPlan?.priority_support || newPlan.priority_support || false}
                       onCheckedChange={(checked) => {
                         if (editingPlan) {
-                          setEditingPlan({...editingPlan, prioritySupport: checked});
+                          setEditingPlan({...editingPlan, priority_support: checked});
                         } else {
-                          setNewPlan({...newPlan, prioritySupport: checked});
+                          setNewPlan({...newPlan, priority_support: checked});
                         }
                       }}
                     />
-                    <Label htmlFor="prioritySupport">Priority Support</Label>
+                    <Label htmlFor="priority_support">{t('admin.plans_priority_support')}</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Switch 
-                      id="adFree"
-                      checked={editingPlan?.adFree || newPlan.adFree}
+                      id="ad_free"
+                      checked={editingPlan?.ad_free || newPlan.ad_free || false}
                       onCheckedChange={(checked) => {
                         if (editingPlan) {
-                          setEditingPlan({...editingPlan, adFree: checked});
+                          setEditingPlan({...editingPlan, ad_free: checked});
                         } else {
-                          setNewPlan({...newPlan, adFree: checked});
+                          setNewPlan({...newPlan, ad_free: checked});
                         }
                       }}
                     />
-                    <Label htmlFor="adFree">Ad-Free Experience</Label>
+                    <Label htmlFor="ad_free">{t('admin.plans_ad_free')}</Label>
                   </div>
                 </div>
               </div>
               <div>
-                <Label htmlFor="sortOrder">Sort Order</Label>
+                <Label htmlFor="sort_order">{t('admin.plans_sort_order')}</Label>
                 <Input 
-                  id="sortOrder" 
+                  id="sort_order" 
                   type="number" 
-                  placeholder="1"
-                  value={editingPlan?.sortOrder || newPlan.sortOrder}
+                  placeholder={t('admin.plans_sort_order_placeholder')}
+                  value={editingPlan?.sort_order || newPlan.sort_order || 1}
                   onChange={(e) => {
-                    const sortOrder = parseInt(e.target.value) || 1;
+                    const sort_order = parseInt(e.target.value) || 1;
                     if (editingPlan) {
-                      setEditingPlan({...editingPlan, sortOrder});
+                      setEditingPlan({...editingPlan, sort_order});
                     } else {
-                      setNewPlan({...newPlan, sortOrder});
+                      setNewPlan({...newPlan, sort_order});
                     }
                   }}
                 />
@@ -458,10 +494,10 @@ const SubscriptionPlans = () => {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancel
+                {t('admin.plans_cancel')}
               </Button>
               <Button onClick={handleSavePlan}>
-                {editingPlan ? 'Update Plan' : 'Create Plan'}
+                {editingPlan ? t('admin.plans_update_plan') : t('admin.plans_create_plan')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -471,10 +507,10 @@ const SubscriptionPlans = () => {
       {/* Plans Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {plans.map((plan) => (
-          <Card key={plan.id} className={`p-6 relative flex flex-col ${plan.isActive ? '' : 'opacity-60'}`}>
-            {!plan.isActive && (
+          <Card key={plan.id} className={`p-6 relative flex flex-col ${plan.is_active ? '' : 'opacity-60'}`}>
+            {!plan.is_active && (
               <div className="absolute top-4 right-4">
-                <Badge variant="secondary">Inactive</Badge>
+                <Badge variant="secondary">{t('admin.plans_inactive')}</Badge>
               </div>
             )}
             
@@ -482,7 +518,7 @@ const SubscriptionPlans = () => {
               <div className="flex items-center space-x-2">
                 {getPlanIcon(plan.name)}
                 <div>
-                  <h3 className="text-lg font-semibold">{plan.displayName}</h3>
+                  <h3 className="text-lg font-semibold">{plan.display_name}</h3>
                   <p className="text-sm text-muted-foreground">{plan.description}</p>
                 </div>
               </div>
@@ -493,26 +529,26 @@ const SubscriptionPlans = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                  <DropdownMenuLabel>{t('admin.common_actions')}</DropdownMenuLabel>
                   <DropdownMenuItem onClick={() => handleEditPlan(plan)}>
                     <Edit className="mr-2 h-4 w-4" />
-                    Edit Plan
+                    {t('admin.plans_edit')}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleDuplicatePlan(plan)}>
                     <Copy className="mr-2 h-4 w-4" />
-                    Duplicate Plan
+                    {t('admin.plans_duplicate')}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => togglePlanStatus(plan.id)}>
-                    {plan.isActive ? (
+                    {plan.is_active ? (
                       <>
                         <X className="mr-2 h-4 w-4" />
-                        Deactivate
+                        {t('admin.plans_deactivate')}
                       </>
                     ) : (
                       <>
                         <CheckCircle className="mr-2 h-4 w-4" />
-                        Activate
+                        {t('admin.plans_activate')}
                       </>
                     )}
                   </DropdownMenuItem>
@@ -521,7 +557,7 @@ const SubscriptionPlans = () => {
                     className="text-red-600"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Delete Plan
+                    {t('admin.plans_delete')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -533,29 +569,29 @@ const SubscriptionPlans = () => {
                   {formatCurrency(plan.price)}
                 </span>
                 <span className="text-muted-foreground">
-                  /{plan.billingCycle}
+                  /{t('admin.plans_monthly').toLowerCase()}
                 </span>
               </div>
-              {plan.duration && (
+              {plan.duration_days && (
                 <p className="text-sm text-muted-foreground">
-                  {plan.duration} days duration
+                  {plan.duration_days} {t('admin.plans_days_duration')}
                 </p>
               )}
             </div>
 
             <div className="space-y-3 mb-6">
               <div className="flex items-center justify-between text-sm">
-                <span>Max Devices:</span>
-                <span className="font-medium">{plan.maxDevices}</span>
+                <span>{t('admin.plans_max_devices_label')}</span>
+                <span className="font-medium">{plan.max_devices}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span>Video Quality:</span>
-                <span className="font-medium">{plan.videoQuality}</span>
+                <span>{t('admin.plans_video_quality_label')}</span>
+                <span className="font-medium">{plan.video_quality}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span>Downloadable Content:</span>
+                <span>{t('admin.plans_downloadable_label')}</span>
                 <span className="font-medium">
-                  {plan.downloadableContent ? (
+                  {plan.downloadable_content ? (
                     <CheckCircle className="h-4 w-4 text-green-500" />
                   ) : (
                     <X className="h-4 w-4 text-red-500" />
@@ -563,7 +599,7 @@ const SubscriptionPlans = () => {
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span>Certificates:</span>
+                <span>{t('admin.plans_certificates_label')}</span>
                 <span className="font-medium">
                   {plan.certificates ? (
                     <CheckCircle className="h-4 w-4 text-green-500" />
@@ -573,9 +609,9 @@ const SubscriptionPlans = () => {
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span>Priority Support:</span>
+                <span>{t('admin.plans_priority_label')}</span>
                 <span className="font-medium">
-                  {plan.prioritySupport ? (
+                  {plan.priority_support ? (
                     <CheckCircle className="h-4 w-4 text-green-500" />
                   ) : (
                     <X className="h-4 w-4 text-red-500" />
@@ -583,9 +619,9 @@ const SubscriptionPlans = () => {
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span>Ad-Free:</span>
+                <span>{t('admin.plans_ad_free_label')}</span>
                 <span className="font-medium">
-                  {plan.adFree ? (
+                  {plan.ad_free ? (
                     <CheckCircle className="h-4 w-4 text-green-500" />
                   ) : (
                     <X className="h-4 w-4 text-red-500" />
@@ -596,14 +632,18 @@ const SubscriptionPlans = () => {
 
             <div className="mt-auto pt-4">
               <div className="border-t mb-4"></div>
-              <h4 className="font-medium text-sm mb-2">Features:</h4>
+              <h4 className="font-medium text-sm mb-2">{t('admin.plans_features_label')}</h4>
               <ul className="space-y-1">
-                {plan.features.map((feature, index) => (
-                  <li key={index} className="text-sm text-muted-foreground flex items-center">
-                    <CheckCircle className="h-3 w-3 text-green-500 mr-2 flex-shrink-0" />
-                    {feature}
-                  </li>
-                ))}
+                {plan.features && plan.features.length > 0 ? (
+                  plan.features.map((feature, index) => (
+                    <li key={index} className="text-sm text-muted-foreground flex items-center">
+                      <CheckCircle className="h-3 w-3 text-green-500 mr-2 flex-shrink-0" />
+                      {feature}
+                    </li>
+                  ))
+                ) : (
+                  <li className="text-sm text-muted-foreground">{t('admin.common_no_data')}</li>
+                )}
               </ul>
             </div>
           </Card>
@@ -615,7 +655,7 @@ const SubscriptionPlans = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Plans</p>
+              <p className="text-sm text-muted-foreground">{t('admin.plans_total_plans')}</p>
               <p className="text-2xl font-bold">{plans.length}</p>
             </div>
             <DollarSign className="h-8 w-8 text-primary" />
@@ -624,8 +664,8 @@ const SubscriptionPlans = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Active Plans</p>
-              <p className="text-2xl font-bold">{plans.filter(p => p.isActive).length}</p>
+              <p className="text-sm text-muted-foreground">{t('admin.plans_active_plans')}</p>
+              <p className="text-2xl font-bold">{plans.filter(p => p.is_active).length}</p>
             </div>
             <CheckCircle className="h-8 w-8 text-green-500" />
           </div>
@@ -633,7 +673,7 @@ const SubscriptionPlans = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Average Price</p>
+              <p className="text-sm text-muted-foreground">{t('admin.plans_avg_price')}</p>
               <p className="text-2xl font-bold">
                 ${(plans.reduce((sum, plan) => sum + plan.price, 0) / plans.length).toFixed(2)}
               </p>
@@ -644,9 +684,9 @@ const SubscriptionPlans = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Premium Features</p>
+              <p className="text-sm text-muted-foreground">{t('admin.plans_premium_features')}</p>
               <p className="text-2xl font-bold">
-                {plans.filter(p => p.downloadableContent || p.certificates || p.prioritySupport).length}
+                {plans.filter(p => p.downloadable_content || p.certificates || p.priority_support).length}
               </p>
             </div>
             <Crown className="h-8 w-8 text-yellow-500" />

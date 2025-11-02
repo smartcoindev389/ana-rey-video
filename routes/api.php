@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\FeedbackController;
 use App\Http\Controllers\Api\HeroBackgroundController;
 use App\Http\Controllers\Api\TestimonialController;
+use App\Http\Controllers\Api\LanguageController;
 
 // Preflight CORS for all API routes (avoid auth/csrf on OPTIONS)
 Route::options('/{any}', function () {
@@ -41,6 +42,12 @@ Route::get('/faqs/categories', [FaqController::class, 'categories']);
 
 // Public Settings routes
 Route::get('/settings/public', [SettingsController::class, 'getPublicSettings']);
+
+// Public Language routes
+Route::get('/languages', [LanguageController::class, 'languages']);
+Route::get('/locale', [LanguageController::class, 'getLocale']);
+Route::get('/translations/{locale?}', [LanguageController::class, 'translations']);
+Route::post('/locale', [LanguageController::class, 'setLocale']);
 
 // Public Testimonial routes
 Route::get('/testimonials/public', [TestimonialController::class, 'public']);
@@ -125,18 +132,25 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/admin/settings', [SettingsController::class, 'bulkUpdate']);
 
         // Subscription Plans Management (Admin CRUD)
-        Route::apiResource('subscription-plans', SubscriptionPlanController::class);
-        Route::post('/subscription-plans/{plan}/toggle-status', [SubscriptionPlanController::class, 'toggleStatus']);
-        Route::get('/subscription-plans/{plan}/statistics', [SubscriptionPlanController::class, 'statistics']);
-        Route::get('/subscription-plans/public', [SubscriptionPlanController::class, 'public']);
+        Route::prefix('admin/subscription-plans')->group(function () {
+            Route::get('/', [SubscriptionPlanController::class, 'index']);
+            Route::post('/', [SubscriptionPlanController::class, 'store']);
+            Route::get('/public', [SubscriptionPlanController::class, 'public']);
+            Route::get('/{plan}', [SubscriptionPlanController::class, 'show']);
+            Route::put('/{plan}', [SubscriptionPlanController::class, 'update']);
+            Route::patch('/{plan}', [SubscriptionPlanController::class, 'update']);
+            Route::delete('/{plan}', [SubscriptionPlanController::class, 'destroy']);
+            Route::post('/{plan}/toggle-status', [SubscriptionPlanController::class, 'toggleStatus']);
+            Route::get('/{plan}/statistics', [SubscriptionPlanController::class, 'statistics']);
+        });
 
         // Payment Transactions Management (Admin CRUD)
-        Route::apiResource('payment-transactions', PaymentTransactionController::class);
-        Route::post('/payment-transactions/{transaction}/mark-completed', [PaymentTransactionController::class, 'markCompleted']);
-        Route::post('/payment-transactions/{transaction}/mark-failed', [PaymentTransactionController::class, 'markFailed']);
-        Route::post('/payment-transactions/{transaction}/refund', [PaymentTransactionController::class, 'refund']);
-        Route::get('/payment-transactions/statistics', [PaymentTransactionController::class, 'statistics']);
-        Route::get('/payment-transactions/export', [PaymentTransactionController::class, 'export']);
+        Route::apiResource('admin/payment-transactions', PaymentTransactionController::class);
+        Route::post('/admin/payment-transactions/{transaction}/mark-completed', [PaymentTransactionController::class, 'markCompleted']);
+        Route::post('/admin/payment-transactions/{transaction}/mark-failed', [PaymentTransactionController::class, 'markFailed']);
+        Route::post('/admin/payment-transactions/{transaction}/refund', [PaymentTransactionController::class, 'refund']);
+        Route::get('/admin/payment-transactions/statistics', [PaymentTransactionController::class, 'statistics']);
+        Route::get('/admin/payment-transactions/export', [PaymentTransactionController::class, 'export']);
 
         // Analytics and Reports (Admin only)
         Route::prefix('analytics')->group(function () {
@@ -150,12 +164,19 @@ Route::middleware('auth:sanctum')->group(function () {
         });
 
         // Coupons Management (Admin CRUD)
-        Route::apiResource('coupons', CouponController::class);
-        Route::post('/coupons/{coupon}/toggle-status', [CouponController::class, 'toggleStatus']);
-        Route::post('/coupons/validate', [CouponController::class, 'validate']);
-        Route::get('/coupons/{coupon}/statistics', [CouponController::class, 'statistics']);
-        Route::get('/coupons/{coupon}/usage', [CouponController::class, 'usage']);
-        Route::get('/coupons-statistics', [CouponController::class, 'overallStatistics']);
+        Route::prefix('admin/coupons')->group(function () {
+            Route::get('/', [CouponController::class, 'index']);
+            Route::post('/', [CouponController::class, 'store']);
+            Route::post('/validate', [CouponController::class, 'validate']);
+            Route::get('/{coupon}', [CouponController::class, 'show']);
+            Route::put('/{coupon}', [CouponController::class, 'update']);
+            Route::patch('/{coupon}', [CouponController::class, 'update']);
+            Route::delete('/{coupon}', [CouponController::class, 'destroy']);
+            Route::post('/{coupon}/toggle-status', [CouponController::class, 'toggleStatus']);
+            Route::get('/{coupon}/statistics', [CouponController::class, 'statistics']);
+            Route::get('/{coupon}/usage', [CouponController::class, 'usage']);
+        });
+        Route::get('/admin/coupons-statistics', [CouponController::class, 'overallStatistics']);
 
         // Support Tickets Management (Admin CRUD)
         Route::apiResource('support-tickets', SupportTicketController::class);
@@ -174,7 +195,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/feedback/{feedback}/reject', [FeedbackController::class, 'reject']);
         Route::get('/feedback/by-type/{type}', [FeedbackController::class, 'byType']);
         Route::get('/feedback/high-priority', [FeedbackController::class, 'highPriority']);
-        Route::get('/feedback-statistics', [FeedbackController::class, 'statistics']);
+        Route::get('/admin/feedback-statistics', [FeedbackController::class, 'statistics']);
 
         // Hero Background Management (Admin CRUD)
         Route::apiResource('/admin/hero-backgrounds', HeroBackgroundController::class);
@@ -189,6 +210,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/admin/testimonials/{id}', [TestimonialController::class, 'destroy']);
         Route::post('/admin/testimonials/{id}/toggle-approval', [TestimonialController::class, 'toggleApproval']);
         Route::post('/admin/testimonials/{id}/toggle-featured', [TestimonialController::class, 'toggleFeatured']);
+
+        // Translation Management (Admin CRUD)
+        Route::get('/admin/translations', [LanguageController::class, 'getAllTranslations']);
+        Route::post('/admin/translations', [LanguageController::class, 'updateTranslation']);
+        Route::post('/admin/translations/bulk', [LanguageController::class, 'bulkUpdateTranslations']);
+        Route::delete('/admin/translations/{id}', [LanguageController::class, 'deleteTranslation']);
     });
 
     // Public read access to categories

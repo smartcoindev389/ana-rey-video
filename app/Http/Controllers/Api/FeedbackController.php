@@ -110,8 +110,22 @@ class FeedbackController extends Controller
         $validated['status'] = 'new';
         $validated['priority'] = $validated['priority'] ?? 'medium';
 
+        // Check if user has already submitted feedback for this video
+        if (!empty($validated['video_id'])) {
+            $existingFeedback = Feedback::where('user_id', Auth::id())
+                ->where('video_id', $validated['video_id'])
+                ->first();
+
+            if ($existingFeedback) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You have already submitted feedback for this video. You can only submit one feedback per video.',
+                ], 422);
+            }
+        }
+
         $feedback = Feedback::create($validated);
-        $feedback->load(['user']);
+        $feedback->load(['user', 'video']);
 
         return response()->json([
             'success' => true,
@@ -258,7 +272,7 @@ class FeedbackController extends Controller
                 'resolved' => Feedback::byStatus('resolved')->count(),
                 'rejected' => Feedback::byStatus('rejected')->count(),
             ],
-            'average_rating' => Feedback::whereNotNull('rating')->avg('rating'),
+            'average_rating' => (float) Feedback::whereNotNull('rating')->avg('rating') ?: 0,
             'feedback_by_month' => Feedback::selectRaw('YEAR(created_at) as year, MONTH(created_at) as month, COUNT(*) as count')
                 ->where('created_at', '>=', now()->subMonths(12))
                 ->groupBy('year', 'month')

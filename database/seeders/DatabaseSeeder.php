@@ -60,6 +60,9 @@ class DatabaseSeeder extends Seeder
             SettingsSeeder::class,
             HeroBackgroundSeeder::class,
             TestimonialSeeder::class,
+            FaqSeeder::class,
+            SubscriptionPlanSeeder::class,
+            TranslationSeeder::class, // Seed UI translations
         ]);
     }
 }

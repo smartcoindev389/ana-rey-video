@@ -48,6 +48,10 @@ class ApiClient {
       'Accept': 'application/json',
     };
 
+    // Add locale header for backend translation
+    const locale = localStorage.getItem('i18nextLng') || 'en';
+    headers['Accept-Language'] = locale;
+
     const token = localStorage.getItem('auth_token');
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
