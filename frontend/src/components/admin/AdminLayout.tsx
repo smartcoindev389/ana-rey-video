@@ -180,10 +180,9 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                 <SelectItem value="PT">PT</SelectItem>
               </SelectContent>
             </Select>
-            
-                <span className="text-sm text-muted-foreground">
-                  {t('admin.dashboard_welcome', { name: user?.name || '' })}
-                </span>
+            <span className="text-sm text-muted-foreground">
+              {t('admin.dashboard_welcome')} {user?.name || ''}
+            </span>
           </div>
         </div>
 

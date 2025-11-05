@@ -406,7 +406,7 @@ return [
     'admin_common_error' => 'Error',
     
     // Admin Dashboard
-    'admin_dashboard_welcome' => 'Welcome, {name}',
+    'admin_dashboard_welcome' => 'Welcome, ',
     'admin_dashboard_quick_actions' => 'Quick Actions',
     'admin_dashboard_add_user' => 'Add User',
     'admin_dashboard_upload_video' => 'Upload Video',

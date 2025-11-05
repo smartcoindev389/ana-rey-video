@@ -588,7 +588,7 @@
     "common_confirm": "Are you sure?",
     "common_success": "Success",
     "common_error": "Error",
-    "dashboard_welcome": "Welcome, {name}",
+    "dashboard_welcome": "Welcome, ",
     "dashboard_quick_actions": "Quick Actions",
     "dashboard_add_user": "Add User",
     "dashboard_upload_video": "Upload Video",
@@ -690,6 +690,19 @@
     "faq_enter_category": "Please enter a category name",
     "faq_edit_title": "Edit FAQ",
     "feedback_resolved_items": "Resolved Items",
+    "analytics_export_report": "Export Report",
+    "analytics_generate": "Generate Analytics",
+    "subscription_distribution": "Subscription Distribution",
+    "performance_metrics": "Performance Metrics",
+    "total_subscriptions": "Total Subscriptions",
+    "active_subs_short": "Active Subs",
+    "mrr": "MRR",
+    "quick_stats": "Quick Stats",
+    "avg_revenue_user": "Avg Revenue/User",
+    "recent_activity": "Recent Activity",
+    "top_performing_videos": "Top Performing Videos",
+    "views_label": "views",
+    "completion": "completion",
     "payments_transactions": "Payments & Transactions",
     "payments_monitor": "Monitor payment transactions and revenue",
     "payments_loading": "Loading transactions...",
@@ -924,6 +937,30 @@
       }
     },
     "settings_fields": {
+      "hero_title": {
+        "label": "Hero Title",
+        "description": "Main title displayed in the hero section"
+      },
+      "hero_subtitle": {
+        "label": "Hero Subtitle",
+        "description": "Subtitle displayed in the hero section"
+      },
+      "hero_cta_text": {
+        "label": "Hero CTA Text",
+        "description": "Call to action text in hero section"
+      },
+      "hero_price": {
+        "label": "Hero Price",
+        "description": "Price displayed in hero section"
+      },
+      "hero_cta_button_text": {
+        "label": "Hero Button Text",
+        "description": "Button text in hero section"
+      },
+      "hero_disclaimer": {
+        "label": "Hero Disclaimer",
+        "description": "Disclaimer text in hero section"
+      },
       "about_title": {
         "label": "About Title",
         "description": "Title for the about section"

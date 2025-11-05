@@ -585,7 +585,7 @@
     "common_confirm": "¿Está seguro?",
     "common_success": "Éxito",
     "common_error": "Error",
-    "dashboard_welcome": "Bienvenido, {name}",
+    "dashboard_welcome": "Bienvenido, ",
     "dashboard_quick_actions": "Acciones Rápidas",
     "dashboard_add_user": "Agregar Usuario",
     "dashboard_upload_video": "Subir Video",
@@ -687,6 +687,19 @@
     "faq_enter_category": "Por favor ingrese un nombre de categoría",
     "faq_edit_title": "Editar FAQ",
     "feedback_resolved_items": "Elementos Resueltos",
+    "analytics_export_report": "Exportar Informe",
+    "analytics_generate": "Generar Analíticas",
+    "subscription_distribution": "Distribución de Suscripciones",
+    "performance_metrics": "Métricas de Rendimiento",
+    "total_subscriptions": "Suscripciones Totales",
+    "active_subs_short": "Subs Activas",
+    "mrr": "MRR",
+    "quick_stats": "Estadísticas Rápidas",
+    "avg_revenue_user": "Prom Ingresos/Usuario",
+    "recent_activity": "Actividad Reciente",
+    "top_performing_videos": "Videos con Mejor Rendimiento",
+    "views_label": "vistas",
+    "completion": "completado",
     "payments_transactions": "Pagos y Transacciones",
     "payments_monitor": "Monitorear transacciones de pago e ingresos",
     "payments_loading": "Cargando transacciones...",
@@ -921,6 +934,30 @@
       }
     },
     "settings_fields": {
+      "hero_title": {
+        "label": "Título del Hero",
+        "description": "Título principal mostrado en la sección hero"
+      },
+      "hero_subtitle": {
+        "label": "Subtítulo del Hero",
+        "description": "Subtítulo mostrado en la sección hero"
+      },
+      "hero_cta_text": {
+        "label": "Texto de CTA del Hero",
+        "description": "Texto de llamada a la acción en la sección hero"
+      },
+      "hero_price": {
+        "label": "Precio del Hero",
+        "description": "Precio mostrado en la sección hero"
+      },
+      "hero_cta_button_text": {
+        "label": "Texto del Botón del Hero",
+        "description": "Texto del botón en la sección hero"
+      },
+      "hero_disclaimer": {
+        "label": "Descargo de Responsabilidad del Hero",
+        "description": "Texto de descargo en la sección hero"
+      },
       "about_title": {
         "label": "Título de Acerca de",
         "description": "Título para la sección Acerca de"

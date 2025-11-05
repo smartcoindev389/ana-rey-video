@@ -183,10 +183,10 @@ const AdminDashboard = () => {
         <div className="flex space-x-2">
           <Button variant="outline" size="sm">
             <Activity className="h-4 w-4 mr-2" />
-            Refresh
+            {t('admin.common_refresh')}
           </Button>
-          <Button variant="outline">Export Report</Button>
-          <Button>Generate Analytics</Button>
+          <Button variant="outline">{t('admin.analytics_export_report')}</Button>
+          <Button>{t('admin.analytics_generate')}</Button>
         </div>
       </div>
 
@@ -218,7 +218,7 @@ const AdminDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Subscription Distribution</h3>
+            <h3 className="text-lg font-semibold">{t('admin.subscription_distribution')}</h3>
           </div>
           <div className="space-y-4">
             {subscriptionStats?.subscription_breakdown && (() => {
@@ -229,7 +229,7 @@ const AdminDashboard = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
-                      <span className="text-sm">Freemium</span>
+                      <span className="text-sm">{t('subscription.plan_names.freemium')}</span>
                     </div>
                     <div className="text-right">
                       <div className="text-sm font-medium">{freemium}</div>
@@ -241,7 +241,7 @@ const AdminDashboard = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-                      <span className="text-sm">Basic</span>
+                      <span className="text-sm">{t('subscription.plan_names.basic')}</span>
                     </div>
                     <div className="text-right">
                       <div className="text-sm font-medium">{basic}</div>
@@ -253,7 +253,7 @@ const AdminDashboard = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       <div className="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
-                      <span className="text-sm">Premium</span>
+                      <span className="text-sm">{t('subscription.plan_names.premium')}</span>
                     </div>
                     <div className="text-right">
                       <div className="text-sm font-medium">{premium}</div>
@@ -270,27 +270,27 @@ const AdminDashboard = () => {
 
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Performance Metrics</h3>
+            <h3 className="text-lg font-semibold">{t('admin.performance_metrics')}</h3>
           </div>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <TrendingUp className="h-4 w-4 text-muted-foreground mr-2" />
-                <span className="text-sm">Total Subscriptions</span>
+                <span className="text-sm">{t('admin.total_subscriptions')}</span>
               </div>
               <Badge variant="secondary">{subscriptionStats?.total_subscriptions || 0}</Badge>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <Activity className="h-4 w-4 text-muted-foreground mr-2" />
-                <span className="text-sm">Active Subs</span>
+                <span className="text-sm">{t('admin.active_subs_short')}</span>
               </div>
               <Badge variant="secondary">{subscriptionStats?.active_subscriptions || 0}</Badge>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <Star className="h-4 w-4 text-muted-foreground mr-2" />
-                <span className="text-sm">MRR</span>
+                <span className="text-sm">{t('admin.mrr')}</span>
               </div>
               <Badge variant="secondary">{formatCurrency(subscriptionStats?.monthly_recurring_revenue || 0)}</Badge>
             </div>
@@ -299,19 +299,19 @@ const AdminDashboard = () => {
 
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Quick Stats</h3>
+            <h3 className="text-lg font-semibold">{t('admin.quick_stats')}</h3>
           </div>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Total Revenue</span>
+              <span className="text-sm text-muted-foreground">{t('admin.total_revenue')}</span>
               <span className="text-sm font-medium">{formatCurrency(overview?.total_revenue || 0)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Avg Revenue/User</span>
+              <span className="text-sm text-muted-foreground">{t('admin.avg_revenue_user')}</span>
               <span className="text-sm font-medium">{formatCurrency(subscriptionStats?.average_revenue_per_user || 0)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Video Views</span>
+              <span className="text-sm text-muted-foreground">{t('admin.video_views')}</span>
               <span className="text-sm font-medium">{formatNumber(overview?.total_views || 0)}</span>
             </div>
           </div>
@@ -323,7 +323,7 @@ const AdminDashboard = () => {
         {/* Recent Activity */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Recent Activity</h3>
+            <h3 className="text-lg font-semibold">{t('admin.recent_activity')}</h3>
             <Button variant="outline" size="sm">{t('admin.dashboard_view_all')}</Button>
           </div>
           <div className="space-y-4">
@@ -342,7 +342,7 @@ const AdminDashboard = () => {
         {/* Top Videos */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Top Performing Videos</h3>
+            <h3 className="text-lg font-semibold">{t('admin.top_performing_videos')}</h3>
             <Button variant="outline" size="sm">{t('admin.dashboard_view_all')}</Button>
           </div>
           <div className="space-y-4">
@@ -354,14 +354,14 @@ const AdminDashboard = () => {
                     <div className="flex items-center space-x-4 text-xs text-muted-foreground">
                       <span className="flex items-center">
                         <Eye className="h-3 w-3 mr-1" />
-                        {formatNumber(video.views || 0)} views
+                        {formatNumber(video.views || 0)} {t('admin.views_label')}
                       </span>
                       <span className="flex items-center">
                         <Star className="h-3 w-3 mr-1" />
                         {(() => { const r = typeof video.rating === 'number' ? video.rating : parseFloat(video.rating || '0'); return isNaN(r) ? '0.0' : r.toFixed(1); })()}
                       </span>
                       <span className="text-xs">
-                        {video.completion_rate || 0}% completion
+                        {video.completion_rate || 0}% {t('admin.completion')}
                       </span>
                     </div>
                   </div>
