@@ -8,6 +8,7 @@ use App\Services\WebpConversionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class HeroBackgroundController extends Controller
 {
@@ -109,37 +110,93 @@ class HeroBackgroundController extends Controller
                 ], 422);
             }
 
-            // Upload and convert image to WebP
-            $uploadResult = $this->webpService->convertToWebP(
-                $file,
-                'data_section/image'
-            );
-
-            if (!$uploadResult['success']) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to upload image',
-                ], 500);
-            }
-
             // Check if hero background exists for this sort_order (slot index)
             $sortOrder = $validated['sort_order'] ?? 0;
             $background = HeroBackground::where('sort_order', $sortOrder)->first();
 
             if ($background) {
                 // Update existing hero background
-                // Delete old image if exists
-                if ($background->image_path) {
-                    $this->webpService->deleteFile($background->image_path);
+                // Get old image path BEFORE updating
+                $oldImagePath = $background->getRawOriginal('image_path');
+                Log::info('Hero background update: Found existing background', [
+                    'background_id' => $background->id,
+                    'sort_order' => $sortOrder,
+                    'old_image_path' => $oldImagePath
+                ]);
+                
+                // Upload new image first
+                $uploadResult = $this->webpService->convertToWebP(
+                    $file,
+                    'data_section/image'
+                );
+
+                if (!$uploadResult['success']) {
+                    Log::error('Hero background update: Upload failed', [
+                        'background_id' => $background->id
+                    ]);
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Failed to upload image',
+                    ], 500);
                 }
 
-                $background->update([
+                Log::info('Hero background update: Upload successful', [
+                    'background_id' => $background->id,
+                    'new_image_path' => $uploadResult['path'],
+                    'new_image_url' => $uploadResult['url']
+                ]);
+
+                // Delete old image only after successful upload
+                if ($oldImagePath && !empty($oldImagePath)) {
+                    $deleted = $this->webpService->deleteFile($oldImagePath);
+                    if (!$deleted) {
+                        // Log warning but don't fail the update
+                        Log::warning('Failed to delete old hero background image', [
+                            'background_id' => $background->id,
+                            'old_path' => $oldImagePath,
+                            'new_path' => $uploadResult['path']
+                        ]);
+                    } else {
+                        Log::info('Hero background update: Old file deleted', [
+                            'background_id' => $background->id,
+                            'old_path' => $oldImagePath
+                        ]);
+                    }
+                }
+
+                $updateData = [
                     'name' => $validated['name'] ?? $background->name,
                     'description' => $validated['description'] ?? $background->description,
-                    'image_path' => $uploadResult['path'] ?? null,
-                    'image_url' => $uploadResult['url'] ?? null,
+                    'image_path' => $uploadResult['path'],
+                    'image_url' => $uploadResult['url'],
                     'is_active' => isset($validated['is_active']) ? $validated['is_active'] : ($background->is_active ?? true),
                     'metadata' => $validated['metadata'] ?? $background->metadata,
+                ];
+
+                Log::info('Hero background update: Attempting database update', [
+                    'background_id' => $background->id,
+                    'update_data' => $updateData
+                ]);
+
+                $updated = $background->update($updateData);
+                
+                if (!$updated) {
+                    Log::error('Hero background update: Database update failed', [
+                        'background_id' => $background->id
+                    ]);
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Failed to update hero background in database',
+                    ], 500);
+                }
+
+                // Refresh to get latest data
+                $background->refresh();
+
+                Log::info('Hero background update: Successfully updated', [
+                    'background_id' => $background->id,
+                    'final_image_path' => $background->getRawOriginal('image_path'),
+                    'final_image_url' => $background->getRawOriginal('image_url')
                 ]);
 
                 return response()->json([
@@ -148,6 +205,24 @@ class HeroBackgroundController extends Controller
                     'data' => $background,
                 ]);
             } else {
+                // Upload and convert image to WebP for new record
+                $uploadResult = $this->webpService->convertToWebP(
+                    $file,
+                    'data_section/image'
+                );
+
+                if (!$uploadResult['success']) {
+                    Log::error('Hero background create: Upload failed');
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Failed to upload image',
+                    ], 500);
+                }
+
+                Log::info('Hero background create: Upload successful', [
+                    'image_path' => $uploadResult['path'],
+                    'image_url' => $uploadResult['url']
+                ]);
                 // Create new hero background record only if it doesn't exist
                 $background = HeroBackground::create([
                     'name' => $validated['name'] ?? 'Hero Background',
@@ -157,6 +232,12 @@ class HeroBackgroundController extends Controller
                     'is_active' => $validated['is_active'] ?? true,
                     'sort_order' => $sortOrder,
                     'metadata' => $validated['metadata'] ?? [],
+                ]);
+
+                Log::info('Hero background create: Successfully created', [
+                    'background_id' => $background->id,
+                    'image_path' => $background->getRawOriginal('image_path'),
+                    'image_url' => $background->getRawOriginal('image_url')
                 ]);
 
                 return response()->json([
@@ -220,29 +301,91 @@ class HeroBackgroundController extends Controller
         ]);
 
         try {
+            // If background doesn't exist (no ID), try to find by sort_order or create new
+            if (!$background->id) {
+                $sortOrder = isset($validated['sort_order']) ? (int)$validated['sort_order'] : null;
+                if ($sortOrder !== null) {
+                    $existingBackground = HeroBackground::where('sort_order', $sortOrder)->first();
+                    if ($existingBackground) {
+                        $background = $existingBackground;
+                        Log::info('Hero background update: Found existing background by sort_order', [
+                            'background_id' => $background->id,
+                            'sort_order' => $sortOrder
+                        ]);
+                    }
+                }
+                
+                // If still not found and we have sort_order and file, create new
+                if (!$background->id && $sortOrder !== null && ($request->hasFile('image') || $request->hasFile('image_file'))) {
+                    Log::info('Hero background update: Background not found, redirecting to create', [
+                        'sort_order' => $sortOrder
+                    ]);
+                    // Use store method logic
+                    return $this->store($request);
+                } else if (!$background->id) {
+                    Log::error('Hero background update: Background not found', [
+                        'sort_order' => $sortOrder
+                    ]);
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Hero background not found and cannot create without sort_order',
+                    ], 404);
+                }
+            }
+
             $updateData = [
-                'name' => $validated['name'] ?? $background->name,
-                'description' => $validated['description'] ?? $background->description,
-                'is_active' => $validated['is_active'] ?? $background->is_active,
-                'sort_order' => $validated['sort_order'] ?? $background->sort_order,
-                'metadata' => $validated['metadata'] ?? $background->metadata,
+                'name' => isset($validated['name']) ? $validated['name'] : $background->name,
+                'description' => isset($validated['description']) ? $validated['description'] : $background->description,
+                'is_active' => isset($validated['is_active']) ? $validated['is_active'] : $background->is_active,
+                'sort_order' => isset($validated['sort_order']) ? (int)$validated['sort_order'] : $background->sort_order,
+                'metadata' => isset($validated['metadata']) ? $validated['metadata'] : $background->metadata,
             ];
 
             // Handle new image upload (support 'image' and 'image_file')
             if ($request->hasFile('image') || $request->hasFile('image_file')) {
-                // Delete old image
-                if ($background->image_path) {
-                    $this->webpService->deleteFile($background->image_path);
-                }
-
+                // Get old image path BEFORE updating (refresh to get current value)
+                $oldImagePath = $background->getRawOriginal('image_path');
+                
+                Log::info('Hero background update: Starting file upload', [
+                    'background_id' => $background->id,
+                    'old_image_path' => $oldImagePath
+                ]);
+                
                 // Upload and convert new image
                 $file = $request->file('image') ?? $request->file('image_file');
                 $uploadResult = $this->webpService->convertToWebP($file, 'data_section/image');
 
                 if ($uploadResult['success']) {
+                    Log::info('Hero background update: File upload successful', [
+                        'background_id' => $background->id,
+                        'new_image_path' => $uploadResult['path'],
+                        'new_image_url' => $uploadResult['url']
+                    ]);
+
+                    // Only delete old file if new upload succeeded and old file exists
+                    if ($oldImagePath && !empty($oldImagePath) && $oldImagePath !== $uploadResult['path']) {
+                        $deleted = $this->webpService->deleteFile($oldImagePath);
+                        if (!$deleted) {
+                            // Log warning but don't fail the update
+                            Log::warning('Failed to delete old hero background image', [
+                                'background_id' => $background->id,
+                                'old_path' => $oldImagePath,
+                                'new_path' => $uploadResult['path']
+                            ]);
+                        } else {
+                            Log::info('Hero background update: Old file deleted', [
+                                'background_id' => $background->id,
+                                'old_path' => $oldImagePath
+                            ]);
+                        }
+                    }
+                    
                     $updateData['image_path'] = $uploadResult['path'];
                     $updateData['image_url'] = $uploadResult['url'];
                 } else {
+                    Log::error('Hero background update: File upload failed', [
+                        'background_id' => $background->id
+                    ]);
                     return response()->json([
                         'success' => false,
                         'message' => 'Failed to upload new image',
@@ -250,7 +393,32 @@ class HeroBackgroundController extends Controller
                 }
             }
 
-            $background->update($updateData);
+            Log::info('Hero background update: Attempting database update', [
+                'background_id' => $background->id,
+                'update_data' => $updateData
+            ]);
+
+            $updated = $background->update($updateData);
+            
+            if (!$updated) {
+                Log::error('Hero background update: Database update failed', [
+                    'background_id' => $background->id,
+                    'update_data' => $updateData
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to update hero background in database',
+                ], 500);
+            }
+
+            // Refresh to get latest data
+            $background->refresh();
+
+            Log::info('Hero background update: Successfully updated', [
+                'background_id' => $background->id,
+                'final_image_path' => $background->getRawOriginal('image_path'),
+                'final_image_url' => $background->getRawOriginal('image_url')
+            ]);
 
             return response()->json([
                 'success' => true,
@@ -259,6 +427,11 @@ class HeroBackgroundController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            Log::error('Hero background update: Exception occurred', [
+                'background_id' => $background->id ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update hero background: ' . $e->getMessage(),
@@ -277,9 +450,18 @@ class HeroBackgroundController extends Controller
         }
 
         try {
+            // Get old image path BEFORE deleting
+            $oldImagePath = $background->getRawOriginal('image_path');
+            
             // Delete image file
-            if ($background->image_path) {
-                $this->webpService->deleteFile($background->image_path);
+            if ($oldImagePath && !empty($oldImagePath)) {
+                $deleted = $this->webpService->deleteFile($oldImagePath);
+                if (!$deleted) {
+                    Log::warning('Failed to delete hero background image file', [
+                        'background_id' => $background->id,
+                        'path' => $oldImagePath
+                    ]);
+                }
             }
 
             $background->delete();

@@ -38,6 +38,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
   className = ''
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -65,6 +66,15 @@ const FileUpload: React.FC<FileUploadProps> = ({
     }
   }, [currentFile]);
 
+  // Clean up object URL when component unmounts or file changes
+  React.useEffect(() => {
+    return () => {
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -85,6 +95,14 @@ const FileUpload: React.FC<FileUploadProps> = ({
       return;
     }
 
+    // Revoke previous preview URL if exists
+    if (previewUrl && previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    // Create preview URL for instant preview
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
     setSelectedFile(file);
     setUploadError(null);
     onFileSelect(file);
@@ -117,6 +135,13 @@ const FileUpload: React.FC<FileUploadProps> = ({
       
       clearInterval(progressInterval);
       setUploadProgress(100);
+      
+      // Revoke preview URL since we now have uploaded URL
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+      }
+      
       // Support both absolute URLs and relative paths from server
       setUploadedUrl(resolveUrl(url));
       setUploadError(null);
@@ -134,7 +159,13 @@ const FileUpload: React.FC<FileUploadProps> = ({
   };
 
   const handleRemoveFile = () => {
+    // Revoke preview URL if exists
+    if (previewUrl && previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    
     setSelectedFile(null);
+    setPreviewUrl(null);
     setUploadedUrl(null);
     setUploadError(null);
     onFileSelect(null);
@@ -218,6 +249,29 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 </>
               )}
             </div>
+          ) : previewUrl && selectedFile ? (
+            <div className="space-y-2">
+              {type === 'image' ? (
+                <div className="relative w-full h-32 overflow-hidden rounded-lg">
+                  <img 
+                    src={previewUrl} 
+                    alt={label || 'Preview'} 
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // Fallback if preview fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <VideoIcon className="h-8 w-8 mx-auto text-gray-400" />
+                  <p className="text-sm font-medium">{selectedFile.name}</p>
+                  <p className="text-xs text-gray-500">{formatFileSize(selectedFile.size)}</p>
+                </div>
+              )}
+            </div>
           ) : selectedFile ? (
             <div className="space-y-2">
               {getIcon()}
@@ -252,6 +306,9 @@ const FileUpload: React.FC<FileUploadProps> = ({
             <span className="text-sm text-gray-700">
               {selectedFile?.name || uploadedUrl?.split('/').pop()}
             </span>
+            {selectedFile && !uploadedUrl && (
+              <span className="text-xs text-gray-500 ml-2">(Preview)</span>
+            )}
           </div>
           <Button
             type="button"

@@ -53,6 +53,11 @@ class HeroBackground extends Model
             return $value;
         }
 
+        // If it's already a relative path starting with /storage/, return as is
+        if (is_string($value) && str_starts_with($value, '/storage/')) {
+            return $value;
+        }
+
         // If it's a full URL but missing /storage, attempt to fix using image_path
         if (is_string($value) && str_starts_with($value, 'http') && !str_contains($value, '/storage/')) {
             if (!empty($this->attributes['image_path'])) {
@@ -60,16 +65,17 @@ class HeroBackground extends Model
             }
         }
 
-        // If it's a relative path, convert via storage helper
-        if (is_string($value) && !str_starts_with($value, 'http')) {
+        // If it's a relative path (not starting with /storage/), convert via storage helper
+        if (is_string($value) && !str_starts_with($value, 'http') && !str_starts_with($value, '/storage/') && !empty($value)) {
             return Storage::url($value);
         }
 
-        // Fallback to image_path if image_url is empty
+        // Fallback to image_path if image_url is empty or invalid
         if (empty($value) && !empty($this->attributes['image_path'])) {
             return Storage::url($this->attributes['image_path']);
         }
 
-        return $value;
+        // Return empty string if nothing is available (frontend will handle fallback)
+        return $value ?? '';
     }
 }

@@ -5,6 +5,7 @@ namespace App\Services;
 use WebPConvert\WebPConvert;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class WebpConversionService
@@ -377,8 +378,13 @@ class WebpConversionService
      */
     public function deleteFile(string $path): bool
     {
+        if (empty($path) || !is_string($path)) {
+            Log::warning('deleteFile: Invalid path provided', ['path' => $path]);
+            return false;
+        }
+
         // Normalize to relative path under storage/app/public
-        $normalized = $path;
+        $normalized = trim($path);
 
         // If full URL, extract path component
         if (str_starts_with($normalized, 'http://') || str_starts_with($normalized, 'https://')) {
@@ -394,17 +400,91 @@ class WebpConversionService
         // Ensure we have a relative path like data_section/image/...
         $normalized = ltrim($normalized, '/');
 
+        if (empty($normalized)) {
+            Log::warning('deleteFile: Empty normalized path', ['original_path' => $path]);
+            return false;
+        }
+
         // Primary location: storage/app/public/
         $storageFullPath = storage_path('app/public/' . $normalized);
         if (file_exists($storageFullPath)) {
-            return @unlink($storageFullPath);
+            if (is_file($storageFullPath)) {
+                $deleted = @unlink($storageFullPath);
+                if ($deleted) {
+                    Log::info('deleteFile: Successfully deleted file', [
+                        'path' => $normalized,
+                        'full_path' => $storageFullPath
+                    ]);
+                    return true;
+                } else {
+                    Log::error('deleteFile: Failed to delete file (unlink returned false)', [
+                        'path' => $normalized,
+                        'full_path' => $storageFullPath,
+                        'permissions' => substr(sprintf('%o', fileperms($storageFullPath)), -4),
+                        'is_writable' => is_writable($storageFullPath)
+                    ]);
+                    return false;
+                }
+            } else {
+                Log::warning('deleteFile: Path exists but is not a file', [
+                    'path' => $normalized,
+                    'full_path' => $storageFullPath
+                ]);
+            }
         }
 
         // Fallback: public/ (in case legacy files were placed directly under public)
         $publicFullPath = public_path($normalized);
         if (file_exists($publicFullPath)) {
-            return @unlink($publicFullPath);
+            if (is_file($publicFullPath)) {
+                $deleted = @unlink($publicFullPath);
+                if ($deleted) {
+                    Log::info('deleteFile: Successfully deleted file from public directory', [
+                        'path' => $normalized,
+                        'full_path' => $publicFullPath
+                    ]);
+                    return true;
+                } else {
+                    Log::error('deleteFile: Failed to delete file from public directory', [
+                        'path' => $normalized,
+                        'full_path' => $publicFullPath,
+                        'permissions' => substr(sprintf('%o', fileperms($publicFullPath)), -4),
+                        'is_writable' => is_writable($publicFullPath)
+                    ]);
+                    return false;
+                }
+            } else {
+                Log::warning('deleteFile: Path exists in public but is not a file', [
+                    'path' => $normalized,
+                    'full_path' => $publicFullPath
+                ]);
+            }
         }
+
+        // Try with /storage prefix removed if it's in the path
+        if (str_contains($normalized, 'storage/')) {
+            $withoutStorage = str_replace('storage/', '', $normalized);
+            $altStoragePath = storage_path('app/public/' . $withoutStorage);
+            if (file_exists($altStoragePath) && is_file($altStoragePath)) {
+                $deleted = @unlink($altStoragePath);
+                if ($deleted) {
+                    Log::info('deleteFile: Successfully deleted file (alternative path)', [
+                        'path' => $withoutStorage,
+                        'full_path' => $altStoragePath
+                    ]);
+                    return true;
+                }
+            }
+        }
+
+        Log::warning('deleteFile: File not found', [
+            'original_path' => $path,
+            'normalized_path' => $normalized,
+            'storage_path' => $storageFullPath,
+            'public_path' => $publicFullPath,
+            'storage_exists' => file_exists($storageFullPath),
+            'public_exists' => file_exists($publicFullPath)
+        ]);
 
         return false;
     }

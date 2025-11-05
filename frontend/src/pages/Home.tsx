@@ -206,12 +206,17 @@ const Home = () => {
 
   // Helper to construct full URL if needed (defined early for use in useEffect)
   const getImageUrl = (src: string) => {
-    if (!src) return cover1;
-    // If it's already a full URL or starts with /, return as is
-    if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/')) {
+    if (!src || !src.trim()) return cover1;
+    // If it's already a full URL, return as is
+    if (src.startsWith('http://') || src.startsWith('https://')) {
       return src;
     }
-    // If it's a relative path, construct full URL
+    // If it starts with /storage or /, construct full URL
+    if (src.startsWith('/storage/') || src.startsWith('/')) {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      return `${API_BASE_URL.replace('/api', '')}${src}`;
+    }
+    // If it's a relative path without leading slash, construct full URL
     const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
     return `${API_BASE_URL.replace('/api', '')}/${src.replace(/^\//, '')}`;
   };
@@ -231,17 +236,18 @@ const Home = () => {
             .map(bg => {
               const url = bg.image_url || bg.image_path;
               // Construct full URL if needed, add cache-busting parameter
-              if (url) {
+              if (url && url.trim()) {
                 const fullUrl = getImageUrl(url);
                 // Add timestamp to prevent caching
-                return fullUrl.includes('?') 
+                const finalUrl = fullUrl.includes('?') 
                   ? `${fullUrl}&t=${Date.now()}` 
                   : `${fullUrl}?t=${Date.now()}`;
+                return finalUrl;
               }
               return null;
             })
-            .filter(Boolean);
-          setHeroBgUrls(urls as string[]);
+            .filter((url): url is string => Boolean(url) && url.trim() !== '');
+          setHeroBgUrls(urls);
         } else {
           // If no backgrounds found, clear the state
           setHeroBgUrls([]);
@@ -284,13 +290,18 @@ const Home = () => {
 
     // Prefer database hero backgrounds if available
     if (heroBgUrls.length > 0) {
-      return defaultCollage.map((d, index) => ({
-        src: heroBgUrls[index % heroBgUrls.length] || d.src,
-        alt: `${t('general.background')} ${index + 1}`,
-        rotation: d.rotation,
-        x: d.x,
-        y: d.y,
-      }));
+      return defaultCollage.map((d, index) => {
+        const dbUrl = heroBgUrls[index % heroBgUrls.length];
+        // Only use database URL if it's valid and not empty
+        const finalSrc = (dbUrl && dbUrl.trim()) ? dbUrl : d.src;
+        return {
+          src: finalSrc,
+          alt: `${t('general.background')} ${index + 1}`,
+          rotation: d.rotation,
+          x: d.x,
+          y: d.y,
+        };
+      });
     }
 
     // Otherwise, if hero settings have background images, use them
@@ -1208,15 +1219,15 @@ const Home = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12 max-w-6xl mx-auto mb-8">
             {/* Freemium Plan */}
-            <div className="bg-gray-900/50 rounded-xl p-8 lg:p-10 border border-white/10 hover:border-primary/50 transition-all duration-300 hover:shadow-2xl backdrop-blur-sm">
+            <div className="bg-gray-900/50 rounded-xl p-8 lg:p-10 border border-white/10 hover:border-primary/50 transition-all duration-300 hover:shadow-2xl backdrop-blur-sm flex flex-col">
               <div className="text-center mb-8">
                 <h3 className="text-2xl font-bold mb-2 text-white font-montserrat">{t('plans.freemium')}</h3>
                 <div className="text-4xl font-bold text-white mb-2 font-montserrat">{t('plans.free')}</div>
                 <p className="text-gray-400 font-montserrat">{t('plans.perfect_for_getting_started')}</p>
               </div>
-              <ul className="space-y-4 mb-8">
+              <ul className="space-y-4 mb-8 flex-grow">
                 <li className="flex items-center text-gray-300 font-montserrat">
                   <Check className="h-5 w-5 text-primary mr-3 flex-shrink-0" />
                   <span>{t('features.access_basic_content')}</span>
@@ -1230,13 +1241,10 @@ const Home = () => {
                   <span>{t('features.mobile_app_access')}</span>
                 </li>
               </ul>
-              <Button variant="outline" className="w-full bg-white/10 border-white/30 text-white hover:bg-white/20 hover:border-white font-semibold" onClick={() => navigate('/auth')}>
-                {t('plans.get_started_free')}
-              </Button>
             </div>
 
             {/* Basic Plan */}
-            <div className="bg-gray-900/50 rounded-xl p-8 lg:p-10 border-2 border-primary relative hover:shadow-2xl transition-all duration-300 backdrop-blur-sm transform hover:scale-105">
+            <div className="bg-gray-900/50 rounded-xl p-8 lg:p-10 border-2 border-primary relative hover:shadow-2xl transition-all duration-300 backdrop-blur-sm transform hover:scale-105 flex flex-col">
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                 <Badge className="bg-primary text-white px-4 py-1 font-semibold">{t('plans.most_popular')}</Badge>
               </div>
@@ -1245,7 +1253,7 @@ const Home = () => {
                 <div className="text-4xl font-bold text-white mb-2 font-montserrat">$19<span className="text-lg text-gray-400">{t('plans.per_month')}</span></div>
                 <p className="text-gray-400 font-montserrat">{t('plans.for_art_enthusiasts')}</p>
               </div>
-              <ul className="space-y-4 mb-8">
+              <ul className="space-y-4 mb-8 flex-grow">
                 <li className="flex items-center text-gray-300 font-montserrat">
                   <Check className="h-5 w-5 text-primary mr-3 flex-shrink-0" />
                   <span>{t('features.everything_in_freemium')}</span>
@@ -1263,19 +1271,16 @@ const Home = () => {
                   <span>{t('features.priority_support')}</span>
                 </li>
               </ul>
-              <Button className="w-full bg-primary hover:bg-primary/90 text-white font-semibold" onClick={() => navigate('/subscription')}>
-                {t('plans.start_basic_plan')}
-              </Button>
             </div>
 
             {/* Premium Plan */}
-            <div className="bg-gray-900/50 rounded-xl p-8 lg:p-10 border border-white/10 hover:border-primary/50 transition-all duration-300 hover:shadow-2xl backdrop-blur-sm">
+            <div className="bg-gray-900/50 rounded-xl p-8 lg:p-10 border border-white/10 hover:border-primary/50 transition-all duration-300 hover:shadow-2xl backdrop-blur-sm flex flex-col">
               <div className="text-center mb-8">
                 <h3 className="text-2xl font-bold mb-2 text-white font-montserrat">{t('plans.premium')}</h3>
                 <div className="text-4xl font-bold text-white mb-2 font-montserrat">$39<span className="text-lg text-gray-400">{t('plans.per_month')}</span></div>
                 <p className="text-gray-400 font-montserrat">{t('plans.for_professionals')}</p>
               </div>
-              <ul className="space-y-4 mb-8">
+              <ul className="space-y-4 mb-8 flex-grow">
                 <li className="flex items-center text-gray-300 font-montserrat">
                   <Check className="h-5 w-5 text-primary mr-3 flex-shrink-0" />
                   <span>{t('features.everything_in_basic')}</span>
@@ -1297,10 +1302,20 @@ const Home = () => {
                   <span>{t('features.premium_support_24_7')}</span>
                 </li>
               </ul>
-              <Button variant="outline" className="w-full bg-white/10 border-white/30 text-white hover:bg-white/20 hover:border-white font-semibold" onClick={() => navigate('/subscription')}>
-                {t('plans.go_premium')}
-              </Button>
             </div>
+          </div>
+          
+          {/* Buttons Row - Aligned Horizontally */}
+          <div className="flex flex-col md:flex-row gap-4 md:gap-8 lg:gap-12 max-w-6xl mx-auto">
+            <Button variant="outline" className="w-full md:w-auto md:flex-1 bg-white/10 border-white/30 text-white hover:bg-white/20 hover:border-white font-semibold" onClick={() => navigate('/auth')}>
+              {t('plans.get_started_free')}
+            </Button>
+            <Button className="w-full md:w-auto md:flex-1 bg-primary hover:bg-primary/90 text-white font-semibold" onClick={() => navigate('/subscription')}>
+              {t('plans.start_basic_plan')}
+            </Button>
+            <Button variant="outline" className="w-full md:w-auto md:flex-1 bg-white/10 border-white/30 text-white hover:bg-white/20 hover:border-white font-semibold" onClick={() => navigate('/subscription')}>
+              {t('plans.go_premium')}
+            </Button>
           </div>
         </div>
       </section>
