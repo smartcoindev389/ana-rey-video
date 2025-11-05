@@ -56,7 +56,7 @@ import {
   TrendingUp,
   PlayCircle,
   RefreshCw,
-  
+  Languages
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
@@ -70,7 +70,8 @@ import FileUpload from '@/components/admin/FileUpload';
 const ContentManagement = () => {
   const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
-  const { locale } = useLocale();
+  const { locale: urlLocale } = useLocale();
+  const [contentLocale, setContentLocale] = useState<'en' | 'es' | 'pt'>(urlLocale as 'en' | 'es' | 'pt' || 'en');
   
   const [activeTab, setActiveTab] = useState('series');
   const [searchTerm, setSearchTerm] = useState('');
@@ -97,12 +98,16 @@ const ContentManagement = () => {
 
   useEffect(() => {
     fetchContent();
-  }, [locale]); // Refetch when locale changes
+  }, [contentLocale]); // Refetch when content locale changes
 
   const fetchContent = async () => {
     try {
       setIsLoading(true);
       console.log('Fetching content from admin APIs...');
+      
+      // Temporarily set locale in localStorage to fetch localized content
+      const originalLocale = localStorage.getItem('i18nextLng');
+      localStorage.setItem('i18nextLng', contentLocale);
       
       // Fetch data from API in parallel
       const [categoriesResponse, seriesResponse, videosResponse] = await Promise.allSettled([
@@ -110,6 +115,11 @@ const ContentManagement = () => {
         seriesApi.getAll({ per_page: 100 }),
         videoApi.getAll({ per_page: 100 })
       ]);
+      
+      // Restore original locale
+      if (originalLocale) {
+        localStorage.setItem('i18nextLng', originalLocale);
+      }
       
       console.log('API responses received:', {
         categories: categoriesResponse.status,

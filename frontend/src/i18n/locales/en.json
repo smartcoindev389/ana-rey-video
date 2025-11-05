@@ -863,14 +863,112 @@
     "multilingual_enter_translation": "Enter {language} translation...",
     "multilingual_no_translation": "No translation available",
     "multilingual_english": "English:",
-    "multilingual_of": "of"
+    "multilingual_of": "of",
+    "settings_page": {
+      "title": "Site Settings",
+      "subtitle": "Manage your site configuration and content",
+      "subtitle_short": "Manage your site configuration",
+      "tabs": {
+        "hero": "Hero Section",
+        "about": "About",
+        "testimonials": "Testimonials",
+        "faq": "FAQ",
+        "general": "General",
+        "footer": "Footer",
+        "contact": "Contact"
+      },
+      "slots": "slots",
+      "hero": {
+        "title": "Hero Section Settings",
+        "no_settings": "No hero settings found.",
+        "background_images": "Background Images",
+        "background_help": "Update background images shown in the home hero collage. If empty, the site uses default mock images."
+      },
+      "about": {
+        "title": "About Section Settings",
+        "image": "About Image",
+        "no_settings": "No about settings found."
+      },
+      "testimonials": {
+        "all_reviews": "All Reviews",
+        "subtitle": "All testimonials from the database. Choose which ones to display on homepage.",
+        "reviews_selected": "{{count}} review(s) selected for homepage",
+        "selection_help": "Only approved reviews can be selected. Click reviews to toggle selection.",
+        "clear_all": "Clear All",
+        "cleared": "Homepage reviews cleared",
+        "clear_failed": "Failed to clear homepage reviews",
+        "search_placeholder": "Search reviews...",
+        "filter_all": "All Reviews",
+        "filter_approved": "Approved Only",
+        "filter_pending": "Pending Review",
+        "loading": "Loading reviews...",
+        "no_reviews": "No reviews found.",
+        "show_on_home": "Show on Homepage",
+        "pending": "Pending Approval",
+        "featured": "Featured"
+      },
+      "faq": {
+        "editing_in_locale": "Editing FAQs in {{locale}} - Questions and answers will be saved in the selected language."
+      },
+      "general": {
+        "title": "General Settings",
+        "no_settings": "No general settings found."
+      },
+      "footer": {
+        "title": "Footer Settings",
+        "no_settings": "No footer settings found."
+      },
+      "contact": {
+        "title": "Contact Settings",
+        "save_btn": "Save Contact Settings ({{locale}})"
+      }
+    },
+    "settings_fields": {
+      "about_title": {
+        "label": "About Title",
+        "description": "Title for the about section"
+      },
+      "about_description": {
+        "label": "About Description",
+        "description": "Description for the about section"
+      }
+    }
   },
   "general": {
     "series": "Series",
     "anonymous": "Anonymous",
     "user": "User",
     "categories": "Categories",
-    "loading_categories": "Loading categories..."
+    "loading_categories": "Loading categories...",
+    "uncategorized": "Uncategorized",
+    "instructor": "Instructor",
+    "background": "Background",
+    "about_sacrart": "About SACRART",
+    "discover_amazing_content": "Discover amazing content in this category.",
+    "explore_curated_collection": "Explore our curated collection of content in this category.",
+    "expert_content": "Expert Content",
+    "professional_techniques": "Professional Techniques",
+    "quality_learning": "Quality Learning",
+    "sculpting_series": "Sculpting Series",
+    "art_techniques": "Art Techniques",
+    "master_classes": "Master Classes",
+    "restoration": "Restoration",
+    "behind_scenes": "Behind Scenes",
+    "professional_tips": "Professional Tips",
+    "creative_process": "Creative Process",
+    "expert_insights": "Expert Insights",
+    "studio_sessions": "Studio Sessions",
+    "art_history": "Art History",
+    "modern_art": "Modern Art",
+    "classical_techniques": "Classical Techniques",
+    "digital_art": "Digital Art",
+    "traditional_methods": "Traditional Methods",
+    "contemporary_art": "Contemporary Art",
+    "artistic_vision": "Artistic Vision",
+    "featured_courses": "Featured Courses",
+    "handpicked_courses_subtitle": "Handpicked courses from our expert instructors",
+    "courses": "courses",
+    "hero_background": "Hero Background"
   },
   "seriesDetail": {
     "failed_load_category": "Failed to load category details",

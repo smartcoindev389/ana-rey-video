@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -49,8 +49,7 @@ const Home = () => {
   const [activeTab, setActiveTab] = useState(0); // Start at first category tab
   const [faqs, setFaqs] = useState<Record<string, Faq[]>>({});
   const [faqLoading, setFaqLoading] = useState(false);
-  const [heroSettings, setHeroSettings] = useState<Record<string, string>>({});
-  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [aboutImageError, setAboutImageError] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | undefined>(undefined);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
@@ -61,6 +60,8 @@ const Home = () => {
   const [featuredCourse, setFeaturedCourse] = useState<any>(null);
   const [featuredCourses, setFeaturedCourses] = useState<any[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(false);
+  const [heroSettings, setHeroSettings] = useState<Record<string, string>>({});
+  const [settingsLoading, setSettingsLoading] = useState(false);
   const tabContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -83,7 +84,7 @@ const Home = () => {
 
   const handleCategoryClick = (categoryId: number) => {
     setSelectedCategoryId(categoryId);
-    navigateWithLocale(`/explore?category=${categoryId}`);
+    navigateWithLocale(`/category/${categoryId}`);
   };
 
   const centerActiveTab = (tabIndex: number, instant: boolean = false) => {
@@ -203,35 +204,103 @@ const Home = () => {
     visibility: "premium"
   };
 
+  // Helper to construct full URL if needed (defined early for use in useEffect)
+  const getImageUrl = (src: string) => {
+    if (!src) return cover1;
+    // If it's already a full URL or starts with /, return as is
+    if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/')) {
+      return src;
+    }
+    // If it's a relative path, construct full URL
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    return `${API_BASE_URL.replace('/api', '')}/${src.replace(/^\//, '')}`;
+  };
+
+  // HBO Max style poster collage data - pulled from DB when available
+  const [heroBgUrls, setHeroBgUrls] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Fetch public hero backgrounds from DB
+    const fetchHeroBackgrounds = async () => {
+      try {
+        const { heroBackgroundApi } = await import('@/services/heroBackgroundApi');
+        const resp = await heroBackgroundApi.getPublic();
+        if (resp?.success && Array.isArray(resp.data) && resp.data.length > 0) {
+          const urls = resp.data
+            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+            .map(bg => {
+              const url = bg.image_url || bg.image_path;
+              // Construct full URL if needed, add cache-busting parameter
+              if (url) {
+                const fullUrl = getImageUrl(url);
+                // Add timestamp to prevent caching
+                return fullUrl.includes('?') 
+                  ? `${fullUrl}&t=${Date.now()}` 
+                  : `${fullUrl}?t=${Date.now()}`;
+              }
+              return null;
+            })
+            .filter(Boolean);
+          setHeroBgUrls(urls as string[]);
+        } else {
+          // If no backgrounds found, clear the state
+          setHeroBgUrls([]);
+        }
+      } catch (e) {
+        // Silent fallback to defaults
+        console.warn('Hero backgrounds fetch failed; using defaults', e);
+        setHeroBgUrls([]);
+      }
+    };
+
+    fetchHeroBackgrounds();
+    
+    // Refetch every 30 seconds to get new uploads (optional, but helpful)
+    const interval = setInterval(fetchHeroBackgrounds, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
   // HBO Max style poster collage data - now configurable from admin
   const getPosterCollage = () => {
     const defaultCollage = [
-      { src: cover1, alt: "Sculpting Series", rotation: -8, x: 10, y: 15 },
-      { src: cover2, alt: "Art Techniques", rotation: 12, x: 25, y: 5 },
-      { src: cover3, alt: "Master Classes", rotation: -5, x: 45, y: 20 },
-      { src: cover4, alt: "Restoration", rotation: 8, x: 65, y: 10 },
-      { src: cover5, alt: "Behind Scenes", rotation: -12, x: 80, y: 25 },
-      { src: cover6, alt: "Professional Tips", rotation: 6, x: 15, y: 35 },
-      { src: cover7, alt: "Creative Process", rotation: -10, x: 35, y: 40 },
-      { src: cover8, alt: "Expert Insights", rotation: 9, x: 55, y: 35 },
-      { src: cover1, alt: "Studio Sessions", rotation: -7, x: 75, y: 45 },
-      { src: cover2, alt: "Art History", rotation: 11, x: 5, y: 55 },
-      { src: cover3, alt: "Modern Art", rotation: -9, x: 30, y: 60 },
-      { src: cover4, alt: "Classical Techniques", rotation: 7, x: 60, y: 55 },
-      { src: cover5, alt: "Digital Art", rotation: -11, x: 85, y: 65 },
-      { src: cover6, alt: "Traditional Methods", rotation: 5, x: 20, y: 75 },
-      { src: cover7, alt: "Contemporary Art", rotation: -6, x: 50, y: 75 },
-      { src: cover8, alt: "Artistic Vision", rotation: 10, x: 70, y: 80 }
+      { src: cover1, alt: t('general.sculpting_series'), rotation: -8, x: 10, y: 15 },
+      { src: cover2, alt: t('general.art_techniques'), rotation: 12, x: 25, y: 5 },
+      { src: cover3, alt: t('general.master_classes'), rotation: -5, x: 45, y: 20 },
+      { src: cover4, alt: t('general.restoration'), rotation: 8, x: 65, y: 10 },
+      { src: cover5, alt: t('general.behind_scenes'), rotation: -12, x: 80, y: 25 },
+      { src: cover6, alt: t('general.professional_tips'), rotation: 6, x: 15, y: 35 },
+      { src: cover7, alt: t('general.creative_process'), rotation: -10, x: 35, y: 40 },
+      { src: cover8, alt: t('general.expert_insights'), rotation: 9, x: 55, y: 35 },
+      { src: cover1, alt: t('general.studio_sessions'), rotation: -7, x: 75, y: 45 },
+      { src: cover2, alt: t('general.art_history'), rotation: 11, x: 5, y: 55 },
+      { src: cover3, alt: t('general.modern_art'), rotation: -9, x: 30, y: 60 },
+      { src: cover4, alt: t('general.classical_techniques'), rotation: 7, x: 60, y: 55 },
+      { src: cover5, alt: t('general.digital_art'), rotation: -11, x: 85, y: 65 },
+      { src: cover6, alt: t('general.traditional_methods'), rotation: 5, x: 20, y: 75 },
+      { src: cover7, alt: t('general.contemporary_art'), rotation: -6, x: 50, y: 75 },
+      { src: cover8, alt: t('general.artistic_vision'), rotation: 10, x: 70, y: 80 }
     ];
 
-    // If hero settings have background images, use them
+    // Prefer database hero backgrounds if available
+    if (heroBgUrls.length > 0) {
+      return defaultCollage.map((d, index) => ({
+        src: heroBgUrls[index % heroBgUrls.length] || d.src,
+        alt: `${t('general.background')} ${index + 1}`,
+        rotation: d.rotation,
+        x: d.x,
+        y: d.y,
+      }));
+    }
+
+    // Otherwise, if hero settings have background images, use them
     if (heroSettings.hero_background_images) {
       try {
         const customImages = JSON.parse(heroSettings.hero_background_images);
         if (Array.isArray(customImages) && customImages.length > 0) {
           return customImages.map((img, index) => ({
-            src: img.url || defaultCollage[index % defaultCollage.length].src,
-            alt: img.alt || `Background ${index + 1}`,
+            src: img.url ? getImageUrl(img.url) : defaultCollage[index % defaultCollage.length].src,
+            alt: img.alt || `${t('general.background')} ${index + 1}`,
             rotation: img.rotation || defaultCollage[index % defaultCollage.length].rotation,
             x: img.x || defaultCollage[index % defaultCollage.length].x,
             y: img.y || defaultCollage[index % defaultCollage.length].y
@@ -245,7 +314,8 @@ const Home = () => {
     return defaultCollage;
   };
 
-  const posterCollage = getPosterCollage();
+  // Make posterCollage reactive to heroBgUrls and heroSettings changes
+  const posterCollage = useMemo(() => getPosterCollage(), [heroBgUrls, heroSettings, t]);
 
   useEffect(() => {
     // Simulate API call
@@ -268,7 +338,7 @@ const Home = () => {
     const fetchFaqs = async () => {
       setFaqLoading(true);
       try {
-        const response = await faqApi.getFaqs();
+        const response = await faqApi.getFaqs(undefined, locale);
         // Keep the grouped structure for category display
         setFaqs(response.data);
       } catch (error) {
@@ -281,7 +351,7 @@ const Home = () => {
     };
 
     fetchFaqs();
-  }, []);
+  }, [locale]); // Refetch when locale changes
 
   // Fetch Hero Settings from backend
   useEffect(() => {
@@ -290,19 +360,24 @@ const Home = () => {
       try {
         const response = await settingsApi.getPublicSettings();
         if (response.success) {
+          console.log('Hero settings loaded:', response.data);
+          console.log('About image URL:', response.data.about_image);
           setHeroSettings(response.data);
+          // Reset image error state when settings are loaded
+          setAboutImageError(false);
         }
       } catch (error) {
         console.error('Error fetching hero settings:', error);
         // Fallback to default values if API fails
         setHeroSettings({
-          hero_title: 'Sculpting Mastery',
-          hero_subtitle: 'Witness the artistry behind incredible sculpting techniques and restoration processes',
-          hero_cta_text: 'Start enjoying SACRART plans from only',
+          hero_title: t('hero.title'),
+          hero_subtitle: t('hero.subtitle'),
+          hero_cta_text: t('hero.cta_text'),
           hero_price: '$9.99/month',
-          hero_cta_button_text: 'GET SACRART',
-          hero_disclaimer: '*Requires subscription and the Premium add-on (its availability varies depending on the subscription provider). Automatic renewal unless canceled. Subject to Terms and Conditions. Content availability varies by plan. +18.'
+          hero_cta_button_text: t('hero.cta_button'),
+          hero_disclaimer: t('hero.disclaimer')
         });
+        setAboutImageError(false);
       } finally {
         setSettingsLoading(false);
       }
@@ -316,7 +391,7 @@ const Home = () => {
     const fetchCategories = async () => {
       setCategoriesLoading(true);
       try {
-        const response = await categoryApi.getPublic();
+        const response = await categoryApi.getPublic(locale);
         if (response.success) {
           const cats = response.data || [];
           setCategories(cats);
@@ -338,7 +413,7 @@ const Home = () => {
     };
 
     fetchCategories();
-  }, []);
+  }, [locale]); // Refetch when locale changes
 
   // Fetch videos for all categories
   const fetchSeriesForCategories = async (cats: Category[]) => {
@@ -419,11 +494,11 @@ const Home = () => {
             description: firstVideo.short_description || firstVideo.description || '',
             video: firstVideo, // Include full video object for preview
             image: getImageUrl(firstVideo.thumbnail_url || firstVideo.intro_image_url || firstVideo.thumbnail || firstVideo.intro_image || cover1),
-            category: firstVideo.category?.name || 'Uncategorized',
+            category: firstVideo.category?.name || t('general.uncategorized'),
             duration: `${Math.floor((firstVideo.duration || 0) / 60)}m`,
             rating: parseFloat(firstVideo.rating || '0'),
             studentsCount: firstVideo.views || 0,
-            instructor: firstVideo.instructor?.name || 'Instructor',
+            instructor: firstVideo.instructor?.name || t('general.instructor'),
             comments_count: (firstVideo as any).comments_count || 0,
             views: firstVideo.views || 0
           });
@@ -437,8 +512,8 @@ const Home = () => {
             duration: `${Math.floor((video.duration || 0) / 60)}m`,
             rating: parseFloat(video.rating || '0'),
             studentsCount: video.views || 0,
-            instructor: video.instructor?.name || 'Instructor',
-            category: video.category?.name || 'Uncategorized',
+            instructor: video.instructor?.name || t('general.instructor'),
+            category: video.category?.name || t('general.uncategorized'),
             comments_count: (video as any).comments_count || 0
           }));
           
@@ -480,8 +555,8 @@ const Home = () => {
               duration: `${Math.floor((video.duration || 0) / 60)}m`,
               rating: parseFloat(video.rating || '0'),
               studentsCount: video.views || 0,
-              instructor: video.instructor?.name || 'Instructor',
-              category: video.category?.name || 'Uncategorized',
+              instructor: video.instructor?.name || t('general.instructor'),
+              category: video.category?.name || t('general.uncategorized'),
               comments_count: (video as any).comments_count || 0
             }));
             
@@ -569,23 +644,23 @@ const Home = () => {
     );
   };
 
-  // Helper to construct full URL if needed
-  const getImageUrl = (src: string) => {
-    if (!src) return cover1;
-    // If it's already a full URL or starts with /, return as is
-    if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/')) {
-      return src;
-    }
-    // If it's a relative path, construct full URL
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-    return `${API_BASE_URL.replace('/api', '')}/${src.replace(/^\//, '')}`;
-  };
 
   // Transform categories from database to courseCategories format
   const courseCategories = categories.map((category) => {
-    // Get image from category's thumbnail or cover_image, fallback to default
-    const categoryImage = category.cover_image || category.thumbnail;
-    const imageUrl = categoryImage ? getImageUrl(categoryImage) : cover1;
+    // Get image from category's URL fields (from backend accessors) or raw fields, fallback to default
+    // Priority: image_url > cover_image_url > thumbnail_url > image > cover_image > thumbnail
+    const categoryImage = category.image_url 
+      || category.cover_image_url 
+      || category.thumbnail_url 
+      || category.image 
+      || category.cover_image 
+      || category.thumbnail;
+    // If it's already a full URL (from accessors), use it directly; otherwise construct URL
+    const imageUrl = categoryImage 
+      ? (categoryImage.startsWith('http') || categoryImage.startsWith('/') 
+          ? categoryImage 
+          : getImageUrl(categoryImage)) 
+      : cover1;
     
     return {
       id: category.id,
@@ -715,9 +790,9 @@ const Home = () => {
         id: category.id,
         title: category.name.toUpperCase(),
         icon: TrendingUp,
-        summary: category.description || "Discover amazing content in this category.",
-        description: category.description || "Explore our curated collection of content in this category.",
-        features: ["Expert Content", "Professional Techniques", "Quality Learning"],
+        summary: category.description || t('general.discover_amazing_content'),
+        description: category.description || t('general.explore_curated_collection'),
+        features: [t('general.expert_content'), t('general.professional_techniques'), t('general.quality_learning')],
         backgroundImage: cover1,
         series: seriesData
       };
@@ -876,6 +951,15 @@ const Home = () => {
                     src={poster.src}
                     alt={poster.alt}
                     className="w-full h-full object-cover rounded-sm shadow-lg"
+                    key={`${poster.src}-${index}`}
+                    onError={(e) => {
+                      // Fallback to default cover if image fails to load
+                      const target = e.target as HTMLImageElement;
+                      if (!target.src.includes('cover')) {
+                        const covers = [cover1, cover2, cover3, cover4, cover5, cover6, cover7, cover8];
+                        target.src = covers[index % covers.length];
+                      }
+                    }}
                   />
                 </div>
               ))}
@@ -948,6 +1032,29 @@ const Home = () => {
            onCourseClick={handleCourseClick}
            onCategoryClick={handleCategoryClick}
            selectedCategoryId={selectedCategoryId}
+          heroBackgroundImage={(() => {
+            // First, try to use first hero background from database
+            if (heroBgUrls.length > 0) {
+              return heroBgUrls[0];
+            }
+            // Fallback: Get hero background image from settings
+            if (heroSettings.hero_background_images) {
+              try {
+                const customImages = JSON.parse(heroSettings.hero_background_images);
+                if (Array.isArray(customImages) && customImages.length > 0) {
+                  // Get the first image URL
+                  const firstImage = customImages[0];
+                  const imageUrl = firstImage.url || '';
+                  if (imageUrl) {
+                    return getImageUrl(imageUrl);
+                  }
+                }
+              } catch (e) {
+                console.error('Error parsing hero_background_images:', e);
+              }
+            }
+            return null;
+          })()}
          />
        ) : null}
 
@@ -980,14 +1087,30 @@ const Home = () => {
             </div>
             <div className="relative">
               <div className="aspect-[16/9] rounded-xl overflow-hidden shadow-2xl">
-                <iframe
-                  src="https://www.youtube.com/embed/aHR2IFjhOwg"
-                  title="About SACRART"
-                  className="w-full h-full"
-                  frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
+                {heroSettings.about_image && !aboutImageError ? (
+                  <img
+                    src={getImageUrl(heroSettings.about_image)}
+                    alt={heroSettings.about_title || t('about.title')}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // Fallback to YouTube if image fails to load
+                      console.error('About image failed to load:', getImageUrl(heroSettings.about_image), heroSettings.about_image);
+                      setAboutImageError(true);
+                    }}
+                    onLoad={() => {
+                      console.log('About image loaded successfully:', getImageUrl(heroSettings.about_image));
+                    }}
+                  />
+                ) : (
+                  <iframe
+                    src="https://www.youtube.com/embed/aHR2IFjhOwg"
+                    title={t('general.about_sacrart')}
+                    className="w-full h-full"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                )}
               </div>
             </div>
           </div>

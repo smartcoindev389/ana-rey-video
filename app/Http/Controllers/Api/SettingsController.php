@@ -10,21 +10,48 @@ use Illuminate\Support\Facades\Validator;
 
 class SettingsController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $settings = SiteSetting::getGrouped();
+        $locale = $request->header('Accept-Language') ? 
+            substr($request->header('Accept-Language'), 0, 2) : 
+            app()->getLocale();
+        
+        // Normalize locale
+        if (!in_array($locale, ['en', 'es', 'pt'])) {
+            $locale = 'en';
+        }
+        
+        $settings = SiteSetting::getGrouped($locale);
         return response()->json(['success' => true, 'data' => $settings]);
     }
 
-    public function getByGroup(string $group)
+    public function getByGroup(string $group, Request $request)
     {
-        $settings = SiteSetting::getByGroup($group);
+        $locale = $request->header('Accept-Language') ? 
+            substr($request->header('Accept-Language'), 0, 2) : 
+            app()->getLocale();
+        
+        // Normalize locale
+        if (!in_array($locale, ['en', 'es', 'pt'])) {
+            $locale = 'en';
+        }
+        
+        $settings = SiteSetting::getByGroup($group, $locale);
         return response()->json(['success' => true, 'data' => $settings]);
     }
 
-    public function getValue(string $key)
+    public function getValue(string $key, Request $request)
     {
-        $value = SiteSetting::getValue($key);
+        $locale = $request->header('Accept-Language') ? 
+            substr($request->header('Accept-Language'), 0, 2) : 
+            app()->getLocale();
+        
+        // Normalize locale
+        if (!in_array($locale, ['en', 'es', 'pt'])) {
+            $locale = 'en';
+        }
+        
+        $value = SiteSetting::getValue($key, null, $locale);
         return response()->json(['success' => true, 'value' => $value]);
     }
 
@@ -42,6 +69,7 @@ class SettingsController extends Controller
             'group' => 'string|max:255',
             'label' => 'nullable|string|max:255',
             'description' => 'nullable|string',
+            'locale' => 'nullable|in:en,es,pt', // Allow specifying locale for translations
         ]);
 
         if ($validator->fails()) {
@@ -49,13 +77,16 @@ class SettingsController extends Controller
         }
 
         try {
+            $locale = $request->input('locale', app()->getLocale());
+            
             $setting = SiteSetting::setValue(
                 $request->key,
                 $request->value,
                 $request->type ?? 'text',
                 $request->group ?? 'general',
                 $request->label,
-                $request->description
+                $request->description,
+                $locale
             );
 
             return response()->json(['success' => true, 'data' => $setting, 'message' => 'Setting updated successfully.']);
@@ -79,6 +110,7 @@ class SettingsController extends Controller
             'settings.*.group' => 'string|max:255',
             'settings.*.label' => 'nullable|string|max:255',
             'settings.*.description' => 'nullable|string',
+            'settings.*.locale' => 'nullable|in:en,es,pt', // Allow specifying locale for translations
         ]);
 
         if ($validator->fails()) {
@@ -89,13 +121,16 @@ class SettingsController extends Controller
             $updatedSettings = [];
             
             foreach ($request->settings as $settingData) {
+                $locale = $settingData['locale'] ?? app()->getLocale();
+                
                 $setting = SiteSetting::setValue(
                     $settingData['key'],
                     $settingData['value'],
                     $settingData['type'] ?? 'text',
                     $settingData['group'] ?? 'general',
                     $settingData['label'] ?? null,
-                    $settingData['description'] ?? null
+                    $settingData['description'] ?? null,
+                    $locale
                 );
                 $updatedSettings[] = $setting;
             }
@@ -106,21 +141,57 @@ class SettingsController extends Controller
         }
     }
 
-    public function getPublicSettings()
+    public function getPublicSettings(Request $request)
     {
+        // Get locale from request
+        $locale = $request->header('Accept-Language') ? 
+            substr($request->header('Accept-Language'), 0, 2) : 
+            app()->getLocale();
+        
+        // Normalize locale
+        if (!in_array($locale, ['en', 'es', 'pt'])) {
+            $locale = 'en';
+        }
+        
         // Only return public settings (you can add a 'is_public' field later if needed)
         $settings = SiteSetting::where('is_active', true)
             ->whereIn('key', [
+                // Hero section settings
                 'hero_title',
                 'hero_subtitle', 
                 'hero_cta_text',
                 'hero_cta_button_text',
                 'hero_price',
-                'hero_disclaimer'
+                'hero_disclaimer',
+                'hero_background_images',
+                // About section settings
+                'about_image',
+                'about_title',
+                'about_description',
+                // Testimonial section settings
+                'testimonial_title',
+                'testimonial_subtitle',
+                'homepage_testimonial_ids',
             ])
-            ->get()
-            ->pluck('value', 'key');
+            ->get();
+        
+        // Apply locale to translatable settings
+        $result = [];
+        foreach ($settings as $setting) {
+            $value = $setting->getLocalizedValue($locale);
+            
+            // Handle type casting for non-translatable fields
+            if ($setting->type === 'boolean') {
+                $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+            } elseif ($setting->type === 'number') {
+                $value = is_numeric($value) ? (float) $value : $value;
+            } elseif ($setting->type === 'json') {
+                $value = json_decode($value, true) ?? $value;
+            }
+            
+            $result[$setting->key] = $value;
+        }
 
-        return response()->json(['success' => true, 'data' => $settings]);
+        return response()->json(['success' => true, 'data' => $result]);
     }
 }

@@ -693,5 +693,5 @@ return [
     'admin_multilingual_no_translation' => 'Nenhuma tradução disponível',
     'admin_multilingual_english' => 'Inglês:',
     'admin_multilingual_of' => 'de',
-],
+];
 

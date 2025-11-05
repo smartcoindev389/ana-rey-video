@@ -6,9 +6,9 @@ const getLocale = (): string => {
 };
 
 // Helper function to get auth headers
-const getAuthHeaders = (): HeadersInit => {
+const getAuthHeaders = (localeOverride?: string): HeadersInit => {
   const token = localStorage.getItem('auth_token');
-  const locale = getLocale();
+  const locale = localeOverride || getLocale();
   return {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -49,6 +49,7 @@ export interface Category {
   color: string;
   icon: string;
   image?: string | null;
+  image_url?: string | null; // Full URL from backend accessor
   is_active: boolean;
   sort_order: number;
   // Series fields (merged from series table)
@@ -56,7 +57,9 @@ export interface Category {
   status?: 'draft' | 'published' | 'archived';
   instructor_id?: number | null;
   thumbnail?: string | null;
+  thumbnail_url?: string | null; // Full URL from backend accessor
   cover_image?: string | null;
+  cover_image_url?: string | null; // Full URL from backend accessor
   trailer_url?: string | null;
   meta_title?: string | null;
   meta_description?: string | null;
@@ -178,9 +181,14 @@ export const categoryApi = {
     return handleResponse<{ success: boolean; data: { data: Category[] } }>(response);
   },
 
-  async getPublic() {
+  async getPublic(locale?: string) {
+    const headers: HeadersInit = {
+      'Accept': 'application/json',
+      'Accept-Language': locale || getLocale(),
+    };
+    
     const response = await fetch(`${API_BASE_URL}/categories/public`, {
-      headers: getAuthHeaders(),
+      headers,
     });
     return handleResponse<{ success: boolean; data: Category[] }>(response);
   },

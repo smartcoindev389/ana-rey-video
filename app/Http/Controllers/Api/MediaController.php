@@ -28,17 +28,40 @@ class MediaController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
-        $validator = Validator::make($request->all(), [
-            'images' => 'required|array|max:10',
-            'images.*' => 'required|file|image|mimes:jpeg,png,jpg,webp|max:10240', // 10MB max per file
-        ]);
+        // Support both single image and array of images
+        $files = [];
+        if ($request->hasFile('image')) {
+            // Single image upload
+            $files = [$request->file('image')];
+        } elseif ($request->hasFile('images')) {
+            // Array of images
+            $files = is_array($request->file('images')) 
+                ? $request->file('images') 
+                : [$request->file('images')];
+        } elseif ($request->hasFile('images.*')) {
+            // Array form data with images[]
+            $files = $request->file('images');
+        }
 
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        if (empty($files)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No image file provided. Please upload a file under "image" or "images".'
+            ], 422);
+        }
+
+        // Validate each file
+        foreach ($files as $file) {
+            $validator = Validator::make(['file' => $file], [
+                'file' => 'required|file|image|mimes:jpeg,png,jpg,webp|max:10240', // 10MB max per file
+            ]);
+            if ($validator->fails()) {
+                return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+            }
         }
 
         try {
-            $results = $this->webpService->convertMultipleToWebP($request->file('images'), 'data_section/image');
+            $results = $this->webpService->convertMultipleToWebP($files, 'data_section/image');
             
             return response()->json([
                 'success' => true,

@@ -61,6 +61,8 @@ class Category extends Model
         'tags' => 'array',
     ];
 
+    protected $appends = ['image_url', 'thumbnail_url', 'cover_image_url'];
+
     /**
      * Get the route key for the model.
      */
@@ -293,5 +295,47 @@ class Category extends Model
         $rawValue = $this->attributes['meta_description'] ?? $value;
         $translation = $this->getTranslation('meta_description', $locale);
         return $translation ?: $rawValue;
+    }
+
+    /**
+     * Get the full image URL.
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        if ($this->image) {
+            if (str_starts_with($this->image, 'http')) {
+                return $this->image;
+            }
+            return url('storage/' . $this->image);
+        }
+        return null;
+    }
+
+    /**
+     * Get the full thumbnail URL.
+     */
+    public function getThumbnailUrlAttribute(): ?string
+    {
+        if ($this->thumbnail) {
+            if (str_starts_with($this->thumbnail, 'http')) {
+                return $this->thumbnail;
+            }
+            return url('storage/' . $this->thumbnail);
+        }
+        return null;
+    }
+
+    /**
+     * Get the full cover image URL.
+     */
+    public function getCoverImageUrlAttribute(): ?string
+    {
+        if ($this->cover_image) {
+            if (str_starts_with($this->cover_image, 'http')) {
+                return $this->cover_image;
+            }
+            return url('storage/' . $this->cover_image);
+        }
+        return null;
     }
 }

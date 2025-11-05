@@ -48,14 +48,23 @@ export const heroBackgroundApi = {
    */
   create: async (formData: FormData): Promise<HeroBackgroundResponse> => {
     const token = localStorage.getItem('auth_token');
-    const response = await axios.post(`${API_BASE_URL}/admin/hero-backgrounds`, formData, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json',
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data;
+    try {
+      // Let the browser/axios set proper multipart boundaries automatically
+      const response = await axios.post(`${API_BASE_URL}/admin/hero-backgrounds`, formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+        },
+      });
+      return response.data;
+    } catch (err: any) {
+      const server = err?.response?.data;
+      // Normalize error to surface validation messages clearly
+      const msg = server?.message 
+        || (server?.errors && Object.values(server.errors)[0]?.[0])
+        || 'Upload failed';
+      throw new Error(msg);
+    }
   },
 
   /**
@@ -63,14 +72,21 @@ export const heroBackgroundApi = {
    */
   update: async (id: number, formData: FormData): Promise<HeroBackgroundResponse> => {
     const token = localStorage.getItem('auth_token');
-    const response = await axios.put(`${API_BASE_URL}/admin/hero-backgrounds/${id}`, formData, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json',
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data;
+    try {
+      const response = await axios.post(`${API_BASE_URL}/admin/hero-backgrounds/${id}?_method=PUT`, formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+        },
+      });
+      return response.data;
+    } catch (err: any) {
+      const server = err?.response?.data;
+      const msg = server?.message 
+        || (server?.errors && Object.values(server.errors)[0]?.[0])
+        || 'Update failed';
+      throw new Error(msg);
+    }
   },
 
   /**

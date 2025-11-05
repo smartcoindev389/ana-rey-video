@@ -514,8 +514,8 @@ class VideoController extends Controller
                     'size' => $request->file('video_file')->getSize(),
                 ]);
                 
-                // Delete old video file if exists (and it's different from new one)
-                if ($video->video_file_path && $video->video_file_path !== $request->get('video_file_path')) {
+                // Delete old video file if exists
+                if ($video->video_file_path) {
                     $this->webpService->deleteFile($video->video_file_path);
                 }
 
@@ -584,7 +584,11 @@ class VideoController extends Controller
                         $validated['video_file_path'] = $newPath;
                     }
                 } else {
-                    // Path is being changed to a new/different path, just use it
+                    // Path is being changed to a new/different path
+                    // Delete old video file if it exists and is different from new path
+                    if ($originalPath && $originalPath !== $newPath) {
+                        $this->webpService->deleteFile($originalPath);
+                    }
                     $validated['video_file_path'] = $newPath;
                 }
             } else {

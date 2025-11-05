@@ -226,6 +226,11 @@ class SeriesController extends Controller
         // Handle image file upload
         if ($request->hasFile('image_file')) {
             try {
+                // Delete old image if exists
+                if ($category->image) {
+                    $this->webpService->deleteFile($category->image);
+                }
+
                 $imageUploadResult = $this->webpService->convertToWebP(
                     $request->file('image_file'),
                     'data_section/image'

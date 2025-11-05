@@ -43,7 +43,27 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(currentFile || null);
   
+  // Helper to resolve absolute URL for previews (works with Storage::url and raw paths)
+  const resolveUrl = (src?: string | null) => {
+    if (!src) return '';
+    // If already absolute
+    if (src.startsWith('http://') || src.startsWith('https://')) return src;
+    // Determine backend base (prefer VITE_API_BASE_URL without /api, fallback to VITE_API_URL)
+    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api';
+    const origin = String(apiBase).replace(/\/?api\/?$/, '');
+    // Ensure leading slash for storage/relative paths
+    const path = src.startsWith('/') ? src : `/${src}`;
+    return `${origin}${path}`;
+  };
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Update uploadedUrl when currentFile prop changes
+  React.useEffect(() => {
+    if (currentFile) {
+      setUploadedUrl(resolveUrl(currentFile));
+    }
+  }, [currentFile]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -97,7 +117,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
       
       clearInterval(progressInterval);
       setUploadProgress(100);
-      setUploadedUrl(url);
+      // Support both absolute URLs and relative paths from server
+      setUploadedUrl(resolveUrl(url));
       setUploadError(null);
       
       setTimeout(() => {
@@ -176,9 +197,26 @@ const FileUpload: React.FC<FileUploadProps> = ({
             </div>
           ) : uploadedUrl ? (
             <div className="space-y-2">
-              <CheckCircle className="h-8 w-8 text-green-500 mx-auto" />
-              <p className="text-sm text-green-600">File uploaded successfully</p>
-              <p className="text-xs text-gray-500 truncate">{uploadedUrl.split('/').pop()}</p>
+              {type === 'image' ? (
+                <div className="relative w-full h-32 overflow-hidden rounded-lg">
+                  <img 
+                    src={resolveUrl(uploadedUrl || '')} 
+                    alt={label || 'Uploaded image'} 
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // Fallback if image fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              ) : (
+                <>
+                  <CheckCircle className="h-8 w-8 text-green-500 mx-auto" />
+                  <p className="text-sm text-green-600">File uploaded successfully</p>
+                  <p className="text-xs text-gray-500 truncate">{uploadedUrl.split('/').pop()}</p>
+                </>
+              )}
             </div>
           ) : selectedFile ? (
             <div className="space-y-2">

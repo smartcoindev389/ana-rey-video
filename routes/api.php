@@ -43,6 +43,9 @@ Route::get('/faqs/categories', [FaqController::class, 'categories']);
 // Public Settings routes
 Route::get('/settings/public', [SettingsController::class, 'getPublicSettings']);
 
+// Public Hero Backgrounds route
+Route::get('/hero-backgrounds/public', [HeroBackgroundController::class, 'public']);
+
 // Public Language routes
 Route::get('/languages', [LanguageController::class, 'languages']);
 Route::get('/locale', [LanguageController::class, 'getLocale']);
@@ -222,9 +225,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/categories', [CategoryController::class, 'index']);
     Route::get('/categories/{category}', [CategoryController::class, 'show']);
 
-    // Public access to hero backgrounds
-    Route::get('/hero-backgrounds/public', [HeroBackgroundController::class, 'public']);
-
     // Series (read access for authenticated users)
     Route::get('/series/{series}/videos', [VideoController::class, 'seriesVideos']);
     Route::get('/series/{series}/recommended', [SeriesController::class, 'recommended']);
@@ -265,6 +265,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/media/images', [\App\Http\Controllers\Api\MediaController::class, 'getImages']);
         Route::get('/media/videos', [\App\Http\Controllers\Api\MediaController::class, 'getVideos']);
         Route::delete('/media/files', [\App\Http\Controllers\Api\MediaController::class, 'deleteFile']);
+        Route::post('/media/files/delete', [\App\Http\Controllers\Api\MediaController::class, 'deleteFile']); // POST alias for compatibility
     });
     
 });

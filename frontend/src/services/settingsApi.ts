@@ -6,9 +6,9 @@ const getLocale = (): string => {
 };
 
 // Helper function to get auth headers
-const getAuthHeaders = (): HeadersInit => {
+const getAuthHeaders = (localeOverride?: string): HeadersInit => {
   const token = localStorage.getItem('auth_token');
-  const locale = getLocale();
+  const locale = localeOverride || getLocale();
   return {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -65,14 +65,15 @@ export interface SettingsUpdateRequest {
   group?: string;
   label?: string;
   description?: string;
+  locale?: string; // Add locale support for translations
 }
 
 // Settings API
 export const settingsApi = {
   // Get all settings grouped by group
-  async getAll(): Promise<{ success: boolean; data: SettingsGroup }> {
+  async getAll(locale?: string): Promise<{ success: boolean; data: SettingsGroup }> {
     const response = await fetch(`${API_BASE_URL}/admin/settings`, {
-      headers: getAuthHeaders(),
+      headers: getAuthHeaders(locale),
     });
     return handleResponse(response);
   },
@@ -94,11 +95,16 @@ export const settingsApi = {
   },
 
   // Bulk update settings
-  async bulkUpdate(settings: SettingsUpdateRequest[]): Promise<{ success: boolean; data: SiteSetting[]; message: string }> {
+  async bulkUpdate(settings: SettingsUpdateRequest[], locale?: string): Promise<{ success: boolean; data: SiteSetting[]; message: string }> {
+    // Add locale to each setting if provided (but don't override if already set)
+    const settingsWithLocale = locale 
+      ? settings.map(s => ({ ...s, locale: s.locale || locale }))
+      : settings;
+    
     const response = await fetch(`${API_BASE_URL}/admin/settings`, {
       method: 'PUT',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ settings }),
+      body: JSON.stringify({ settings: settingsWithLocale }),
     });
     return handleResponse(response);
   },

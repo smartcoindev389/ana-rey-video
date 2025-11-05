@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Play, Star, Clock, Users, Award, ChevronRight } from 'lucide-react';
@@ -53,6 +54,7 @@ interface CourseHeroSectionProps {
   onCourseClick: (courseId: number) => void;
   onCategoryClick: (categoryId: number) => void;
   selectedCategoryId?: number;
+  heroBackgroundImage?: string | null; // Hero background image from admin settings
 }
 
 const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
@@ -61,8 +63,10 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
   featuredCourses,
   onCourseClick,
   onCategoryClick,
-  selectedCategoryId
+  selectedCategoryId,
+  heroBackgroundImage
 }) => {
+  const { t } = useTranslation();
   const categoriesCarouselRef = useRef<HTMLDivElement>(null);
   const coursesCarouselRef = useRef<HTMLDivElement>(null);
   const [showCategoriesLeftArrow, setShowCategoriesLeftArrow] = useState(false);
@@ -212,12 +216,35 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
             </h1>
           </div>
           
-          {/* Right Side - Featured Course Video Preview */}
+          {/* Right Side - Hero Background Image */}
           <div className="relative">
-            <div className="aspect-[16/10] rounded-lg overflow-hidden shadow-2xl group">
-              {featuredCourse.video?.video_url_full ? (
+            <div className="aspect-[16/10] rounded-lg overflow-hidden shadow-2xl border-2 border-primary/30">
+              {heroBackgroundImage ? (
                 <>
-                  {/* Always show image as poster */}
+                  <img
+                    src={heroBackgroundImage}
+                    alt={featuredCourse.title || t('general.hero_background')}
+                    className="w-full h-full object-cover absolute inset-0"
+                    onError={(e) => {
+                      // If image fails, try to construct URL from relative path
+                      const target = e.target as HTMLImageElement;
+                      const src = target.src;
+                      if (!src.startsWith('http') && !src.startsWith('/')) {
+                        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+                        target.src = `${API_BASE_URL.replace('/api', '')}/storage/${src}`;
+                      } else if (src.startsWith('/')) {
+                        // If relative path, construct full URL
+                        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+                        target.src = `${API_BASE_URL.replace('/api', '')}${src}`;
+                      }
+                    }}
+                  />
+                  {/* Gradient Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                </>
+              ) : (
+                <>
+                  {/* Fallback to featured course image if no hero background */}
                   <img
                     src={featuredCourse.image || featuredCourse.video?.thumbnail_url || featuredCourse.video?.intro_image_url || featuredCourse.video?.thumbnail || featuredCourse.video?.intro_image}
                     alt={featuredCourse.title}
@@ -232,51 +259,10 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
                       }
                     }}
                   />
-                  {/* Video overlay - plays on hover for 15 seconds */}
-                  <video
-                    src={featuredCourse.video.video_url_full}
-                    className="w-full h-full object-cover absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                    muted
-                    playsInline
-                    preload="metadata"
-                    onMouseEnter={(e) => {
-                      const video = e.currentTarget;
-                      video.currentTime = 0;
-                      video.play().catch(() => {});
-                      // Pause after 15 seconds or at video end, whichever comes first
-                      setTimeout(() => {
-                        if (video.currentTime < 15) {
-                          video.pause();
-                        }
-                      }, 15000);
-                    }}
-                    onMouseLeave={(e) => {
-                      const video = e.currentTarget;
-                      video.pause();
-                      video.currentTime = 0;
-                    }}
-                    onTimeUpdate={(e) => {
-                      // Pause when reaching 15 seconds
-                      if (e.currentTarget.currentTime >= 15) {
-                        e.currentTarget.pause();
-                      }
-                    }}
-                  />
+                  {/* Gradient Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
                 </>
-              ) : (
-                <img
-                  src={featuredCourse.image}
-                  alt={featuredCourse.title}
-                  className="w-full h-full object-cover"
-                />
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-              {/* Play Button Overlay */}
-              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                <div className="bg-white/20 backdrop-blur-sm rounded-full p-4">
-                  <Play className="w-12 h-12 text-white fill-white ml-1" />
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -315,6 +301,15 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
                       src={category.image}
                       alt={category.title}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      onError={(e) => {
+                        // If image fails, try to construct URL from relative path
+                        const target = e.target as HTMLImageElement;
+                        const src = target.src;
+                        if (!src.startsWith('http') && !src.startsWith('/')) {
+                          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+                          target.src = `${API_BASE_URL.replace('/api', '')}/storage/${src}`;
+                        }
+                      }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                     
@@ -322,7 +317,7 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
                     <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
                       <div className="flex items-center justify-between mb-2">
                         <Badge variant="secondary" className="bg-white/20 text-white border-0">
-                          {category.courseCount} courses
+                          {category.courseCount} {t('general.courses')}
                         </Badge>
                       </div>
                       <h3 className="font-bold text-lg mb-1 group-hover:text-white transition-colors">
@@ -361,10 +356,10 @@ const CourseHeroSection: React.FC<CourseHeroSectionProps> = ({
             {/* Section Title */}
             <div className="text-center">
               <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-6">
-                Featured Courses
+                {t('general.featured_courses')}
               </h2>
               <p className="text-gray-400 text-xl md:text-2xl">
-                Handpicked courses from our expert instructors
+                {t('general.handpicked_courses_subtitle')}
               </p>
             </div>
             

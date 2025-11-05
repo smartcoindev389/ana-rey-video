@@ -25,6 +25,7 @@ export interface FaqCreateRequest {
   category: string;
   sort_order?: number;
   is_active?: boolean;
+  locale?: string; // Add locale support
 }
 
 export interface FaqUpdateRequest {
@@ -33,20 +34,21 @@ export interface FaqUpdateRequest {
   category?: string;
   sort_order?: number;
   is_active?: boolean;
+  locale?: string; // Add locale support
 }
 
 class FaqApi {
   private baseURL = `${API_BASE_URL}/faqs`;
 
   // Public methods (no auth required)
-  async getFaqs(category?: string): Promise<FaqResponse> {
+  async getFaqs(category?: string, localeOverride?: string): Promise<FaqResponse> {
     try {
       const params = new URLSearchParams();
       if (category && category !== 'all') {
         params.append('category', category);
       }
       
-      const locale = this.getLocale();
+      const locale = localeOverride || this.getLocale();
       const response = await axios.get(`${this.baseURL}?${params.toString()}`, {
         headers: {
           'Accept-Language': locale
@@ -80,11 +82,11 @@ class FaqApi {
   }
 
   // Helper method to get auth headers
-  private getAuthHeaders(): Record<string, string> {
+  private getAuthHeaders(localeOverride?: string): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'Accept-Language': this.getLocale()
+      'Accept-Language': localeOverride || this.getLocale()
     };
 
     const token = localStorage.getItem('auth_token');
@@ -145,10 +147,10 @@ class FaqApi {
   }
 
   // Admin method to get all FAQs (including inactive)
-  async getAdminFaqs(): Promise<FaqResponse> {
+  async getAdminFaqs(locale?: string): Promise<FaqResponse> {
     try {
       const response = await axios.get(`${API_BASE_URL}/admin/faqs`, {
-        headers: this.getAuthHeaders()
+        headers: this.getAuthHeaders(locale)
       });
       return response.data;
     } catch (error) {

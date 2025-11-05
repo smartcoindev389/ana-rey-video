@@ -190,6 +190,29 @@ const SeriesDetail = () => {
     return `${mins}m`;
   };
 
+  // Helper to get category image URL
+  const getCategoryImageUrl = (category: any) => {
+    if (!category) return null;
+    // Priority: image_url > cover_image_url > thumbnail_url > image > cover_image > thumbnail
+    const imageUrl = category.image_url 
+      || category.cover_image_url 
+      || category.thumbnail_url 
+      || category.image 
+      || category.cover_image 
+      || category.thumbnail;
+    
+    if (!imageUrl) return null;
+    
+    // If it's already a full URL, return it
+    if (imageUrl.startsWith('http') || imageUrl.startsWith('/')) {
+      return imageUrl;
+    }
+    
+    // Otherwise construct full URL
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    return `${API_BASE_URL.replace('/api', '')}/storage/${imageUrl.replace(/^\//, '')}`;
+  };
+
   // Apply progress-only filter if requested
   const params = new URLSearchParams(location.search);
   const filter = params.get('filter');
@@ -205,28 +228,29 @@ const SeriesDetail = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Hero Section */}
-      <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/5 rounded-xl mb-8 relative overflow-hidden">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <div className="w-24 h-24 bg-primary/90 rounded-full flex items-center justify-center mx-auto">
-              <Play className="h-8 w-8 text-primary-foreground ml-1" />
-            </div>
-            <Button size="lg" className="flex items-center">
-              <Play className="h-4 w-4 mr-2" />
-              {t('seriesDetail.start_watching')}
-            </Button>
-          </div>
-        </div>
-        <div className="absolute top-4 right-4">
+      <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/5 rounded-xl mb-8 relative overflow-hidden border-2 border-primary/30">
+        {/* Category Image Background */}
+        {getCategoryImageUrl(category) ? (
+          <>
+            <img
+              src={getCategoryImageUrl(category) || ''}
+              alt={category.name}
+              className="absolute inset-0 w-full h-full object-cover"
+              onError={(e) => {
+                // If image fails to load, hide it and show gradient background
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+              }}
+            />
+            {/* Gradient Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/20 to-transparent" />
+          </>
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5" />
+        )}
+        {/* Visibility Badge */}
+        <div className="absolute top-4 right-4 z-10">
           {category.visibility && getVisibilityBadge(category.visibility)}
-        </div>
-        <div className="absolute top-4 left-4 flex space-x-2">
-          <Button variant="secondary" size="sm">
-            <Heart className={`h-4 w-4 ${isFavorite ? 'fill-current text-red-500' : ''}`} />
-          </Button>
-          <Button variant="secondary" size="sm">
-            <Share2 className="h-4 w-4" />
-          </Button>
         </div>
       </div>
 

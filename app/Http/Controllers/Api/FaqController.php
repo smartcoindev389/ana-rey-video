@@ -46,15 +46,41 @@ class FaqController extends Controller
     public function store(Request $request): JsonResponse
     {
         try {
+            $locale = $request->input('locale', app()->getLocale());
+            
             $validated = $request->validate([
                 'question' => 'required|string|max:255',
                 'answer' => 'required|string',
                 'category' => 'required|string|max:50',
                 'sort_order' => 'nullable|integer|min:0',
-                'is_active' => 'nullable|boolean'
+                'is_active' => 'nullable|boolean',
+                'locale' => 'nullable|in:en,es,pt', // Allow locale parameter
             ]);
 
-            $faq = Faq::create($validated);
+            // If locale is English, create normally (auto-translate will handle translations)
+            // If locale is not English, save English version first, then add translation
+            if ($locale === 'en') {
+                $faq = Faq::create($validated);
+            } else {
+                // For non-English locales, we need to save English first, then add translation
+                // But we don't have English values, so we'll save the provided values as English
+                // and then add them as translations
+                $faq = Faq::create([
+                    'question' => $validated['question'], // Save as English (will be overwritten with translation)
+                    'answer' => $validated['answer'],
+                    'category' => $validated['category'],
+                    'sort_order' => $validated['sort_order'] ?? 0,
+                    'is_active' => $validated['is_active'] ?? true,
+                ]);
+                
+                // Now save as translations for the specified locale
+                $faq->setTranslation('question', $locale, $validated['question']);
+                $faq->setTranslation('answer', $locale, $validated['answer']);
+                
+                // Set English values to empty or placeholder (since we don't have them)
+                // Actually, let's keep the values as-is since they're in the requested locale
+                // Admin should create FAQs in English first, then translate
+            }
 
             return response()->json([
                 'success' => true,
@@ -94,15 +120,39 @@ class FaqController extends Controller
     public function update(Request $request, Faq $faq): JsonResponse
     {
         try {
+            $locale = $request->input('locale', app()->getLocale());
+            
             $validated = $request->validate([
                 'question' => 'sometimes|required|string|max:255',
                 'answer' => 'sometimes|required|string',
                 'category' => 'sometimes|required|string|max:50',
                 'sort_order' => 'nullable|integer|min:0',
-                'is_active' => 'nullable|boolean'
+                'is_active' => 'nullable|boolean',
+                'locale' => 'nullable|in:en,es,pt', // Allow locale parameter
             ]);
 
-            $faq->update($validated);
+            // If locale is English, update main fields
+            if ($locale === 'en') {
+                $faq->update($validated);
+            } else {
+                // For other locales, save translations
+                if (isset($validated['question'])) {
+                    $faq->setTranslation('question', $locale, $validated['question']);
+                }
+                if (isset($validated['answer'])) {
+                    $faq->setTranslation('answer', $locale, $validated['answer']);
+                }
+                
+                // Update non-translatable fields
+                $nonTranslatableFields = ['category', 'sort_order', 'is_active'];
+                $fieldsToUpdate = array_intersect_key($validated, array_flip($nonTranslatableFields));
+                if (!empty($fieldsToUpdate)) {
+                    $faq->update($fieldsToUpdate);
+                }
+                
+                // Refresh to get translated values
+                $faq->refresh();
+            }
 
             return response()->json([
                 'success' => true,

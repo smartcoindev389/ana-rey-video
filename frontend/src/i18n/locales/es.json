@@ -860,14 +860,112 @@
     "multilingual_enter_translation": "Ingrese la traducción en {language}...",
     "multilingual_no_translation": "No hay traducción disponible",
     "multilingual_english": "Inglés:",
-    "multilingual_of": "de"
+    "multilingual_of": "de",
+    "settings_page": {
+      "title": "Configuración del Sitio",
+      "subtitle": "Administra la configuración y el contenido del sitio",
+      "subtitle_short": "Administra la configuración del sitio",
+      "tabs": {
+        "hero": "Sección Hero",
+        "about": "Acerca de",
+        "testimonials": "Testimonios",
+        "faq": "FAQ",
+        "general": "General",
+        "footer": "Pie de página",
+        "contact": "Contacto"
+      },
+      "slots": "espacios",
+      "hero": {
+        "title": "Ajustes de la Sección Hero",
+        "no_settings": "No se encontraron ajustes de hero.",
+        "background_images": "Imágenes de Fondo",
+        "background_help": "Actualiza las imágenes de fondo que se muestran en el collage del hero. Si está vacío, el sitio usa imágenes predeterminadas."
+      },
+      "about": {
+        "title": "Ajustes de la Sección Acerca de",
+        "image": "Imagen de Acerca de",
+        "no_settings": "No se encontraron ajustes de acerca de."
+      },
+      "testimonials": {
+        "all_reviews": "Todas las Reseñas",
+        "subtitle": "Todos los testimonios de la base de datos. Elige cuáles mostrar en la página de inicio.",
+        "reviews_selected": "{{count}} reseña(s) seleccionada(s) para la página de inicio",
+        "selection_help": "Solo se pueden seleccionar reseñas aprobadas. Haz clic para alternar la selección.",
+        "clear_all": "Limpiar Todo",
+        "cleared": "Reseñas de inicio limpiadas",
+        "clear_failed": "No se pudo limpiar las reseñas de inicio",
+        "search_placeholder": "Buscar reseñas...",
+        "filter_all": "Todas las Reseñas",
+        "filter_approved": "Solo Aprobadas",
+        "filter_pending": "Pendiente de Revisión",
+        "loading": "Cargando reseñas...",
+        "no_reviews": "No se encontraron reseñas.",
+        "show_on_home": "Mostrar en Inicio",
+        "pending": "Aprobación Pendiente",
+        "featured": "Destacado"
+      },
+      "faq": {
+        "editing_in_locale": "Editando FAQs en {{locale}} - Las preguntas y respuestas se guardarán en el idioma seleccionado."
+      },
+      "general": {
+        "title": "Configuración General",
+        "no_settings": "No se encontraron ajustes generales."
+      },
+      "footer": {
+        "title": "Configuración del Pie de Página",
+        "no_settings": "No se encontraron ajustes del pie de página."
+      },
+      "contact": {
+        "title": "Configuración de Contacto",
+        "save_btn": "Guardar Configuración de Contacto ({{locale}})"
+      }
+    },
+    "settings_fields": {
+      "about_title": {
+        "label": "Título de Acerca de",
+        "description": "Título para la sección Acerca de"
+      },
+      "about_description": {
+        "label": "Descripción de Acerca de",
+        "description": "Descripción para la sección Acerca de"
+      }
+    }
   },
   "general": {
     "series": "Serie",
     "anonymous": "Anónimo",
     "user": "Usuario",
     "categories": "Categorías",
-    "loading_categories": "Cargando categorías..."
+    "loading_categories": "Cargando categorías...",
+    "uncategorized": "Sin categoría",
+    "instructor": "Instructor",
+    "background": "Fondo",
+    "about_sacrart": "Acerca de SACRART",
+    "discover_amazing_content": "Descubre contenido increíble en esta categoría.",
+    "explore_curated_collection": "Explora nuestra colección curada de contenido en esta categoría.",
+    "expert_content": "Contenido de Expertos",
+    "professional_techniques": "Técnicas Profesionales",
+    "quality_learning": "Aprendizaje de Calidad",
+    "sculpting_series": "Serie de Escultura",
+    "art_techniques": "Técnicas Artísticas",
+    "master_classes": "Clases Magistrales",
+    "restoration": "Restauración",
+    "behind_scenes": "Detrás de Escenas",
+    "professional_tips": "Consejos Profesionales",
+    "creative_process": "Proceso Creativo",
+    "expert_insights": "Perspectivas de Expertos",
+    "studio_sessions": "Sesiones de Estudio",
+    "art_history": "Historia del Arte",
+    "modern_art": "Arte Moderno",
+    "classical_techniques": "Técnicas Clásicas",
+    "digital_art": "Arte Digital",
+    "traditional_methods": "Métodos Tradicionales",
+    "contemporary_art": "Arte Contemporáneo",
+    "artistic_vision": "Visión Artística",
+    "featured_courses": "Cursos Destacados",
+    "handpicked_courses_subtitle": "Cursos seleccionados por nuestros instructores expertos",
+    "courses": "cursos",
+    "hero_background": "Fondo del Héroe"
   },
   "seriesDetail": {
     "failed_load_category": "Error al cargar los detalles de la categoría",

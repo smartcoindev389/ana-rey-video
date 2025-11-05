@@ -50,7 +50,7 @@ class WebpConversionService
             return [
                 'success' => true,
                 'path' => $fullPath,
-                'url' => url('storage/' . $fullPath),
+                'url' => Storage::url($fullPath),
                 'filename' => $filename,
                 'size' => $file->getSize(),
                 'mime_type' => 'image/webp'
@@ -146,7 +146,7 @@ class WebpConversionService
             return [
                 'success' => true,
                 'path' => $fullPath,
-                'url' => 'http://localhost:8000/data_section/image/' . $filename,
+                'url' => Storage::url($fullPath),
                 'filename' => $filename,
                 'size' => filesize($storagePath),
                 'mime_type' => 'image/webp'
@@ -377,10 +377,33 @@ class WebpConversionService
      */
     public function deleteFile(string $path): bool
     {
-        $fullPath = storage_path('app/public/' . $path);
-        
-        if (file_exists($fullPath)) {
-            return unlink($fullPath);
+        // Normalize to relative path under storage/app/public
+        $normalized = $path;
+
+        // If full URL, extract path component
+        if (str_starts_with($normalized, 'http://') || str_starts_with($normalized, 'https://')) {
+            $parsed = parse_url($normalized, PHP_URL_PATH) ?: '';
+            $normalized = ltrim($parsed, '/');
+        }
+
+        // If it starts with storage/, strip it (Storage::url adds this prefix)
+        if (str_starts_with($normalized, 'storage/')) {
+            $normalized = substr($normalized, strlen('storage/'));
+        }
+
+        // Ensure we have a relative path like data_section/image/...
+        $normalized = ltrim($normalized, '/');
+
+        // Primary location: storage/app/public/
+        $storageFullPath = storage_path('app/public/' . $normalized);
+        if (file_exists($storageFullPath)) {
+            return @unlink($storageFullPath);
+        }
+
+        // Fallback: public/ (in case legacy files were placed directly under public)
+        $publicFullPath = public_path($normalized);
+        if (file_exists($publicFullPath)) {
+            return @unlink($publicFullPath);
         }
 
         return false;

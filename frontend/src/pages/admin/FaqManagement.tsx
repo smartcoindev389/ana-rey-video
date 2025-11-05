@@ -28,7 +28,8 @@ import {
   Save,
   X,
   Folder,
-  List
+  List,
+  Languages
 } from 'lucide-react';
 import { faqApi, Faq, FaqCreateRequest, FaqUpdateRequest } from '@/services/faqApi';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,7 +41,8 @@ import { useTranslation } from 'react-i18next';
 const FaqManagement = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { locale } = useLocale();
+  const { locale: urlLocale } = useLocale();
+  const [contentLocale, setContentLocale] = useState<'en' | 'es' | 'pt'>(urlLocale as 'en' | 'es' | 'pt' || 'en');
   const [faqs, setFaqs] = useState<Faq[]>([]);
   const [categories, setCategories] = useState<string[]>(['general', 'subscription', 'technical', 'content', 'billing']);
   const [loading, setLoading] = useState(true);
@@ -62,7 +64,7 @@ const FaqManagement = () => {
   useEffect(() => {
     fetchFaqs();
     fetchCategories();
-  }, [locale]); // Refetch when locale changes
+  }, [contentLocale]); // Refetch when content locale changes
 
   const fetchFaqs = async () => {
     try {
@@ -70,8 +72,17 @@ const FaqManagement = () => {
       console.log('Fetching FAQs - User:', user);
       
       if (user) {
+        // Temporarily set locale in localStorage to fetch localized content
+        const originalLocale = localStorage.getItem('i18nextLng');
+        localStorage.setItem('i18nextLng', contentLocale);
+        
         const response = await faqApi.getAdminFaqs();
         console.log('FAQ API Response:', response);
+        
+        // Restore original locale
+        if (originalLocale) {
+          localStorage.setItem('i18nextLng', originalLocale);
+        }
         
         // Flatten the grouped FAQs into a single array
         const allFaqs: Faq[] = [];
@@ -105,19 +116,35 @@ const FaqManagement = () => {
   const handleCreateFaq = async () => {
     try {
       if (user) {
+        // Temporarily set locale in localStorage to save with correct locale
+        const originalLocale = localStorage.getItem('i18nextLng');
+        localStorage.setItem('i18nextLng', contentLocale);
+        
         await faqApi.createFaq(formData);
+        
+        // Restore original locale
+        if (originalLocale) {
+          localStorage.setItem('i18nextLng', originalLocale);
+        }
+        
         await fetchFaqs();
         setIsCreateDialogOpen(false);
         resetForm();
+        toast.success(`FAQ created successfully in ${contentLocale.toUpperCase()}`);
       }
     } catch (error) {
       console.error('Error creating FAQ:', error);
+      toast.error('Failed to create FAQ');
     }
   };
 
   const handleUpdateFaq = async () => {
     try {
       if (user && editingFaq) {
+        // Temporarily set locale in localStorage to save with correct locale
+        const originalLocale = localStorage.getItem('i18nextLng');
+        localStorage.setItem('i18nextLng', contentLocale);
+        
         const updateData: FaqUpdateRequest = {
           question: formData.question,
           answer: formData.answer,
@@ -126,13 +153,21 @@ const FaqManagement = () => {
           is_active: formData.is_active
         };
         await faqApi.updateFaq(editingFaq.id, updateData);
+        
+        // Restore original locale
+        if (originalLocale) {
+          localStorage.setItem('i18nextLng', originalLocale);
+        }
+        
         await fetchFaqs();
         setIsEditDialogOpen(false);
         setEditingFaq(null);
         resetForm();
+        toast.success(`FAQ updated successfully in ${contentLocale.toUpperCase()}`);
       }
     } catch (error) {
       console.error('Error updating FAQ:', error);
+      toast.error('Failed to update FAQ');
     }
   };
 
@@ -270,6 +305,40 @@ const FaqManagement = () => {
           <h1 className="text-3xl font-bold">{t('admin.faq_management')}</h1>
           <p className="text-muted-foreground">{t('admin.faq_manage_questions')}</p>
         </div>
+        <div className="flex items-center gap-2 border rounded-lg p-1">
+          <Languages className="h-4 w-4 text-muted-foreground" />
+          <Button
+            variant={contentLocale === 'en' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setContentLocale('en')}
+            className="h-8"
+          >
+            EN
+          </Button>
+          <Button
+            variant={contentLocale === 'es' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setContentLocale('es')}
+            className="h-8"
+          >
+            ES
+          </Button>
+          <Button
+            variant={contentLocale === 'pt' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setContentLocale('pt')}
+            className="h-8"
+          >
+            PT
+          </Button>
+        </div>
+      </div>
+
+      {/* Language Notice */}
+      <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+        <p className="text-sm text-blue-900 dark:text-blue-100">
+          <strong>Editing FAQs in: {contentLocale.toUpperCase()}</strong> - Questions and answers will be saved in the selected language. The system will automatically translate to other languages.
+        </p>
       </div>
 
       {/* Tabs */}

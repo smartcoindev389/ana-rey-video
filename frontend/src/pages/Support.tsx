@@ -49,11 +49,13 @@ import { toast } from 'sonner';
 import { supportTicketApi, SupportTicket as TicketType, TicketReply } from '@/services/supportTicketApi';
 import { faqApi, Faq } from '@/services/faqApi';
 import { useTranslation } from 'react-i18next';
+import { useLocale } from '@/hooks/useLocale';
 
 const Support = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { locale } = useLocale();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -96,7 +98,7 @@ const Support = () => {
 
     const fetchFaqs = async () => {
       try {
-        const response = await faqApi.getFaqs();
+        const response = await faqApi.getFaqs(undefined, locale);
         if (response.success) {
           const faqData = Array.isArray(response.data) ? response.data : [];
           // Flatten grouped FAQs
@@ -116,7 +118,7 @@ const Support = () => {
 
     fetchTickets();
     fetchFaqs();
-  }, [user]);
+  }, [user, locale]); // Refetch when user or locale changes
 
   const getStatusIcon = (status: string | undefined) => {
     if (!status) return null;

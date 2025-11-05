@@ -23,7 +23,6 @@ return new class extends Migration
             // Video content
             $table->string('video_url')->nullable(); // Main video URL
             $table->string('video_file_path')->nullable(); // Local file path
-            $table->string('thumbnail')->nullable();
             $table->integer('duration')->default(0); // Duration in seconds
             $table->integer('file_size')->nullable(); // File size in bytes
             $table->string('video_format')->nullable(); // mp4, webm, etc.
