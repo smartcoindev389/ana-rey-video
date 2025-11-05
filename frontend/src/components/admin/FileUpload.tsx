@@ -299,28 +299,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
         </div>
       )}
 
-      {(selectedFile || uploadedUrl) && !uploading && (
-        <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-          <div className="flex items-center space-x-2">
-            {type === 'image' ? <FileImage className="h-4 w-4" /> : <FileVideo className="h-4 w-4" />}
-            <span className="text-sm text-gray-700">
-              {selectedFile?.name || uploadedUrl?.split('/').pop()}
-            </span>
-            {selectedFile && !uploadedUrl && (
-              <span className="text-xs text-gray-500 ml-2">(Preview)</span>
-            )}
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={handleRemoveFile}
-            disabled={disabled}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
     </div>
   );
 };

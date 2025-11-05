@@ -1121,28 +1121,28 @@ const ContentManagement = () => {
                               <MoreVertical className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48 bg-white border border-gray-200 shadow-lg">
-                            <DropdownMenuLabel className="text-gray-900 font-semibold px-3 py-2">{t('admin.common_actions')}</DropdownMenuLabel>
-                            <DropdownMenuSeparator className="bg-gray-200" />
+                          <DropdownMenuContent align="end" className="w-48 bg-popover border-border shadow-lg">
+                            <DropdownMenuLabel className="font-semibold px-3 py-2">{t('admin.common_actions')}</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem 
                               onClick={() => handleEditSeries(serie)}
-                              className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 cursor-pointer"
+                              className="px-3 py-2 cursor-pointer"
                             >
                               <Edit className="mr-2 h-4 w-4" />
                               Edit Series
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 cursor-pointer">
+                            <DropdownMenuItem className="px-3 py-2 cursor-pointer">
                               <Plus className="mr-2 h-4 w-4" />
                               Add Episode
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 cursor-pointer">
+                            <DropdownMenuItem className="px-3 py-2 cursor-pointer">
                               <Eye className="mr-2 h-4 w-4" />
                               View Series
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator className="bg-gray-200" />
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem 
                               onClick={() => handleToggleSeriesStatus(serie.id)}
-                              className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 cursor-pointer"
+                              className="px-3 py-2 cursor-pointer"
                             >
                               {serie.status === 'published' ? (
                                 <>
@@ -1158,7 +1158,7 @@ const ContentManagement = () => {
                             </DropdownMenuItem>
                             <DropdownMenuItem 
                               onClick={() => handleDeleteSeries(serie.id)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-2 cursor-pointer"
+                              className="text-destructive focus:text-destructive focus:bg-destructive/10 px-3 py-2 cursor-pointer"
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete Series
@@ -1219,28 +1219,28 @@ const ContentManagement = () => {
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48 bg-white border border-gray-200 shadow-lg">
-                      <DropdownMenuLabel className="text-gray-900 font-semibold px-3 py-2">Actions</DropdownMenuLabel>
-                      <DropdownMenuSeparator className="bg-gray-200" />
+                    <DropdownMenuContent align="end" className="w-48 bg-popover border-border shadow-lg">
+                      <DropdownMenuLabel className="font-semibold px-3 py-2">Actions</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem 
                         onClick={() => handleEditSeries(serie)}
-                        className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 cursor-pointer"
+                        className="px-3 py-2 cursor-pointer"
                       >
                         <Edit className="mr-2 h-4 w-4" />
                         Edit Series
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 cursor-pointer">
+                      <DropdownMenuItem className="px-3 py-2 cursor-pointer">
                         <Plus className="mr-2 h-4 w-4" />
                         Add Episode
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 cursor-pointer">
+                      <DropdownMenuItem className="px-3 py-2 cursor-pointer">
                         <Eye className="mr-2 h-4 w-4" />
                         View Series
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator className="bg-gray-200" />
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem 
                         onClick={() => handleToggleSeriesStatus(serie.id)}
-                        className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 cursor-pointer"
+                        className="px-3 py-2 cursor-pointer"
                       >
                         {serie.status === 'published' ? (
                           <>
@@ -1256,7 +1256,7 @@ const ContentManagement = () => {
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         onClick={() => handleDeleteSeries(serie.id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-2 cursor-pointer"
+                        className="text-destructive focus:text-destructive focus:bg-destructive/10 px-3 py-2 cursor-pointer"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
                         Delete Series
@@ -1343,27 +1343,27 @@ const ContentManagement = () => {
                               <MoreVertical className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48 bg-white border border-gray-200 shadow-lg">
-                            <DropdownMenuLabel className="text-gray-900 font-semibold px-3 py-2">{t('admin.common_actions')}</DropdownMenuLabel>
-                            <DropdownMenuSeparator className="bg-gray-200" />
+                          <DropdownMenuContent align="end" className="w-48 bg-popover border-border shadow-lg">
+                            <DropdownMenuLabel className="font-semibold px-3 py-2">{t('admin.common_actions')}</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem 
                               onClick={() => handleEditVideo(video)}
-                              className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 cursor-pointer"
+                              className="px-3 py-2 cursor-pointer"
                             >
                               <Edit className="mr-2 h-4 w-4" />
                               Edit Episode
                             </DropdownMenuItem>
                             <DropdownMenuItem 
                               onClick={() => window.open(`/video/${video.id}`, '_blank')}
-                              className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 cursor-pointer"
+                              className="px-3 py-2 cursor-pointer"
                             >
                               <PlayCircle className="mr-2 h-4 w-4" />
                               Play Episode
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator className="bg-gray-200" />
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem 
                               onClick={() => handleToggleVideoStatus(video.id)}
-                              className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 cursor-pointer"
+                              className="px-3 py-2 cursor-pointer"
                             >
                               {video.status === 'published' ? (
                                 <>
@@ -1379,7 +1379,7 @@ const ContentManagement = () => {
                             </DropdownMenuItem>
                             <DropdownMenuItem 
                               onClick={() => handleDeleteVideo(video.id)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-2 cursor-pointer"
+                              className="text-destructive focus:text-destructive focus:bg-destructive/10 px-3 py-2 cursor-pointer"
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete Episode
@@ -1441,27 +1441,27 @@ const ContentManagement = () => {
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48 bg-white border border-gray-200 shadow-lg">
-                      <DropdownMenuLabel className="text-gray-900 font-semibold px-3 py-2">Actions</DropdownMenuLabel>
-                      <DropdownMenuSeparator className="bg-gray-200" />
+                    <DropdownMenuContent align="end" className="w-48 bg-popover border-border shadow-lg">
+                      <DropdownMenuLabel className="font-semibold px-3 py-2">Actions</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem 
                         onClick={() => handleEditVideo(video)}
-                        className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 cursor-pointer"
+                        className="px-3 py-2 cursor-pointer"
                       >
                         <Edit className="mr-2 h-4 w-4" />
                         Edit Episode
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         onClick={() => window.open(`/video/${video.id}`, '_blank')}
-                        className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 cursor-pointer"
+                        className="px-3 py-2 cursor-pointer"
                       >
                         <PlayCircle className="mr-2 h-4 w-4" />
                         Play Episode
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator className="bg-gray-200" />
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem 
                         onClick={() => handleToggleVideoStatus(video.id)}
-                        className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 cursor-pointer"
+                        className="px-3 py-2 cursor-pointer"
                       >
                         {video.status === 'published' ? (
                           <>
@@ -1477,7 +1477,7 @@ const ContentManagement = () => {
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         onClick={() => handleDeleteVideo(video.id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-2 cursor-pointer"
+                        className="text-destructive focus:text-destructive focus:bg-destructive/10 px-3 py-2 cursor-pointer"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
                         Delete Episode
@@ -1590,10 +1590,10 @@ const ContentManagement = () => {
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Select visibility" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="freemium">Freemium</SelectItem>
-                    <SelectItem value="basic">Basic</SelectItem>
-                    <SelectItem value="premium">Premium</SelectItem>
+                  <SelectContent className="bg-popover border-border">
+                    <SelectItem value="freemium" className="focus:bg-accent">Freemium</SelectItem>
+                    <SelectItem value="basic" className="focus:bg-accent">Basic</SelectItem>
+                    <SelectItem value="premium" className="focus:bg-accent">Premium</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1608,10 +1608,10 @@ const ContentManagement = () => {
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="published">Published</SelectItem>
-                    <SelectItem value="archived">Archived</SelectItem>
+                  <SelectContent className="bg-popover border-border">
+                    <SelectItem value="draft" className="focus:bg-accent">Draft</SelectItem>
+                    <SelectItem value="published" className="focus:bg-accent">Published</SelectItem>
+                    <SelectItem value="archived" className="focus:bg-accent">Archived</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1729,10 +1729,10 @@ const ContentManagement = () => {
                   <SelectTrigger className="col-span-3">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="freemium">Freemium</SelectItem>
-                    <SelectItem value="basic">Basic</SelectItem>
-                    <SelectItem value="premium">Premium</SelectItem>
+                  <SelectContent className="bg-popover border-border">
+                    <SelectItem value="freemium" className="focus:bg-accent">Freemium</SelectItem>
+                    <SelectItem value="basic" className="focus:bg-accent">Basic</SelectItem>
+                    <SelectItem value="premium" className="focus:bg-accent">Premium</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1747,9 +1747,9 @@ const ContentManagement = () => {
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder={t('admin.content_label_select_series')} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-popover border-border">
                     {series.map((serie) => (
-                      <SelectItem key={serie.id} value={serie.id.toString()}>
+                      <SelectItem key={serie.id} value={serie.id.toString()} className="focus:bg-accent">
                         <div className="flex flex-col">
                           <span className="font-medium">{serie.name || 'Category'}</span>
                           <span className="text-sm text-muted-foreground">{serie.title}</span>
@@ -1770,10 +1770,10 @@ const ContentManagement = () => {
                   <SelectTrigger className="col-span-3">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="published">Published</SelectItem>
-                    <SelectItem value="archived">Archived</SelectItem>
+                  <SelectContent className="bg-popover border-border">
+                    <SelectItem value="draft" className="focus:bg-accent">Draft</SelectItem>
+                    <SelectItem value="published" className="focus:bg-accent">Published</SelectItem>
+                    <SelectItem value="archived" className="focus:bg-accent">Archived</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

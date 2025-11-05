@@ -174,10 +174,10 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
               <SelectTrigger className="w-20 h-9">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="EN">EN</SelectItem>
-                <SelectItem value="ES">ES</SelectItem>
-                <SelectItem value="PT">PT</SelectItem>
+              <SelectContent className="bg-popover border-border">
+                <SelectItem value="EN" className="focus:bg-accent">EN</SelectItem>
+                <SelectItem value="ES" className="focus:bg-accent">ES</SelectItem>
+                <SelectItem value="PT" className="focus:bg-accent">PT</SelectItem>
               </SelectContent>
             </Select>
             <span className="text-sm text-muted-foreground">
