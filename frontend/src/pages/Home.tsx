@@ -62,6 +62,12 @@ const Home = () => {
   const [featuredLoading, setFeaturedLoading] = useState(false);
   const [heroSettings, setHeroSettings] = useState<Record<string, string>>({});
   const [settingsLoading, setSettingsLoading] = useState(false);
+  const [homepageVideos, setHomepageVideos] = useState<any[]>([]);
+  const [homepageVideosLoading, setHomepageVideosLoading] = useState(false);
+  const homepageVideosCarouselRef = useRef<HTMLDivElement>(null);
+  const [showVideosLeftArrow, setShowVideosLeftArrow] = useState(false);
+  const [showVideosRightArrow, setShowVideosRightArrow] = useState(true);
+  const [shouldCenterVideos, setShouldCenterVideos] = useState(false);
   const tabContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -627,6 +633,159 @@ const Home = () => {
     }
   }, [heroSettings]);
 
+  // Fetch Homepage Videos (selected videos for carousel)
+  useEffect(() => {
+    const fetchHomepageVideos = async () => {
+      setHomepageVideosLoading(true);
+      try {
+        // Get selected video IDs from settings
+        const selectedIds = heroSettings.homepage_video_ids;
+        let videoIds: number[] = [];
+        
+        if (selectedIds) {
+          try {
+            videoIds = typeof selectedIds === 'string' ? JSON.parse(selectedIds) : selectedIds;
+          } catch (e) {
+            console.error('Error parsing homepage_video_ids:', e);
+          }
+        }
+
+        // If no videos selected, don't fetch
+        if (videoIds.length === 0) {
+          setHomepageVideos([]);
+          setHomepageVideosLoading(false);
+          return;
+        }
+
+        console.log('Fetching homepage videos, selected IDs:', videoIds, 'Total IDs:', videoIds.length);
+
+        // Fetch all published videos with high limit
+        const publicResponse = await videoApi.getPublic({ 
+          status: 'published', 
+          per_page: 1000,
+          sort_by: 'created_at',
+          sort_order: 'desc'
+        });
+        
+        const responseData = publicResponse.data;
+        const videosData = responseData?.data || [];
+        const allPublicVideos = Array.isArray(videosData) ? videosData : [];
+        
+        console.log('Total published videos fetched:', allPublicVideos.length);
+        console.log('Pagination info:', {
+          current_page: responseData?.current_page,
+          last_page: responseData?.last_page,
+          total: responseData?.total
+        });
+
+        // Filter to only selected videos and maintain order
+        const validVideos = videoIds
+          .map(id => {
+            const video = allPublicVideos.find((v: any) => v.id === id);
+            if (!video) {
+              console.warn(`Video ${id} not found in published videos`);
+              return null;
+            }
+            return {
+              id: video.id,
+              title: video.title,
+              video: video,
+              image: getImageUrl(video.thumbnail_url || video.intro_image_url || video.thumbnail || video.intro_image || cover1),
+              duration: `${Math.floor((video.duration || 0) / 60)}m`,
+              rating: parseFloat(video.rating || '0'),
+              studentsCount: video.views || 0,
+              instructor: video.instructor?.name || t('general.instructor'),
+              category: video.category?.name || t('general.uncategorized'),
+            };
+          })
+          .filter(v => v !== null);
+
+        console.log('Fetched homepage videos:', validVideos.length, 'out of', videoIds.length, 'selected');
+        if (validVideos.length < videoIds.length) {
+          console.warn('Some videos were not found. Missing IDs:', 
+            videoIds.filter(id => !allPublicVideos.find((v: any) => v.id === id))
+          );
+        }
+
+        setHomepageVideos(validVideos);
+      } catch (error) {
+        console.error('Error fetching homepage videos:', error);
+        setHomepageVideos([]);
+      } finally {
+        setHomepageVideosLoading(false);
+      }
+    };
+
+    // Only fetch when heroSettings is loaded
+    if (Object.keys(heroSettings).length > 0) {
+      fetchHomepageVideos();
+    }
+  }, [heroSettings]);
+
+  // Check if homepage videos carousel should be centered and show/hide arrows
+  useEffect(() => {
+    const checkCenterVideos = () => {
+      if (homepageVideosCarouselRef.current) {
+        const container = homepageVideosCarouselRef.current;
+        const containerWidth = container.clientWidth;
+        const contentWidth = container.scrollWidth;
+        
+        // If content fits within container, center it
+        setShouldCenterVideos(contentWidth <= containerWidth);
+        
+        // Check arrow visibility
+        setShowVideosLeftArrow(container.scrollLeft > 0);
+        setShowVideosRightArrow(
+          container.scrollLeft < contentWidth - containerWidth - 10
+        );
+      }
+    };
+
+    checkCenterVideos();
+    
+    // Check on window resize and when videos change
+    const handleResize = () => {
+      checkCenterVideos();
+    };
+    window.addEventListener('resize', handleResize);
+    
+    // Also check on scroll
+    const handleScroll = () => {
+      checkCenterVideos();
+    };
+    if (homepageVideosCarouselRef.current) {
+      homepageVideosCarouselRef.current.addEventListener('scroll', handleScroll);
+    }
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (homepageVideosCarouselRef.current) {
+        homepageVideosCarouselRef.current.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, [homepageVideos]);
+
+  const scrollVideosCarousel = (direction: 'left' | 'right') => {
+    if (homepageVideosCarouselRef.current) {
+      const scrollAmount = homepageVideosCarouselRef.current.clientWidth * 0.8;
+      const newScrollLeft = homepageVideosCarouselRef.current.scrollLeft + (direction === 'left' ? -scrollAmount : scrollAmount);
+      
+      homepageVideosCarouselRef.current.scrollTo({
+        left: newScrollLeft,
+        behavior: 'smooth'
+      });
+
+      setTimeout(() => {
+        if (homepageVideosCarouselRef.current) {
+          setShowVideosLeftArrow(homepageVideosCarouselRef.current.scrollLeft > 0);
+          setShowVideosRightArrow(
+            homepageVideosCarouselRef.current.scrollLeft < homepageVideosCarouselRef.current.scrollWidth - homepageVideosCarouselRef.current.clientWidth - 10
+          );
+        }
+      }, 300);
+    }
+  };
+
   const getVisibilityIcon = (visibility: string) => {
     switch (visibility) {
       case 'premium':
@@ -1073,6 +1232,166 @@ const Home = () => {
       <div className="w-full px-4 md:px-8 lg:px-16 xl:px-24 2xl:px-32 pt-16 lg:pt-20 pb-12 lg:pb-20">
           <TabbedCarousel />
         </div>
+
+      {/* Homepage Video Carousel */}
+      {homepageVideos.length > 0 && (
+        <section className="py-16 lg:py-24 px-4 md:px-8 bg-[#141414]">
+          <div className="container mx-auto max-w-7xl">
+            <div className="space-y-12">
+              {/* Section Title */}
+              <div className="text-center">
+                <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-6">
+                  {t('general.featured_courses')}
+                </h2>
+                <p className="text-gray-400 text-xl md:text-2xl">
+                  {t('general.handpicked_courses_subtitle')}
+                </p>
+              </div>
+              
+              {/* Video Carousel */}
+              {homepageVideosLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-gray-400">{t('common.loading')}</p>
+                </div>
+              ) : (
+                <div className="relative group">
+                  {/* Left Arrow */}
+                  {showVideosLeftArrow && !shouldCenterVideos && (
+                    <button
+                      onClick={() => scrollVideosCarousel('left')}
+                      className="absolute left-0 top-0 bottom-0 z-20 w-12 md:w-16 bg-black/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-black/90"
+                    >
+                      <ChevronRight className="w-8 h-8 md:w-10 md:h-10 text-white rotate-180" />
+                    </button>
+                  )}
+                  
+                  {/* Video Carousel */}
+                  <div 
+                    ref={homepageVideosCarouselRef}
+                    className={`flex space-x-8 overflow-x-auto hide-scrollbar py-4 ${shouldCenterVideos ? 'justify-center' : ''}`}
+                  >
+                    {homepageVideos.map((video) => {
+                      const VideoCardPreview = () => {
+                        const videoRef = useRef<HTMLVideoElement>(null);
+                        const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+                        const handleMouseEnter = () => {
+                          if (videoRef.current && video.video?.video_url_full) {
+                            const vid = videoRef.current;
+                            vid.currentTime = 0;
+                            vid.play().catch(() => {});
+                            
+                            if (timeoutRef.current) {
+                              clearTimeout(timeoutRef.current);
+                            }
+                            
+                            timeoutRef.current = setTimeout(() => {
+                              if (vid && !vid.paused) {
+                                vid.pause();
+                              }
+                            }, 15000);
+                          }
+                        };
+
+                        const handleMouseLeave = () => {
+                          if (videoRef.current) {
+                            const vid = videoRef.current;
+                            vid.pause();
+                            vid.currentTime = 0;
+                            
+                            if (timeoutRef.current) {
+                              clearTimeout(timeoutRef.current);
+                              timeoutRef.current = null;
+                            }
+                          }
+                        };
+
+                        return (
+                          <div
+                            className="group transition-all duration-300 hover:scale-105 flex-shrink-0 w-56 md:w-64 lg:w-72 cursor-pointer"
+                            onMouseEnter={handleMouseEnter}
+                            onMouseLeave={handleMouseLeave}
+                            onClick={() => handleCourseClick(video.id)}
+                          >
+                            <div className="aspect-[3/4] rounded-xl overflow-hidden shadow-2xl relative group/card">
+                              {/* Video */}
+                              {video.video?.video_url_full && (
+                                <video
+                                  ref={videoRef}
+                                  src={video.video.video_url_full}
+                                  poster={video.image}
+                                  className="absolute inset-0 w-full h-full object-cover"
+                                  muted
+                                  playsInline
+                                  preload="auto"
+                                  onLoadedData={(e) => {
+                                    e.currentTarget.currentTime = 0.1;
+                                    e.currentTarget.pause();
+                                  }}
+                                  onTimeUpdate={(e) => {
+                                    if (e.currentTarget.currentTime >= 15) {
+                                      e.currentTarget.pause();
+                                      if (timeoutRef.current) {
+                                        clearTimeout(timeoutRef.current);
+                                        timeoutRef.current = null;
+                                      }
+                                    }
+                                  }}
+                                />
+                              )}
+                              {!video.video?.video_url_full && (
+                                <img
+                                  src={video.image}
+                                  alt={video.title}
+                                  className="absolute inset-0 w-full h-full object-cover"
+                                />
+                              )}
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                              
+                              {/* Video Info */}
+                              <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                                <div className="flex items-center justify-between mb-3">
+                                  <Badge variant="secondary" className="bg-blue-600/80 text-white border-0 px-3 py-1 text-sm font-semibold">
+                                    {video.category}
+                                  </Badge>
+                                  <div className="flex items-center space-x-1 text-sm">
+                                    <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                                    <span className="font-semibold">{video.rating}</span>
+                                  </div>
+                                </div>
+                                <h3 className="font-bold text-xl md:text-2xl mb-2 group-hover:text-white transition-colors line-clamp-2">
+                                  {video.title}
+                                </h3>
+                                <div className="flex items-center justify-between text-sm text-gray-300">
+                                  <span className="font-medium">{video.instructor}</span>
+                                  <span className="font-medium">{video.duration}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      };
+
+                      return <VideoCardPreview key={video.id} />;
+                    })}
+                  </div>
+                  
+                  {/* Right Arrow */}
+                  {showVideosRightArrow && !shouldCenterVideos && (
+                    <button
+                      onClick={() => scrollVideosCarousel('right')}
+                      className="absolute right-0 top-0 bottom-0 z-20 w-12 md:w-16 bg-black/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-black/90"
+                    >
+                      <ChevronRight className="w-8 h-8 md:w-10 md:h-10 text-white" />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* About Section */}
       <section className="py-16 lg:py-24 bg-gradient-to-br from-gray-900 via-black to-gray-800">

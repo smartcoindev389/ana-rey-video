@@ -172,6 +172,8 @@ class SettingsController extends Controller
                 'testimonial_title',
                 'testimonial_subtitle',
                 'homepage_testimonial_ids',
+                // Homepage video carousel settings
+                'homepage_video_ids',
             ])
             ->get();
         

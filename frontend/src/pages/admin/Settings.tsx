@@ -23,7 +23,8 @@ import {
   EyeOff,
   X,
   Folder,
-  Languages
+  Languages,
+  Play
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,6 +33,7 @@ import { useTranslation } from 'react-i18next';
 import { settingsApi, SiteSetting, SettingsUpdateRequest } from '@/services/settingsApi';
 import { faqApi, Faq, FaqCreateRequest, FaqUpdateRequest } from '@/services/faqApi';
 import { feedbackApi, Feedback } from '@/services/feedbackApi';
+import { videoApi, Video } from '@/services/videoApi';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -81,11 +83,19 @@ const Settings = () => {
   const [testimonialFilter, setTestimonialFilter] = useState<'all' | 'approved' | 'pending'>('all');
   const [selectedHomepageTestimonials, setSelectedHomepageTestimonials] = useState<number[]>([]);
 
+  // Video Carousel Management State
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [videoLoading, setVideoLoading] = useState(true);
+  const [videoSearch, setVideoSearch] = useState('');
+  const [videoFilter, setVideoFilter] = useState<'all' | 'published' | 'draft'>('all');
+  const [selectedHomepageVideos, setSelectedHomepageVideos] = useState<number[]>([]);
+
   useEffect(() => {
     fetchSettings();
     fetchFaqs();
     fetchFaqCategories();
     fetchTestimonials();
+    fetchVideos();
   }, []);
 
   // Refetch settings and FAQs when content locale changes
@@ -192,6 +202,19 @@ const Settings = () => {
           setSelectedHomepageTestimonials(parsedIds);
         } catch (error) {
           console.error('Error parsing homepage testimonials:', error);
+        }
+      }
+    }
+
+    // Load selected videos for homepage
+    if (settings.homepage) {
+      const selectedVideosSetting = settings.homepage.find(s => s.key === 'homepage_video_ids');
+      if (selectedVideosSetting && selectedVideosSetting.value) {
+        try {
+          const parsedIds = JSON.parse(selectedVideosSetting.value);
+          setSelectedHomepageVideos(parsedIds);
+        } catch (error) {
+          console.error('Error parsing homepage videos:', error);
         }
       }
     }
@@ -521,6 +544,45 @@ const Settings = () => {
     }
   };
 
+  const fetchVideos = async () => {
+    try {
+      setVideoLoading(true);
+      const response = await videoApi.getAll({ status: 'published', per_page: 1000 });
+      if (response.success) {
+        const videosData = response.data?.data || response.data || [];
+        setVideos(Array.isArray(videosData) ? videosData : []);
+      }
+    } catch (error) {
+      console.error('Error fetching videos:', error);
+      toast.error('Failed to fetch videos');
+    } finally {
+      setVideoLoading(false);
+    }
+  };
+
+  const handleToggleHomepageVideo = async (videoId: number) => {
+    try {
+      const updatedIds = selectedHomepageVideos.includes(videoId)
+        ? selectedHomepageVideos.filter(id => id !== videoId)
+        : [...selectedHomepageVideos, videoId];
+
+      setSelectedHomepageVideos(updatedIds);
+
+      // Save to settings
+      const updateData: SettingsUpdateRequest[] = [{
+        key: 'homepage_video_ids',
+        value: JSON.stringify(updatedIds),
+        group: 'homepage'
+      }];
+
+      await settingsApi.bulkUpdate(updateData);
+      toast.success('Homepage videos updated');
+    } catch (error) {
+      console.error('Error updating homepage videos:', error);
+      toast.error('Failed to update homepage videos');
+    }
+  };
+
   const handleCreateFaq = async () => {
     try {
       if (user) {
@@ -821,7 +883,7 @@ const Settings = () => {
 
       {/* Settings Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           {/* Hero tab retained for general text settings; background images managed via About only */}
           <TabsTrigger value="hero" className="flex items-center">
             <Home className="mr-2 h-4 w-4" />
@@ -834,6 +896,10 @@ const Settings = () => {
           <TabsTrigger value="testimonial" className="flex items-center">
             <Users className="mr-2 h-4 w-4" />
             {t('admin.settings_page.tabs.testimonials')}
+          </TabsTrigger>
+          <TabsTrigger value="videos" className="flex items-center">
+            <Play className="mr-2 h-4 w-4" />
+            Videos
           </TabsTrigger>
           <TabsTrigger value="faq" className="flex items-center">
             <HelpCircle className="mr-2 h-4 w-4" />
@@ -1073,6 +1139,157 @@ const Settings = () => {
                 }).length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
                     {t('admin.settings_page.testimonials.no_reviews')}
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* Video Carousel Section Settings */}
+        <TabsContent value="videos" className="mt-6 space-y-6">
+          {/* All Videos from Database */}
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-semibold">Homepage Video Carousel</h2>
+                <p className="text-muted-foreground">Select which videos to display in the homepage carousel</p>
+              </div>
+            </div>
+
+            {/* Selected Videos Info */}
+            {selectedHomepageVideos.length > 0 && (
+              <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-primary">
+                      {selectedHomepageVideos.length} video{selectedHomepageVideos.length !== 1 ? 's' : ''} selected for homepage
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Click on videos below to add or remove them from the homepage carousel
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      setSelectedHomepageVideos([]);
+                      // Save empty array to settings
+                      try {
+                        const updateData: SettingsUpdateRequest[] = [{
+                          key: 'homepage_video_ids',
+                          value: JSON.stringify([]),
+                          group: 'homepage'
+                        }];
+                        await settingsApi.bulkUpdate(updateData);
+                        toast.success('Homepage videos cleared');
+                      } catch (error) {
+                        console.error('Error clearing homepage videos:', error);
+                        toast.error('Failed to clear homepage videos');
+                      }
+                    }}
+                  >
+                    Clear All
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Search and Filter */}
+            <div className="flex gap-4 mb-6">
+              <Input
+                placeholder="Search videos..."
+                value={videoSearch}
+                onChange={(e) => setVideoSearch(e.target.value)}
+                className="flex-1"
+              />
+              <Select value={videoFilter} onValueChange={(value) => setVideoFilter(value as 'all' | 'published' | 'draft')}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Filter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Videos</SelectItem>
+                  <SelectItem value="published">Published</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Videos List */}
+            {videoLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading videos...</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {videos
+                  .filter(v => {
+                    if (videoSearch) {
+                      const search = videoSearch.toLowerCase();
+                      return (v.title || '').toLowerCase().includes(search) || 
+                             (v.description || '').toLowerCase().includes(search);
+                    }
+                    if (videoFilter === 'published') return v.status === 'published';
+                    if (videoFilter === 'draft') return v.status === 'draft';
+                    return true;
+                  })
+                  .map((video) => (
+                    <div 
+                      key={video.id} 
+                      className={`border rounded-lg p-4 transition-colors cursor-pointer ${
+                        selectedHomepageVideos.includes(video.id) 
+                          ? 'bg-primary/5 border-primary/30' 
+                          : 'hover:bg-muted/50'
+                      }`}
+                      onClick={() => handleToggleHomepageVideo(video.id)}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-semibold">{video.title || 'Untitled Video'}</h4>
+                            {selectedHomepageVideos.includes(video.id) && (
+                              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">Show on Homepage</Badge>
+                            )}
+                            {video.status !== 'published' && (
+                              <Badge variant="secondary">{video.status}</Badge>
+                            )}
+                            {video.visibility && (
+                              <Badge variant="default">{video.visibility}</Badge>
+                            )}
+                          </div>
+                          {video.description && (
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                              {video.description}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                            {video.category && (
+                              <span>Category: {typeof video.category === 'object' && video.category ? video.category.name : String(video.category)}</span>
+                            )}
+                            {video.duration && (
+                              <span>Duration: {Math.floor(video.duration / 60)}m</span>
+                            )}
+                            {video.views !== undefined && (
+                              <span>Views: {video.views}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                {videos.filter(v => {
+                  if (videoSearch) {
+                    const search = videoSearch.toLowerCase();
+                    return (v.title || '').toLowerCase().includes(search) || 
+                           (v.description || '').toLowerCase().includes(search);
+                  }
+                  if (videoFilter === 'published') return v.status === 'published';
+                  if (videoFilter === 'draft') return v.status === 'draft';
+                  return true;
+                }).length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No videos found
                   </div>
                 )}
               </div>
