@@ -28,8 +28,11 @@ return [
     // ✅ List your exact frontend origins (no wildcard!)
     'allowed_origins' => [
         'http://localhost:3000',
+        'http://localhost:4173',
         'http://127.0.0.1:3000',
-        'http://135.181.66.232:3000'
+        'http://127.0.0.1:4173',
+        'http://135.181.66.232:3000',
+        'http://135.181.66.232:4173',
     ],
 
     // Optional regex patterns for origins
