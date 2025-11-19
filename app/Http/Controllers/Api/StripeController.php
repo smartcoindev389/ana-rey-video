@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
+use Stripe\StripeClient;
+use Stripe\Webhook;
+use Stripe\Exception\SignatureVerificationException;
 
 class StripeController extends Controller
 {
@@ -53,7 +56,8 @@ class StripeController extends Controller
         $successUrl = $validated['success_url'] ?? Config::get('stripe.success_url');
         $cancelUrl = $validated['cancel_url'] ?? Config::get('stripe.cancel_url');
 
-        $client = new \Stripe\StripeClient($secret);
+        // Initialize Stripe client with API key
+        $client = new StripeClient($secret);
 
         // Ensure Stripe customer exists
         $customerId = $user->stripe_customer_id;
@@ -106,10 +110,11 @@ class StripeController extends Controller
         }
 
         try {
-            $event = \Stripe\Webhook::constructEvent($payload, $sigHeader, $webhookSecret);
+            // Verify webhook signature using Stripe SDK
+            $event = Webhook::constructEvent($payload, $sigHeader, $webhookSecret);
         } catch (\UnexpectedValueException $e) {
             return new Response('Invalid payload', 400);
-        } catch (\Stripe\Exception\SignatureVerificationException $e) {
+        } catch (SignatureVerificationException $e) {
             return new Response('Invalid signature', 400);
         }
 

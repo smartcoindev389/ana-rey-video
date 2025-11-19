@@ -138,6 +138,43 @@ class ApiClient {
 
     return this.handleResponse<{ user: User; message: string }>(response);
   }
+
+  async createStripeCheckoutSession(planId: number, successUrl: string, cancelUrl: string): Promise<{ success: boolean; url: string; id: string; message?: string }> {
+    console.log('🔐 Creating Stripe checkout session via API...', {
+      url: `${this.baseUrl}/payments/checkout`,
+      planId,
+      successUrl,
+      hasToken: !!localStorage.getItem('auth_token')
+    });
+
+    const response = await fetch(`${this.baseUrl}/payments/checkout`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ 
+        plan_id: planId, 
+        success_url: successUrl, 
+        cancel_url: cancelUrl 
+      }),
+    });
+
+    console.log('📡 Stripe checkout API response status:', response.status, response.statusText);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Stripe checkout API error response:', errorText);
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { message: errorText || `HTTP ${response.status}: ${response.statusText}` };
+      }
+      throw new Error(errorData.message || `Failed to create checkout session: ${response.status}`);
+    }
+
+    const result = await this.handleResponse<{ success: boolean; url: string; id: string; message?: string }>(response);
+    console.log('✅ Stripe checkout API success:', result);
+    return result;
+  }
 }
 
 export const api = new ApiClient(API_BASE_URL);

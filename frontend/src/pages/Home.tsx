@@ -20,8 +20,10 @@ import {
   X
 } from 'lucide-react';
 import { generateMockSeries, generateMockVideos, MockSeries } from '@/services/mockData';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+import { api } from '@/lib/api';
 import CourseHeroSection from '@/components/CourseHeroSection';
 import { faqApi, Faq } from '@/services/faqApi';
 import { settingsApi } from '@/services/settingsApi';
@@ -49,7 +51,6 @@ const Home = () => {
   const [activeTab, setActiveTab] = useState(0); // Start at first category tab
   const [faqs, setFaqs] = useState<Record<string, Faq[]>>({});
   const [faqLoading, setFaqLoading] = useState(false);
-  const [aboutImageError, setAboutImageError] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | undefined>(undefined);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
@@ -70,7 +71,8 @@ const Home = () => {
   const [shouldCenterVideos, setShouldCenterVideos] = useState(false);
   const tabContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user, isAuthenticated, updateUser } = useAuth();
   const { t } = useTranslation();
   const { navigateWithLocale, getPathWithLocale, locale } = useLocale();
 
@@ -380,8 +382,6 @@ const Home = () => {
           console.log('Hero settings loaded:', response.data);
           console.log('About image URL:', response.data.about_image);
           setHeroSettings(response.data);
-          // Reset image error state when settings are loaded
-          setAboutImageError(false);
         }
       } catch (error) {
         console.error('Error fetching hero settings:', error);
@@ -394,7 +394,6 @@ const Home = () => {
           hero_cta_button_text: t('hero.cta_button'),
           hero_disclaimer: t('hero.disclaimer')
         });
-        setAboutImageError(false);
       } finally {
         setSettingsLoading(false);
       }
@@ -402,6 +401,40 @@ const Home = () => {
 
     fetchHeroSettings();
   }, []);
+
+  // Handle payment success/cancel callbacks from Stripe
+  useEffect(() => {
+    const paymentStatus = searchParams.get('payment');
+    const sessionId = searchParams.get('session_id');
+
+    if (paymentStatus === 'success' && sessionId) {
+      // Payment successful - refresh user data to get updated subscription
+      const refreshUser = async () => {
+        try {
+          const response = await api.getUser();
+          if (response.user) {
+            updateUser(response.user);
+            toast.success(t('subscription.payment_success') || 'Payment successful! Your subscription is now active.');
+          }
+        } catch (error) {
+          console.error('Error refreshing user after payment:', error);
+          toast.success(t('subscription.payment_success') || 'Payment successful!');
+        }
+      };
+      refreshUser();
+      
+      // Clean up URL
+      searchParams.delete('payment');
+      searchParams.delete('session_id');
+      setSearchParams(searchParams, { replace: true });
+    } else if (paymentStatus === 'cancel') {
+      toast.error(t('subscription.payment_cancelled') || 'Payment was cancelled.');
+      
+      // Clean up URL
+      searchParams.delete('payment');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams, updateUser, t]);
 
   // Fetch Categories and Series from backend
   useEffect(() => {
@@ -1417,30 +1450,14 @@ const Home = () => {
             </div>
             <div className="relative">
               <div className="aspect-[16/9] rounded-xl overflow-hidden shadow-2xl">
-                {heroSettings.about_image && !aboutImageError ? (
-                  <img
-                    src={getImageUrl(heroSettings.about_image)}
-                    alt={heroSettings.about_title || t('about.title')}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      // Fallback to YouTube if image fails to load
-                      console.error('About image failed to load:', getImageUrl(heroSettings.about_image), heroSettings.about_image);
-                      setAboutImageError(true);
-                    }}
-                    onLoad={() => {
-                      console.log('About image loaded successfully:', getImageUrl(heroSettings.about_image));
-                    }}
-                  />
-                ) : (
-                  <iframe
-                    src="https://www.youtube.com/embed/aHR2IFjhOwg"
-                    title={t('general.about_sacrart')}
-                    className="w-full h-full"
-                    frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                )}
+                <iframe
+                  src="https://www.youtube.com/embed/aHR2IFjhOwg"
+                  title={t('general.about_sacrart')}
+                  className="w-full h-full"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
               </div>
             </div>
           </div>

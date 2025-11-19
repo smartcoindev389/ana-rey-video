@@ -52,6 +52,9 @@ Route::get('/locale', [LanguageController::class, 'getLocale']);
 Route::get('/translations/{locale?}', [LanguageController::class, 'translations']);
 Route::post('/locale', [LanguageController::class, 'setLocale']);
 
+// Public Subscription Plans route
+Route::get('/subscription-plans/public', [SubscriptionPlanController::class, 'public']);
+
 // Public Testimonial routes
 Route::get('/testimonials/public', [TestimonialController::class, 'public']);
 
@@ -256,7 +259,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Coupon validation (public)
     Route::post('/coupons/validate', [CouponController::class, 'validate']);
-    Route::get('/subscription-plans/public', [SubscriptionPlanController::class, 'public']);
     
     // Media upload routes (admin only)
     Route::middleware('auth:sanctum')->group(function () {

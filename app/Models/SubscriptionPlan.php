@@ -24,6 +24,7 @@ class SubscriptionPlan extends Model
         'ad_free',
         'is_active',
         'sort_order',
+        'stripe_price_id',
     ];
 
     protected $casts = [
@@ -81,14 +82,33 @@ class SubscriptionPlan extends Model
      */
     public function getDisplayNameAttribute($value): ?string
     {
+        // If value is null, return null
+        if ($value === null) {
+            return null;
+        }
+
         $locale = app()->getLocale();
         if ($locale === 'en') {
             return $value;
         }
-        // Use raw attribute to avoid recursion
-        $rawValue = $this->attributes['display_name'] ?? $value;
-        $translation = $this->getTranslation('display_name', $locale);
-        return $translation ?: $rawValue;
+        
+        // Only try to get translation if model exists and has an ID
+        if (!$this->exists || !$this->id) {
+            return $value;
+        }
+        
+        try {
+            $translation = $this->getTranslation('display_name', $locale);
+            return $translation ?: $value;
+        } catch (\Exception $e) {
+            // If translation lookup fails, return original value
+            \Log::warning('Failed to get translation for display_name', [
+                'model_id' => $this->id,
+                'locale' => $locale,
+                'error' => $e->getMessage()
+            ]);
+            return $value;
+        }
     }
 
     /**
@@ -96,13 +116,32 @@ class SubscriptionPlan extends Model
      */
     public function getDescriptionAttribute($value): ?string
     {
+        // If value is null, return null
+        if ($value === null) {
+            return null;
+        }
+
         $locale = app()->getLocale();
         if ($locale === 'en') {
             return $value;
         }
-        // Use raw attribute to avoid recursion
-        $rawValue = $this->attributes['description'] ?? $value;
-        $translation = $this->getTranslation('description', $locale);
-        return $translation ?: $rawValue;
+        
+        // Only try to get translation if model exists and has an ID
+        if (!$this->exists || !$this->id) {
+            return $value;
+        }
+        
+        try {
+            $translation = $this->getTranslation('description', $locale);
+            return $translation ?: $value;
+        } catch (\Exception $e) {
+            // If translation lookup fails, return original value
+            \Log::warning('Failed to get translation for description', [
+                'model_id' => $this->id,
+                'locale' => $locale,
+                'error' => $e->getMessage()
+            ]);
+            return $value;
+        }
     }
 }
