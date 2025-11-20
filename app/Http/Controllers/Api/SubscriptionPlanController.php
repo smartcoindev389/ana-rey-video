@@ -192,12 +192,12 @@ class SubscriptionPlanController extends Controller
     public function public(): JsonResponse
     {
         try {
-            $plans = SubscriptionPlan::active()->ordered()->get();
+        $plans = SubscriptionPlan::active()->ordered()->get();
 
-            return response()->json([
-                'success' => true,
-                'data' => $plans,
-            ]);
+        return response()->json([
+            'success' => true,
+            'data' => $plans,
+        ]);
         } catch (\Exception $e) {
             \Log::error('Error fetching public subscription plans: ' . $e->getMessage(), [
                 'exception' => $e,

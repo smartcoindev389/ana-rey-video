@@ -58,18 +58,17 @@ Route::get('/subscription-plans/public', [SubscriptionPlanController::class, 'pu
 // Public Testimonial routes
 Route::get('/testimonials/public', [TestimonialController::class, 'public']);
 
-// Public series and videos (with access control)
-Route::get('/series', [SeriesController::class, 'index']);
-Route::get('/series/{series}', [SeriesController::class, 'show']);
-Route::get('/videos', [VideoController::class, 'index']);
-Route::get('/videos/{video}', [VideoController::class, 'show']);
-Route::get('/videos/{video}/stream', [VideoController::class, 'stream']);
-
-// Video Comments (public access to read, authenticated to write)
-Route::get('/videos/{video}/comments', [\App\Http\Controllers\Api\VideoCommentController::class, 'index']);
-
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
+    // Series and videos (require authentication)
+    Route::get('/series', [SeriesController::class, 'index']);
+    Route::get('/series/{series}', [SeriesController::class, 'show']);
+    Route::get('/videos', [VideoController::class, 'index']);
+    Route::get('/videos/{video}', [VideoController::class, 'show']);
+    Route::get('/videos/{video}/stream', [VideoController::class, 'stream']);
+
+    // Video Comments (require authentication to read)
+    Route::get('/videos/{video}/comments', [\App\Http\Controllers\Api\VideoCommentController::class, 'index']);
     // Payments (Stripe)
     Route::post('/payments/checkout', [StripeController::class, 'createCheckoutSession']);
     // Auth routes

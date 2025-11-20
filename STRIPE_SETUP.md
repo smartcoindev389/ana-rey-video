@@ -33,17 +33,35 @@ For each product:
 4. Click **"Save price"**
 5. **Copy the Price ID** (starts with `price_`)
 
-### Step 3: Update Database
+### Step 3: Set Stripe Price IDs
+
+You have 2 options (choose one):
+
+#### Option A: Using Environment Variables (Easiest - No Database Changes)
+Add these to your `.env` file:
+```env
+STRIPE_PRICE_ID_BASIC=price_xxxxx
+STRIPE_PRICE_ID_PREMIUM=price_xxxxx
+```
+
+Then clear config cache:
+```bash
+php artisan config:clear
+```
+
+**Note**: The system will automatically use env variables if database values are NULL. Database values take priority.
+
+#### Option B: Update Database
 
 You have 3 options:
 
-#### Option A: Using Artisan Command (Recommended)
+##### Option B1: Using Artisan Command (Recommended)
 ```bash
 php artisan stripe:set-price-id basic price_xxxxx
 php artisan stripe:set-price-id premium price_xxxxx
 ```
 
-#### Option B: Using Laravel Tinker
+##### Option B2: Using Laravel Tinker
 ```bash
 php artisan tinker
 ```
@@ -56,7 +74,7 @@ $premium = App\Models\SubscriptionPlan::where('name', 'premium')->first();
 $premium->update(['stripe_price_id' => 'price_xxxxx']);
 ```
 
-#### Option C: Direct SQL
+##### Option B3: Direct SQL
 ```sql
 UPDATE subscription_plans SET stripe_price_id = 'price_xxxxx' WHERE name = 'basic';
 UPDATE subscription_plans SET stripe_price_id = 'price_xxxxx' WHERE name = 'premium';

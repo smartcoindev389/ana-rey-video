@@ -1450,14 +1450,14 @@ const Home = () => {
             </div>
             <div className="relative">
               <div className="aspect-[16/9] rounded-xl overflow-hidden shadow-2xl">
-                <iframe
-                  src="https://www.youtube.com/embed/aHR2IFjhOwg"
-                  title={t('general.about_sacrart')}
-                  className="w-full h-full"
-                  frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
+                  <iframe
+                    src="https://www.youtube.com/embed/aHR2IFjhOwg"
+                    title={t('general.about_sacrart')}
+                    className="w-full h-full"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
               </div>
             </div>
           </div>

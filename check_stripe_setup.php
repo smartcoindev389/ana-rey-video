@@ -24,11 +24,27 @@ if ($webhookSecret) {
     echo "   ⚠️  STRIPE_WEBHOOK_SECRET is NOT set (needed for webhooks)\n";
 }
 
-echo "\n2. Checking Subscription Plans:\n";
+echo "\n2. Checking Environment Variables for Price IDs:\n";
+$envPriceIds = [
+    'STRIPE_PRICE_ID_BASIC' => env('STRIPE_PRICE_ID_BASIC'),
+    'STRIPE_PRICE_ID_PREMIUM' => env('STRIPE_PRICE_ID_PREMIUM'),
+    'STRIPE_PRICE_ID_FREEMIUM' => env('STRIPE_PRICE_ID_FREEMIUM'),
+];
+
+foreach ($envPriceIds as $key => $value) {
+    if ($value) {
+        echo "   ✅ {$key}: {$value}\n";
+    } else {
+        echo "   ⚠️  {$key}: NOT SET\n";
+    }
+}
+
+echo "\n3. Checking Subscription Plans:\n";
 $plans = \App\Models\SubscriptionPlan::all();
 
 foreach ($plans as $plan) {
-    $status = $plan->stripe_price_id ? '✅' : '❌';
+    $priceId = $plan->stripe_price_id; // This will use the accessor
+    $status = $priceId ? '✅' : '❌';
     echo sprintf(
         "   %s Plan: %s (ID: %d, Name: %s, Price: $%.2f)\n",
         $status,
@@ -37,14 +53,16 @@ foreach ($plans as $plan) {
         $plan->name,
         $plan->price
     );
-    if ($plan->stripe_price_id) {
-        echo "      Stripe Price ID: {$plan->stripe_price_id}\n";
+    if ($priceId) {
+        $source = $plan->getAttributes()['stripe_price_id'] ?? null;
+        $sourceText = $source ? 'database' : 'env/config';
+        echo "      Stripe Price ID: {$priceId} (from {$sourceText})\n";
     } else {
-        echo "      ⚠️  Stripe Price ID: NOT SET\n";
+        echo "      ⚠️  Stripe Price ID: NOT SET (neither in DB nor env)\n";
     }
 }
 
-echo "\n3. Summary:\n";
+echo "\n4. Summary:\n";
 $plansWithStripe = $plans->filter(fn($p) => $p->stripe_price_id && $p->price > 0)->count();
 $totalPaidPlans = $plans->filter(fn($p) => $p->price > 0)->count();
 

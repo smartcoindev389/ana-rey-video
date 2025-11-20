@@ -231,9 +231,9 @@ const Subscription = () => {
         } else {
           // Freemium plan - just show success and navigate
           console.log('✅ Freemium plan selected, no payment needed');
-          toast.success(`${t('subscription.account_created')} ${plan.name} ${t('subscription.plan_success')}`);
-          const locale = localStorage.getItem('i18nextLng') || 'en';
-          navigate(`/${locale}`);
+        toast.success(`${t('subscription.account_created')} ${plan.name} ${t('subscription.plan_success')}`);
+        const locale = localStorage.getItem('i18nextLng') || 'en';
+        navigate(`/${locale}`);
         }
       } else {
         // For existing users upgrading subscription
@@ -323,14 +323,14 @@ const Subscription = () => {
           const data = await api.createStripeCheckoutSession(match.id, successUrl, cancelUrl);
           console.log('📦 Stripe checkout response:', data);
           
-          if (data?.success && data.url) {
+        if (data?.success && data.url) {
             console.log('✅ Stripe checkout URL received, redirecting...', data.url);
             // Redirect to Stripe Checkout
-            window.location.href = data.url;
-            return;
+          window.location.href = data.url;
+          return;
           } else {
             console.error('❌ Stripe checkout failed - no URL in response:', data);
-            throw new Error(data?.message || t('subscription.failed_start_checkout'));
+        throw new Error(data?.message || t('subscription.failed_start_checkout'));
           }
         } catch (stripeError) {
           console.error('❌ Error creating Stripe checkout session:', stripeError);
@@ -411,7 +411,7 @@ const Subscription = () => {
                     return (
                       <>
                         <span className="text-4xl font-bold text-primary font-playfair">{displayPrice}</span>
-                        <span className="text-muted-foreground ml-1 font-montserrat">{plan.period}</span>
+                  <span className="text-muted-foreground ml-1 font-montserrat">{plan.period}</span>
                       </>
                     );
                   })()}
@@ -442,25 +442,25 @@ const Subscription = () => {
                         </p>
                       </div>
                     )}
-                    <Button
-                      variant={plan.popular ? "hero" : "outline"}
-                      className="w-full"
-                      size="lg"
-                      onClick={() => handleSelectPlan(plan)}
+              <Button
+                variant={plan.popular ? "hero" : "outline"}
+                className="w-full"
+                size="lg"
+                onClick={() => handleSelectPlan(plan)}
                       disabled={isLoading || (!isStripeReady && plan.id !== 'freemium')}
-                    >
-                      {isLoading && selectedPlan === plan.name 
-                        ? t('subscription.processing')
+              >
+                {isLoading && selectedPlan === plan.name 
+                  ? t('subscription.processing')
                         : !isStripeReady && plan.id !== 'freemium'
                           ? 'Payment Not Available'
-                          : isFromSignup 
-                            ? `${t('subscription.start_with')} ${plan.name}`
-                            : plan.id === 'freemium' 
-                              ? t('subscription.select_freemium')
-                              : plan.id === 'basic'
-                                ? t('subscription.select_basic')
-                                : t('subscription.select_premium')}
-                    </Button>
+                  : isFromSignup 
+                    ? `${t('subscription.start_with')} ${plan.name}`
+                    : plan.id === 'freemium' 
+                      ? t('subscription.select_freemium')
+                      : plan.id === 'basic'
+                        ? t('subscription.select_basic')
+                        : t('subscription.select_premium')}
+              </Button>
                   </>
                 );
               })()}

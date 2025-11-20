@@ -72,10 +72,26 @@ const App = () => (
               {/* Locale-prefixed routes */}
               <Route path="/:locale" element={<UserLayout />}>
                 <Route index element={<Home />} />
-                <Route path="explore" element={<Explore />} />
-                <Route path="series/:id" element={<SeriesDetail />} />
-                <Route path="category/:id" element={<SeriesDetail />} />
-                <Route path="video/:id" element={<VideoPlayer />} />
+                <Route path="explore" element={
+                  <ProtectedRoute>
+                    <Explore />
+                  </ProtectedRoute>
+                } />
+                <Route path="series/:id" element={
+                  <ProtectedRoute>
+                    <SeriesDetail />
+                  </ProtectedRoute>
+                } />
+                <Route path="category/:id" element={
+                  <ProtectedRoute>
+                    <SeriesDetail />
+                  </ProtectedRoute>
+                } />
+                <Route path="video/:id" element={
+                  <ProtectedRoute>
+                    <VideoPlayer />
+                  </ProtectedRoute>
+                } />
                 <Route path="library" element={
                   <ProtectedRoute>
                     <Library />
@@ -86,8 +102,16 @@ const App = () => (
                     <Profile />
                   </ProtectedRoute>
                 } />
-                <Route path="support" element={<Support />} />
-                <Route path="subscription" element={<Subscription />} />
+                <Route path="support" element={
+                  <ProtectedRoute>
+                    <Support />
+                  </ProtectedRoute>
+                } />
+                <Route path="subscription" element={
+                  <ProtectedRoute>
+                    <Subscription />
+                  </ProtectedRoute>
+                } />
               </Route>
 
               {/* Admin Routes (with locale prefix, but outside UserLayout to avoid header) */}
