@@ -24,8 +24,8 @@ class StripeController extends Controller
     {
         $validated = $request->validate([
             'plan_id' => 'required|integer|exists:subscription_plans,id',
-            'success_url' => 'nullable|url',
-            'cancel_url' => 'nullable|url',
+            'success_url' => 'nullable|string',
+            'cancel_url' => 'nullable|string',
         ]);
 
         $user = $request->user();
@@ -53,8 +53,38 @@ class StripeController extends Controller
             ], 500);
         }
 
+        // Get URLs from request or config fallback
         $successUrl = $validated['success_url'] ?? Config::get('stripe.success_url');
         $cancelUrl = $validated['cancel_url'] ?? Config::get('stripe.cancel_url');
+
+        // Validate URLs (handle Stripe placeholder - just check basic URL structure)
+        if ($successUrl) {
+            // Replace placeholder with dummy value for validation
+            $successUrlForValidation = str_replace('{CHECKOUT_SESSION_ID}', 'test_session_id', $successUrl);
+            
+            // Basic URL structure check
+            if (!preg_match('/^https?:\/\//', $successUrlForValidation)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The success url field must be a valid URL.',
+                    'errors' => ['success_url' => ['The success url field must be a valid URL.']],
+                ], 422);
+            }
+        }
+
+        if ($cancelUrl) {
+            // Replace placeholder with dummy value for validation
+            $cancelUrlForValidation = str_replace('{CHECKOUT_SESSION_ID}', 'test_session_id', $cancelUrl);
+            
+            // Basic URL structure check
+            if (!preg_match('/^https?:\/\//', $cancelUrlForValidation)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The cancel url field must be a valid URL.',
+                    'errors' => ['cancel_url' => ['The cancel url field must be a valid URL.']],
+                ], 422);
+            }
+        }
 
         // Initialize Stripe client with API key
         $client = new StripeClient($secret);
@@ -73,6 +103,13 @@ class StripeController extends Controller
             $user->update(['stripe_customer_id' => $customerId]);
         }
 
+        // If success_url doesn't already have the placeholder, add it
+        $finalSuccessUrl = $successUrl;
+        if (!str_contains($successUrl, '{CHECKOUT_SESSION_ID}')) {
+            $separator = str_contains($successUrl, '?') ? '&' : '?';
+            $finalSuccessUrl = $successUrl . $separator . 'session_id={CHECKOUT_SESSION_ID}';
+        }
+
         $session = $client->checkout->sessions->create([
             'mode' => 'subscription',
             'customer' => $customerId,
@@ -80,7 +117,7 @@ class StripeController extends Controller
                 'price' => $plan->stripe_price_id,
                 'quantity' => 1,
             ]],
-            'success_url' => $successUrl . '?session_id={CHECKOUT_SESSION_ID}',
+            'success_url' => $finalSuccessUrl,
             'cancel_url' => $cancelUrl,
             'client_reference_id' => (string) $user->id,
             'metadata' => [

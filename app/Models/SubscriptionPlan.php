@@ -146,53 +146,14 @@ class SubscriptionPlan extends Model
     }
 
     /**
-     * Get Stripe Price ID attribute with fallback to environment variables
-     * Priority: Database value > Environment variable > Config > null
+     * Get Stripe Price ID attribute.
+     *
+     * For flexible, admin-managed plans we treat the database column
+     * `subscription_plans.stripe_price_id` as the single source of truth.
+     * If it's empty, the plan is considered not configured for Stripe.
      */
     public function getStripePriceIdAttribute($value): ?string
     {
-        // If database has a value, use it (highest priority)
-        if (!empty($value)) {
-            return $value;
-        }
-
-        // Get plan name from raw attributes to avoid recursion
-        $planName = $this->attributes['name'] ?? null;
-        if (empty($planName) && isset($this->name)) {
-            // Fallback if name accessor exists
-            $planName = $this->name;
-        }
-
-        if (empty($planName)) {
-            return null;
-        }
-
-        $planNameUpper = strtoupper($planName);
-        
-        // Map plan names to env variable names
-        $envKey = match($planNameUpper) {
-            'BASIC' => 'STRIPE_PRICE_ID_BASIC',
-            'PREMIUM' => 'STRIPE_PRICE_ID_PREMIUM',
-            'FREEMIUM' => 'STRIPE_PRICE_ID_FREEMIUM',
-            'ADMIN' => 'STRIPE_PRICE_ID_ADMIN',
-            default => null,
-        };
-
-        // Try environment variable first
-        if ($envKey) {
-            $envValue = env($envKey);
-            if (!empty($envValue)) {
-                return $envValue;
-            }
-        }
-
-        // Fallback to config
-        $configKey = 'stripe.price_ids.' . strtolower($planName);
-        $configValue = config($configKey);
-        if (!empty($configValue)) {
-            return $configValue;
-        }
-
-        return null;
+        return !empty($value) ? $value : null;
     }
 }

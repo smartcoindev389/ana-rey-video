@@ -20,6 +20,7 @@ class Subscription extends Model
         'billing_cycle',
         'auto_renew',
         'notes',
+        'stripe_subscription_id',
     ];
 
     protected $casts = [

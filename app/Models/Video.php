@@ -20,10 +20,15 @@ class Video extends Model
         'slug',
         'description',
         'short_description',
-        'category_id',
+        'series_id',
         'instructor_id',
         'video_url',
         'video_file_path',
+        'bunny_video_id',
+        'bunny_video_url',
+        'bunny_embed_url',
+        'bunny_thumbnail_url',
+        'bunny_player_url',
         'thumbnail',
         'intro_image',
         'intro_description',
@@ -79,7 +84,7 @@ class Video extends Model
         'price' => 'decimal:2',
     ];
 
-    protected $appends = ['video_url_full', 'intro_image_url', 'thumbnail_url', 'series_id'];
+    protected $appends = ['video_url_full', 'intro_image_url', 'thumbnail_url', 'series_id', 'bunny_player_url'];
 
     /**
      * Get the route key for the model.
@@ -109,26 +114,26 @@ class Video extends Model
         });
 
         static::saved(function ($video) {
-            // Update category statistics when video is saved
-            if ($video->category) {
-                $video->category->updateStatistics();
+            // Update series statistics when video is saved
+            if ($video->series) {
+                $video->series->updateStatistics();
             }
         });
 
         static::deleted(function ($video) {
-            // Update category statistics when video is deleted
-            if ($video->category) {
-                $video->category->updateStatistics();
+            // Update series statistics when video is deleted
+            if ($video->series) {
+                $video->series->updateStatistics();
             }
         });
     }
 
     /**
-     * Get the category that owns the video.
+     * Get the series that owns the video.
      */
-    public function category(): BelongsTo
+    public function series(): BelongsTo
     {
-        return $this->belongsTo(Category::class);
+        return $this->belongsTo(Series::class);
     }
 
     /**
@@ -157,9 +162,26 @@ class Video extends Model
 
     /**
      * Get the full video URL.
+     * Priority: Bunny.net embed URL > Bunny.net video URL > video_url > local file path
      */
     public function getVideoUrlFullAttribute(): ?string
     {
+        // Priority 1: Bunny.net embed URL (for player)
+        if ($this->bunny_embed_url) {
+            return $this->bunny_embed_url;
+        }
+        
+        // Priority 2: Bunny.net video URL
+        if ($this->bunny_video_url) {
+            return $this->bunny_video_url;
+        }
+        
+        // Priority 3: Direct video URL
+        if ($this->video_url) {
+            return $this->video_url;
+        }
+        
+        // Priority 4: Legacy local file path (for backward compatibility)
         if ($this->video_file_path) {
             // If it starts with http, it's already a full URL
             if (str_starts_with($this->video_file_path, 'http')) {
@@ -168,7 +190,16 @@ class Video extends Model
             // Use streaming endpoint - it properly handles Range requests which are required for video playback
             return url("api/videos/{$this->id}/stream");
         }
-        return $this->video_url;
+        
+        return null;
+    }
+
+    /**
+     * Get Bunny.net player URL for embedding
+     */
+    public function getBunnyPlayerUrlAttribute(): ?string
+    {
+        return $this->bunny_embed_url;
     }
 
     /**
@@ -199,13 +230,6 @@ class Video extends Model
         return null;
     }
 
-    /**
-     * Get series_id (alias for category_id for frontend compatibility).
-     */
-    public function getSeriesIdAttribute(): ?int
-    {
-        return $this->category_id;
-    }
 
     /**
      * Scope a query to only include published videos.
@@ -316,18 +340,18 @@ class Video extends Model
     {
         $this->increment('views');
         
-        // Also increment category views
-        if ($this->category) {
-            $this->category->increment('total_views');
+        // Also increment series views
+        if ($this->series) {
+            $this->series->increment('total_views');
         }
     }
 
     /**
-     * Get next video in category.
+     * Get next video in series.
      */
     public function getNextVideo()
     {
-        return $this->category->videos()
+        return $this->series->videos()
             ->published()
             ->where('sort_order', '>', $this->sort_order)
             ->orderBy('sort_order')
@@ -335,11 +359,11 @@ class Video extends Model
     }
 
     /**
-     * Get previous video in category.
+     * Get previous video in series.
      */
     public function getPreviousVideo()
     {
-        return $this->category->videos()
+        return $this->series->videos()
             ->published()
             ->where('sort_order', '<', $this->sort_order)
             ->orderBy('sort_order', 'desc')

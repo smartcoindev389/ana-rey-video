@@ -90,11 +90,6 @@ const ContentManagement = () => {
   // Media management state
   const [uploadedImages, setUploadedImages] = useState<any[]>([]);
   const [uploadedVideos, setUploadedVideos] = useState<any[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [selectedVideoFile, setSelectedVideoFile] = useState<File | null>(null);
-  const [selectedIntroImageFile, setSelectedIntroImageFile] = useState<File | null>(null);
-  const [selectedCategoryImageFile, setSelectedCategoryImageFile] = useState<File | null>(null);
 
   useEffect(() => {
     fetchContent();
@@ -319,7 +314,6 @@ const ContentManagement = () => {
       updated_at: serie.updated_at || '',
     };
     setSelectedSeries(mappedSeries);
-    setSelectedCategoryImageFile(null);
     setIsSeriesDialogOpen(true);
   };
 
@@ -367,277 +361,42 @@ const ContentManagement = () => {
       setIsSubmitting(true);
       console.log('Saving series:', selectedSeries);
       
-      // Get original category name if updating (for fallback)
-      let originalName = '';
+      // Prepare series payload with Bunny.net URLs
+      const seriesPayload: any = {
+        title: selectedSeries.title || selectedSeries.name || '',
+        description: selectedSeries.description || '',
+        visibility: selectedSeries.visibility || 'freemium',
+        status: selectedSeries.status || 'draft',
+        category_id: selectedSeries.category_id || null,
+        thumbnail: (selectedSeries as any)?.thumbnail || null,
+        cover_image: (selectedSeries as any)?.cover_image || null,
+        trailer_url: (selectedSeries as any)?.trailer_url || null,
+      };
+      
+      let response;
       if (selectedSeries.id && selectedSeries.id > 0) {
-        const originalCategory = categories.find(c => c.id === selectedSeries.id);
-        if (originalCategory) {
-          originalName = originalCategory.name || '';
-        }
+        // Update series
+        response = await seriesApi.update(selectedSeries.id, seriesPayload);
+      } else {
+        // Create series
+        response = await seriesApi.create(seriesPayload);
       }
       
-      // Check if we need to use FormData for image upload
-      const needsFormData = selectedCategoryImageFile !== null;
-      
-      if (needsFormData) {
-        // Use FormData when there's an image file
-        const formData = new FormData();
-        
-        // Map title to name since backend expects 'name' (category uses 'name', series uses 'title')
-        // Ensure we use name if available, otherwise title, fallback to original name, but never empty
-        let categoryName = (selectedSeries.name || selectedSeries.title || '').trim();
-        
-        // If name is empty and we're updating, use original name as fallback
-        if (!categoryName && selectedSeries.id && selectedSeries.id > 0 && originalName) {
-          categoryName = originalName.trim();
-        }
-        
-        console.log('FormData path - categoryName:', categoryName, 'selectedSeries.name:', selectedSeries.name, 'selectedSeries.title:', selectedSeries.title, 'originalName:', originalName);
-        
-        if (!categoryName) {
-          toast.error('Category name is required');
-          setIsSubmitting(false);
-          return;
-        }
-        
-        // Always append name field - it's required by backend
-        formData.append('name', categoryName);
-        
-        // Add essential category fields
-        if (selectedSeries.description) {
-          formData.append('description', selectedSeries.description);
-        }
-        if (selectedSeries.color) {
-          formData.append('color', selectedSeries.color);
-        }
-        if (selectedSeries.icon) {
-          formData.append('icon', selectedSeries.icon);
-        }
-        if (selectedSeries.sort_order !== undefined) {
-          formData.append('sort_order', selectedSeries.sort_order.toString());
-        }
-        if (selectedSeries.is_active !== undefined) {
-          formData.append('is_active', selectedSeries.is_active ? '1' : '0');
-        }
-        
-        // Add image file if selected
-        if (selectedCategoryImageFile) {
-          formData.append('image_file', selectedCategoryImageFile);
-        }
-        
-        if (selectedSeries.id && selectedSeries.id > 0) {
-          // Update using categoryApi since series are categories
-          // Note: categoryApi.update handles FormData with POST + _method=PUT for Laravel
-          console.log('Sending FormData update with name:', formData.get('name'));
-          // Log all FormData entries for debugging
-          const formDataEntries: string[] = [];
-          formData.forEach((value, key) => {
-            formDataEntries.push(`${key}: ${value instanceof File ? `[File: ${value.name}]` : value}`);
-          });
-          console.log('FormData entries:', formDataEntries);
-          const response = await categoryApi.update(selectedSeries.id, formData);
-          if (response.success) {
-            // Map category response to series format
-            const categoryData = response.data;
-            const seriesData: Series = {
-              ...categoryData,
-              title: categoryData.title || categoryData.name || '',
-              status: (categoryData as any).status || selectedSeries.status || 'draft',
-              visibility: (categoryData as any).visibility || selectedSeries.visibility || 'freemium',
-              video_count: (categoryData as any).video_count || selectedSeries.video_count || 0,
-              total_duration: (categoryData as any).total_duration || selectedSeries.total_duration || 0,
-              total_views: (categoryData as any).total_views || selectedSeries.total_views || 0,
-              category_id: categoryData.id,
-              instructor_id: (categoryData as any).instructor_id || selectedSeries.instructor_id || null,
-              thumbnail: (categoryData as any).thumbnail || selectedSeries.thumbnail || null,
-              cover_image: (categoryData as any).cover_image || selectedSeries.cover_image || null,
-              trailer_url: (categoryData as any).trailer_url || selectedSeries.trailer_url || null,
-              meta_title: (categoryData as any).meta_title || selectedSeries.meta_title || null,
-              meta_description: (categoryData as any).meta_description || selectedSeries.meta_description || null,
-              meta_keywords: (categoryData as any).meta_keywords || selectedSeries.meta_keywords || null,
-              rating: (categoryData as any).rating || selectedSeries.rating || '0',
-              rating_count: (categoryData as any).rating_count || selectedSeries.rating_count || 0,
-              price: (categoryData as any).price || selectedSeries.price || '0',
-              is_free: (categoryData as any).is_free ?? selectedSeries.is_free ?? true,
-              published_at: (categoryData as any).published_at || selectedSeries.published_at || null,
-              featured_until: (categoryData as any).featured_until || selectedSeries.featured_until || null,
-              is_featured: (categoryData as any).is_featured ?? selectedSeries.is_featured ?? false,
-              tags: (categoryData as any).tags || selectedSeries.tags || null,
-            } as Series;
-            setSeries(prev => prev.map(s => s.id === selectedSeries.id ? seriesData : s));
-            setFilteredSeries(prev => prev.map(s => s.id === selectedSeries.id ? seriesData : s));
-            toast.success(t('admin.content_series_updated'));
-            setIsSeriesDialogOpen(false);
-            setSelectedSeries(null);
-            setSelectedCategoryImageFile(null);
-          } else {
-            toast.error(response.message || "Failed to update series");
-          }
+      if (response.success) {
+        const savedSeries = response.data;
+        if (selectedSeries.id) {
+          setSeries(prev => prev.map(s => s.id === selectedSeries.id ? savedSeries : s));
+          setFilteredSeries(prev => prev.map(s => s.id === selectedSeries.id ? savedSeries : s));
+          toast.success(t('admin.content_series_updated'));
         } else {
-          // Create using categoryApi
-          const response = await categoryApi.create(formData);
-          if (response.success) {
-            // Map category response to series format since categories don't have all series fields
-            const categoryData = response.data;
-            const seriesData: Series = {
-              ...categoryData,
-              title: categoryData.title || categoryData.name || '',
-              status: (categoryData as any).status || 'draft',
-              visibility: (categoryData as any).visibility || 'freemium',
-              video_count: (categoryData as any).video_count || 0,
-              total_duration: (categoryData as any).total_duration || 0,
-              total_views: (categoryData as any).total_views || 0,
-              category_id: categoryData.id,
-              instructor_id: (categoryData as any).instructor_id || null,
-              thumbnail: (categoryData as any).thumbnail || null,
-              cover_image: (categoryData as any).cover_image || null,
-              trailer_url: (categoryData as any).trailer_url || null,
-              meta_title: (categoryData as any).meta_title || null,
-              meta_description: (categoryData as any).meta_description || null,
-              meta_keywords: (categoryData as any).meta_keywords || null,
-              rating: (categoryData as any).rating || '0',
-              rating_count: (categoryData as any).rating_count || 0,
-              price: (categoryData as any).price || '0',
-              is_free: (categoryData as any).is_free ?? true,
-              published_at: (categoryData as any).published_at || null,
-              featured_until: (categoryData as any).featured_until || null,
-              is_featured: (categoryData as any).is_featured ?? false,
-              tags: (categoryData as any).tags || null,
-            } as Series;
-            setSeries(prev => [seriesData, ...prev]);
-            setFilteredSeries(prev => [seriesData, ...prev]);
-            toast.success(t('admin.content_series_created'));
-            setIsSeriesDialogOpen(false);
-            setSelectedSeries(null);
-            setSelectedCategoryImageFile(null);
-          } else {
-            toast.error(response.message || "Failed to create series");
-          }
+          setSeries(prev => [savedSeries, ...prev]);
+          setFilteredSeries(prev => [savedSeries, ...prev]);
+          toast.success(t('admin.content_series_created'));
         }
+        setIsSeriesDialogOpen(false);
+        setSelectedSeries(null);
       } else {
-        // Use JSON when no image file
-        // Map title to name since backend CategoryController expects 'name'
-        // Ensure we use name if available, otherwise title, fallback to original name, but never empty
-        let categoryName = (selectedSeries.name || selectedSeries.title || '').trim();
-        
-        // If name is empty and we're updating, use original name as fallback
-        if (!categoryName && selectedSeries.id && selectedSeries.id > 0 && originalName) {
-          categoryName = originalName.trim();
-        }
-        
-        console.log('JSON path - categoryName:', categoryName, 'selectedSeries.name:', selectedSeries.name, 'selectedSeries.title:', selectedSeries.title, 'originalName:', originalName);
-        
-        if (!categoryName) {
-          toast.error('Category name is required');
-          setIsSubmitting(false);
-          return;
-        }
-        
-        if (selectedSeries.id && selectedSeries.id > 0) {
-          // Update existing category using categoryApi
-          const updateData: Partial<Category> = {
-            name: categoryName, // Already trimmed
-            description: selectedSeries.description || null,
-            color: (selectedSeries as any).color || null,
-            icon: (selectedSeries as any).icon || null,
-            sort_order: selectedSeries.sort_order || 0,
-            is_active: (selectedSeries as any).is_active ?? true,
-            image: (selectedSeries as any).image || null,
-          };
-          
-          console.log('Sending JSON update with data:', updateData);
-          const response = await categoryApi.update(selectedSeries.id, updateData);
-          if (response.success) {
-            // Map category response to series format
-            const categoryData = response.data;
-            const seriesData: Series = {
-              ...categoryData,
-              title: categoryData.title || categoryData.name || '',
-              status: (categoryData as any).status || selectedSeries.status || 'draft',
-              visibility: (categoryData as any).visibility || selectedSeries.visibility || 'freemium',
-              video_count: (categoryData as any).video_count || selectedSeries.video_count || 0,
-              total_duration: (categoryData as any).total_duration || selectedSeries.total_duration || 0,
-              total_views: (categoryData as any).total_views || selectedSeries.total_views || 0,
-              category_id: categoryData.id,
-              instructor_id: (categoryData as any).instructor_id || selectedSeries.instructor_id || null,
-              thumbnail: (categoryData as any).thumbnail || selectedSeries.thumbnail || null,
-              cover_image: (categoryData as any).cover_image || selectedSeries.cover_image || null,
-              trailer_url: (categoryData as any).trailer_url || selectedSeries.trailer_url || null,
-              meta_title: (categoryData as any).meta_title || selectedSeries.meta_title || null,
-              meta_description: (categoryData as any).meta_description || selectedSeries.meta_description || null,
-              meta_keywords: (categoryData as any).meta_keywords || selectedSeries.meta_keywords || null,
-              rating: (categoryData as any).rating || selectedSeries.rating || '0',
-              rating_count: (categoryData as any).rating_count || selectedSeries.rating_count || 0,
-              price: (categoryData as any).price || selectedSeries.price || '0',
-              is_free: (categoryData as any).is_free ?? selectedSeries.is_free ?? true,
-              published_at: (categoryData as any).published_at || selectedSeries.published_at || null,
-              featured_until: (categoryData as any).featured_until || selectedSeries.featured_until || null,
-              is_featured: (categoryData as any).is_featured ?? selectedSeries.is_featured ?? false,
-              tags: (categoryData as any).tags || selectedSeries.tags || null,
-            } as Series;
-            setSeries(prev => prev.map(s => s.id === selectedSeries.id ? seriesData : s));
-            setFilteredSeries(prev => prev.map(s => s.id === selectedSeries.id ? seriesData : s));
-            toast.success(t('admin.content_series_updated'));
-            setIsSeriesDialogOpen(false);
-            setSelectedSeries(null);
-          } else {
-            toast.error(response.message || "Failed to update series");
-          }
-        } else {
-          // Create new category using categoryApi
-          if (!categoryName || categoryName.trim() === '') {
-            toast.error('Category name is required');
-            setIsSubmitting(false);
-            return;
-          }
-          
-          const createData: Partial<Category> = {
-            name: categoryName.trim(),
-            description: selectedSeries.description || null,
-            color: (selectedSeries as any).color || '#3B82F6',
-            icon: (selectedSeries as any).icon || null,
-            sort_order: selectedSeries.sort_order || 0,
-            image: (selectedSeries as any).image || null,
-          };
-          
-          const response = await categoryApi.create(createData);
-          if (response.success) {
-            // Map category response to series format since categories don't have all series fields
-            const categoryData = response.data;
-            const seriesData: Series = {
-              ...categoryData,
-              title: categoryData.title || categoryData.name || '',
-              status: (categoryData as any).status || 'draft',
-              visibility: (categoryData as any).visibility || 'freemium',
-              video_count: (categoryData as any).video_count || 0,
-              total_duration: (categoryData as any).total_duration || 0,
-              total_views: (categoryData as any).total_views || 0,
-              category_id: categoryData.id,
-              instructor_id: (categoryData as any).instructor_id || null,
-              thumbnail: (categoryData as any).thumbnail || null,
-              cover_image: (categoryData as any).cover_image || null,
-              trailer_url: (categoryData as any).trailer_url || null,
-              meta_title: (categoryData as any).meta_title || null,
-              meta_description: (categoryData as any).meta_description || null,
-              meta_keywords: (categoryData as any).meta_keywords || null,
-              rating: (categoryData as any).rating || '0',
-              rating_count: (categoryData as any).rating_count || 0,
-              price: (categoryData as any).price || '0',
-              is_free: (categoryData as any).is_free ?? true,
-              published_at: (categoryData as any).published_at || null,
-              featured_until: (categoryData as any).featured_until || null,
-              is_featured: (categoryData as any).is_featured ?? false,
-              tags: (categoryData as any).tags || null,
-            } as Series;
-            setSeries(prev => [seriesData, ...prev]);
-            setFilteredSeries(prev => [seriesData, ...prev]);
-            toast.success(t('admin.content_series_created'));
-            setIsSeriesDialogOpen(false);
-            setSelectedSeries(null);
-          } else {
-            toast.error(response.message || "Failed to create series");
-          }
-        }
+        toast.error(response.message || "Failed to save series");
       }
     } catch (error: any) {
       console.error('Error saving series:', error);
@@ -660,7 +419,6 @@ const ContentManagement = () => {
       slug: '',
       description: '',
       short_description: null,
-      category_id: series.length > 0 ? series[0].category_id : null,
       series_id: series.length > 0 ? series[0].id : null,
       instructor_id: null,
       video_url: null,
@@ -672,6 +430,10 @@ const ContentManagement = () => {
       file_size: null,
       video_format: null,
       video_quality: null,
+      bunny_video_id: null,
+      bunny_video_url: null,
+      bunny_embed_url: '',
+      bunny_thumbnail_url: null,
       streaming_urls: null,
       hls_url: null,
       dash_url: null,
@@ -717,131 +479,41 @@ const ContentManagement = () => {
       return;
     }
 
+    // For Bunny.net-only integration, require at least an embed URL
+    if (!selectedVideo.bunny_embed_url?.trim()) {
+      toast.error('Bunny.net embed URL is required');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
-      setUploadProgress(0);
-      
-      // Prepare form data for file uploads
-      const formData = new FormData();
-      
-      // Add all video data to form data with proper type handling
-      Object.keys(selectedVideo).forEach(key => {
-        const value = selectedVideo[key];
-        
-        // Skip null and undefined values
-        if (value === null || value === undefined) {
-          return;
-        }
-        
-        // Handle boolean values - convert to "1" or "0" for Laravel
-        if (typeof value === 'boolean') {
-          formData.append(key, value ? '1' : '0');
-        }
-        // Handle arrays and objects
-        else if (typeof value === 'object') {
-          formData.append(key, JSON.stringify(value));
-        }
-        // Handle all other types (string, number)
-        else {
-          formData.append(key, value.toString());
-        }
-      });
 
-      // Add files if selected
-      if (selectedVideoFile) {
-        formData.append('video_file', selectedVideoFile);
-      }
-      
-      if (selectedIntroImageFile) {
-        formData.append('intro_image_file', selectedIntroImageFile);
-      }
-      
-      // For updates, use POST with _method spoofing (Laravel requirement for FormData with PUT)
+      const payload: Partial<Video> = {
+        ...selectedVideo,
+      };
+
+      let response;
       if (selectedVideo.id) {
-        formData.append('_method', 'PUT');
+        response = await videoApi.update(selectedVideo.id, payload);
+      } else {
+        response = await videoApi.create(payload);
       }
-      
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
-      
-      // Use XMLHttpRequest for upload progress tracking
-      const xhr = new XMLHttpRequest();
-      
-      // Track upload progress
-      xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable) {
-          const percentComplete = Math.round((event.loaded / event.total) * 100);
-          setUploadProgress(percentComplete);
-        }
-      });
-      
-      // Handle response
-      const uploadPromise = new Promise((resolve, reject) => {
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const result = JSON.parse(xhr.responseText);
-              resolve(result);
-            } catch (e) {
-              reject(new Error('Failed to parse response'));
-            }
-          } else {
-            try {
-              const error = JSON.parse(xhr.responseText);
-              // Extract validation errors if available
-              const errorMessage = error.message || 'Upload failed';
-              const validationErrors = error.errors ? 
-                Object.entries(error.errors).map(([field, msgs]: [string, any]) => 
-                  `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`
-                ).join('; ') : '';
-              
-              reject(new Error(validationErrors || errorMessage));
-            } catch (e) {
-              reject(new Error(`Upload failed with status ${xhr.status}`));
-            }
-          }
-        });
-        
-        xhr.addEventListener('error', () => {
-          reject(new Error('Network error occurred'));
-        });
-        
-        xhr.addEventListener('abort', () => {
-          reject(new Error('Upload cancelled'));
-        });
-      });
-      
-      // Set up request - Always use POST (with _method for updates)
-      const url = selectedVideo.id 
-        ? `${API_BASE_URL}/admin/videos/${selectedVideo.id}`
-        : `${API_BASE_URL}/admin/videos`;
-      
-      xhr.open('POST', url);
-      xhr.setRequestHeader('Authorization', `Bearer ${localStorage.getItem('auth_token')}`);
-      xhr.setRequestHeader('Accept', 'application/json');
-      
-      // Send request
-      xhr.send(formData);
-      
-      // Wait for response
-      const result: any = await uploadPromise;
-      
-      if (result.success) {
+
+      if (response.success) {
+        const savedVideo = response.data;
         if (selectedVideo.id) {
-          setVideos(prev => prev.map(v => v.id === selectedVideo.id ? result.data : v));
-          setFilteredVideos(prev => prev.map(v => v.id === selectedVideo.id ? result.data : v));
+          setVideos(prev => prev.map(v => v.id === selectedVideo.id ? savedVideo : v));
+          setFilteredVideos(prev => prev.map(v => v.id === selectedVideo.id ? savedVideo : v));
           toast.success(t('admin.content_video_updated'));
         } else {
-          setVideos(prev => [result.data, ...prev]);
-          setFilteredVideos(prev => [result.data, ...prev]);
+          setVideos(prev => [savedVideo, ...prev]);
+          setFilteredVideos(prev => [savedVideo, ...prev]);
           toast.success(t('admin.content_video_created'));
         }
         setIsVideoDialogOpen(false);
         setSelectedVideo(null);
-        setSelectedVideoFile(null);
-        setSelectedIntroImageFile(null);
-        setUploadProgress(0);
       } else {
-        toast.error(result.message || "Failed to save video");
+        toast.error(response.message || "Failed to save video");
       }
     } catch (error: any) {
       console.error('Error saving video:', error);
@@ -849,7 +521,6 @@ const ContentManagement = () => {
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
-      setUploadProgress(0);
     }
   };
 
@@ -1545,7 +1216,6 @@ const ContentManagement = () => {
         setIsSeriesDialogOpen(open);
         if (!open) {
           setSelectedSeries(null);
-          setSelectedCategoryImageFile(null);
         }
       }}>
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
@@ -1616,18 +1286,35 @@ const ContentManagement = () => {
                 </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="categoryImage" className="text-right">
-                  Category Image
+                <Label htmlFor="thumbnail" className="text-right">
+                  Thumbnail URL (Bunny.net)
                 </Label>
-                <div className="col-span-3">
-                  <FileUpload
-                    type="image"
-                    label="Upload Category Image"
-                    accept="image/jpeg,image/png,image/jpg,image/webp"
-                    maxSize={10}
-                    onFileSelect={(file) => setSelectedCategoryImageFile(file)}
-                    currentFile={(selectedSeries as any)?.image || null}
+                <div className="col-span-3 space-y-2">
+                  <Input
+                    id="thumbnail"
+                    value={(selectedSeries as any)?.thumbnail || ''}
+                    onChange={(e) => setSelectedSeries({...selectedSeries, thumbnail: e.target.value} as Series)}
+                    placeholder="https://vz-xxx.b-cdn.net/thumbnail.jpg"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Paste the Bunny.net thumbnail URL from your dashboard.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="coverImage" className="text-right">
+                  Cover Image URL (Bunny.net)
+                </Label>
+                <div className="col-span-3 space-y-2">
+                  <Input
+                    id="coverImage"
+                    value={(selectedSeries as any)?.cover_image || ''}
+                    onChange={(e) => setSelectedSeries({...selectedSeries, cover_image: e.target.value} as Series)}
+                    placeholder="https://vz-xxx.b-cdn.net/cover.jpg"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Paste the Bunny.net cover image URL from your dashboard.
+                  </p>
                 </div>
               </div>
             </div>
@@ -1678,16 +1365,40 @@ const ContentManagement = () => {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="introImage" className="text-right">
-                  Intro Image
+                  Intro Image URL (Bunny.net)
                 </Label>
-                <div className="col-span-3">
-                  <FileUpload
-                    type="image"
-                    label=""
-                    onFileSelect={setSelectedIntroImageFile}
-                    currentFile={selectedVideo.intro_image}
+                <div className="col-span-3 space-y-2">
+                  <Input
+                    id="introImage"
+                    value={selectedVideo.intro_image || ''}
+                    onChange={(e) => setSelectedVideo({...selectedVideo, intro_image: e.target.value})}
+                    placeholder="https://vz-xxx.b-cdn.net/intro.jpg"
                     disabled={isSubmitting}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Paste the Bunny.net intro image URL from your dashboard.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="thumbnail" className="text-right">
+                  Thumbnail URL (Bunny.net)
+                </Label>
+                <div className="col-span-3 space-y-2">
+                  <Input
+                    id="thumbnail"
+                    value={selectedVideo.thumbnail || selectedVideo.bunny_thumbnail_url || ''}
+                    onChange={(e) => setSelectedVideo({
+                      ...selectedVideo,
+                      thumbnail: e.target.value,
+                      bunny_thumbnail_url: e.target.value
+                    })}
+                    placeholder="https://vz-xxx.b-cdn.net/thumbnail.jpg"
+                    disabled={isSubmitting}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Paste the Bunny.net thumbnail URL from your dashboard.
+                  </p>
                 </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
@@ -1703,19 +1414,38 @@ const ContentManagement = () => {
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="videoFile" className="text-right">
-                  Video File
+                <Label htmlFor="bunnyEmbedUrl" className="text-right">
+                  Bunny Embed URL
                 </Label>
-                <div className="col-span-3">
-                  <FileUpload
-                    type="video"
-                    label=""
-                    onFileSelect={setSelectedVideoFile}
-                    currentFile={selectedVideo.video_file_path}
-                    disabled={isSubmitting}
-                    maxSize={500}
+                <div className="col-span-3 space-y-2">
+                  <Input
+                    id="bunnyEmbedUrl"
+                    value={selectedVideo.bunny_embed_url || ''}
+                    onChange={(e) => setSelectedVideo({
+                      ...selectedVideo,
+                      bunny_embed_url: e.target.value,
+                    })}
+                    placeholder="https://iframe.mediadelivery.net/embed/{library}/{video}"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Paste the Bunny.net embed URL from your Bunny dashboard.
+                  </p>
                 </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="bunnyVideoId" className="text-right">
+                  Bunny Video ID (optional)
+                </Label>
+                <Input
+                  id="bunnyVideoId"
+                  value={selectedVideo.bunny_video_id || ''}
+                  onChange={(e) => setSelectedVideo({
+                    ...selectedVideo,
+                    bunny_video_id: e.target.value,
+                  })}
+                  className="col-span-3"
+                  placeholder="Video GUID from Bunny (optional)"
+                />
               </div>
               {/* Duration input removed — duration is now auto-calculated on backend */}
               <div className="grid grid-cols-4 items-center gap-4">
@@ -1784,17 +1514,7 @@ const ContentManagement = () => {
               Cancel
             </Button>
             <Button onClick={handleSaveVideo} disabled={isSubmitting} className="min-w-[140px]">
-              {isSubmitting ? (
-                uploadProgress > 0 ? (
-                  <span className="flex items-center gap-2">
-                    <span>Uploading {uploadProgress}%</span>
-                  </span>
-                ) : (
-                  'Saving...'
-                )
-              ) : (
-                selectedVideo?.id ? 'Save Changes' : 'Create Episode'
-              )}
+              {isSubmitting ? 'Saving...' : (selectedVideo?.id ? 'Save Changes' : 'Create Episode')}
             </Button>
           </DialogFooter>
         </DialogContent>

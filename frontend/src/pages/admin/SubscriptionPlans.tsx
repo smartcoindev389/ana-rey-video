@@ -143,7 +143,8 @@ const SubscriptionPlans = () => {
           ad_free: editingPlan.ad_free,
           is_active: editingPlan.is_active,
           sort_order: editingPlan.sort_order,
-        });
+          stripe_price_id: (editingPlan as any)?.stripe_price_id || null,
+        } as any);
         const updatedPlan = response.data;
         setPlans(prev => prev.map(plan => 
           plan.id === editingPlan.id ? updatedPlan : plan
@@ -490,6 +491,22 @@ const SubscriptionPlans = () => {
                     }
                   }}
                 />
+              </div>
+              <div>
+                <Label htmlFor="stripe_price_id">Stripe Price ID</Label>
+                <Input 
+                  id="stripe_price_id" 
+                  placeholder="price_xxxxxxxxxxxxx"
+                  value={(editingPlan as any)?.stripe_price_id || ''}
+                  onChange={(e) => {
+                    if (editingPlan) {
+                      setEditingPlan({...editingPlan, stripe_price_id: e.target.value} as any);
+                    }
+                  }}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enter the Stripe Price ID from your Stripe Dashboard (Products → Prices). This is required for paid plans.
+                </p>
               </div>
             </div>
             <DialogFooter>

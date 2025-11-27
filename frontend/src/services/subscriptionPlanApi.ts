@@ -55,6 +55,7 @@ export interface SubscriptionPlan {
   ad_free: boolean;
   is_active: boolean;
   sort_order: number;
+  stripe_price_id?: string | null;
   billing_cycle?: string;
   created_at?: string;
   updated_at?: string;
@@ -75,6 +76,7 @@ export interface SubscriptionPlanCreateRequest {
   ad_free?: boolean;
   is_active?: boolean;
   sort_order?: number;
+  stripe_price_id?: string | null;
 }
 
 export interface SubscriptionPlanUpdateRequest extends Partial<SubscriptionPlanCreateRequest> {}

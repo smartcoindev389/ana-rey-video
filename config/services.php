@@ -38,4 +38,11 @@ return [
         'secret' => env('STRIPE_SECRET'),
         'key' => env('STRIPE_KEY'),
     ],
+
+    'bunny' => [
+        'api_key' => env('BUNNY_API_KEY'),
+        'library_id' => env('BUNNY_LIBRARY_ID'),
+        'cdn_url' => env('BUNNY_CDN_URL'),
+        'stream_url' => env('BUNNY_STREAM_URL'),
+    ],
 ];

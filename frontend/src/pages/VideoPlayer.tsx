@@ -512,7 +512,26 @@ const VideoPlayer = () => {
             ) : (
               <>
                 {/* Video Player */}
-                {video.video_url_full ? (
+                {video.bunny_embed_url || video.bunny_player_url ? (
+                  // Bunny.net Player (iframe)
+                  <iframe
+                    key={`${video.id}-bunny-player`}
+                    src={video.bunny_embed_url || video.bunny_player_url}
+                    className="w-full h-full border-0"
+                    allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                    allowFullScreen
+                    title={video.title}
+                    onLoad={() => {
+                      console.log('✅ Bunny.net player loaded');
+                      // For Bunny.net player, we'll track progress via API
+                      // Duration will be set from video data
+                      if (video.duration) {
+                        setDuration(video.duration);
+                      }
+                    }}
+                  />
+                ) : video.video_url_full ? (
+                  // Fallback: HTML5 video player for non-Bunny.net videos
                   <video
                     key={`${video.id}-video`}
                     ref={videoRef}

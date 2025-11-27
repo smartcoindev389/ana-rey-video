@@ -65,6 +65,7 @@ class SubscriptionPlanController extends Controller
             'ad_free' => 'nullable|boolean',
             'is_active' => 'nullable|boolean',
             'sort_order' => 'nullable|integer|min:0',
+            'stripe_price_id' => 'nullable|string|max:255',
         ]);
 
         $plan = SubscriptionPlan::create($validated);
@@ -114,6 +115,7 @@ class SubscriptionPlanController extends Controller
             'ad_free' => 'nullable|boolean',
             'is_active' => 'nullable|boolean',
             'sort_order' => 'nullable|integer|min:0',
+            'stripe_price_id' => 'nullable|string|max:255',
         ]);
 
         $plan->update($validated);

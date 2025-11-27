@@ -76,6 +76,25 @@ const Home = () => {
   const { t } = useTranslation();
   const { navigateWithLocale, getPathWithLocale, locale } = useLocale();
 
+  // Bunny.net stream base URL for direct MP4 previews (e.g. https://your-stream-zone.b-cdn.net)
+  const BUNNY_STREAM_BASE = import.meta.env.VITE_BUNNY_STREAM_URL || '';
+
+  const getBunnyPreviewUrl = (video: any): string | null => {
+    if (!video) return null;
+    // If backend ever stores a direct MP4 URL, prefer that
+    if (video.bunny_video_url && (video.bunny_video_url as string).startsWith('http')) {
+      return video.bunny_video_url;
+    }
+    // Otherwise, build from bunny_video_id + Bunny stream base
+    if (!video.bunny_video_id) return null;
+    if (!BUNNY_STREAM_BASE) {
+      console.warn('[Homepage preview] VITE_BUNNY_STREAM_URL is not set, skipping video preview.');
+      return null;
+    }
+    const base = BUNNY_STREAM_BASE.replace(/\/+$/, '');
+    return `${base}/${video.bunny_video_id}/play_720p.mp4`;
+  };
+
   const handleGetStarted = () => {
     if (email.trim()) {
       // Store email for later use in signup flow
@@ -1309,8 +1328,10 @@ const Home = () => {
                         const videoRef = useRef<HTMLVideoElement>(null);
                         const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+                        const previewSrc = getBunnyPreviewUrl(video.video);
+
                         const handleMouseEnter = () => {
-                          if (videoRef.current && video.video?.video_url_full) {
+                          if (videoRef.current && previewSrc) {
                             const vid = videoRef.current;
                             vid.currentTime = 0;
                             vid.play().catch(() => {});
@@ -1348,11 +1369,11 @@ const Home = () => {
                             onClick={() => handleCourseClick(video.id)}
                           >
                             <div className="aspect-[3/4] rounded-xl overflow-hidden shadow-2xl relative group/card">
-                              {/* Video */}
-                              {video.video?.video_url_full && (
+                              {/* Video Preview (15s) */}
+                              {previewSrc && (
                                 <video
                                   ref={videoRef}
-                                  src={video.video.video_url_full}
+                                  src={previewSrc}
                                   poster={video.image}
                                   className="absolute inset-0 w-full h-full object-cover"
                                   muted

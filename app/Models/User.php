@@ -27,6 +27,8 @@ class User extends Authenticatable
         'subscription_started_at',
         'subscription_expires_at',
         'role',
+        'stripe_customer_id',
+        'wallet_balance',
         'bio',
         'avatar',
         'website',
@@ -57,6 +59,7 @@ class User extends Authenticatable
             'subscription_expires_at' => 'datetime',
             'last_login_at' => 'datetime',
             'social_links' => 'array',
+            'wallet_balance' => 'decimal:2',
             'password' => 'hashed',
         ];
     }

@@ -122,12 +122,18 @@ export interface Video {
   slug: string;
   description: string | null;
   short_description: string | null;
-  category_id: number;
-  series_id?: number;
+  series_id: number;
+  category_id?: number; // Legacy field, kept for backward compatibility
   instructor_id: number | null;
   video_url: string | null;
   video_file_path: string | null;
   video_url_full?: string | null;
+  // Bunny.net fields
+  bunny_video_id?: string | null;
+  bunny_video_url?: string | null;
+  bunny_embed_url?: string | null;
+  bunny_thumbnail_url?: string | null;
+  bunny_player_url?: string | null;
   thumbnail: string | null;
   thumbnail_url?: string | null;
   intro_image: string | null;
