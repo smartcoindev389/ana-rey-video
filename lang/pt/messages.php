@@ -168,6 +168,7 @@ return [
     'subscription_maybe_later' => 'Talvez mais tarde',
     'subscription_account_created' => 'Conta criada com sucesso com',
     'subscription_plan_success' => 'plano!',
+    'subscription_payment_success' => 'Pagamento bem-sucedido! Sua assinatura está ativa agora.',
     'subscription_updated' => 'Assinatura atualizada para',
     'subscription_please_login' => 'Por favor, faça login primeiro',
     'subscription_missing_info' => 'Informações de registro ausentes. Por favor, tente se cadastrar novamente.',

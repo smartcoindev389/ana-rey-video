@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,10 +55,29 @@ import {
   FileText,
   Receipt
 } from 'lucide-react';
-import { generateMockTransactions, MockTransaction } from '@/services/mockData';
+import { paymentTransactionApi, PaymentTransaction } from '@/services/paymentTransactionApi';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { useLocale } from '@/hooks/useLocale';
+
+// Frontend transaction interface matching the UI expectations
+interface DisplayTransaction {
+  id: string;
+  user: string;
+  userEmail: string;
+  subscription: string;
+  amount: number;
+  currency: string;
+  status: 'completed' | 'pending' | 'failed' | 'refunded';
+  type: 'subscription' | 'upgrade' | 'refund';
+  paymentMethod: string;
+  cardLastFour: string;
+  gateway: string;
+  transactionId: string;
+  paidAt: string | null;
+  subscriptionPeriod: string;
+  createdAt: string;
+}
 
 const PaymentsTransactions = () => {
   const { t } = useTranslation();
@@ -66,45 +85,197 @@ const PaymentsTransactions = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [selectedPeriod, setSelectedPeriod] = useState('month');
-  const [transactions, setTransactions] = useState<MockTransaction[]>([]);
-  const [filteredTransactions, setFilteredTransactions] = useState<MockTransaction[]>([]);
-  const [selectedTransaction, setSelectedTransaction] = useState<MockTransaction | null>(null);
+  const [transactions, setTransactions] = useState<DisplayTransaction[]>([]);
+  const [filteredTransactions, setFilteredTransactions] = useState<DisplayTransaction[]>([]);
+  const [selectedTransaction, setSelectedTransaction] = useState<DisplayTransaction | null>(null);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
+    totalTransactions: 0,
+    completedTransactions: 0,
+    pendingTransactions: 0,
+    failedTransactions: 0,
+    monthlyRevenue: 0,
+    averageTransaction: 0,
+  });
+
+  // Map backend transaction to frontend format
+  const mapTransaction = (transaction: PaymentTransaction): DisplayTransaction => {
+    const subscriptionName = transaction.subscription?.plan?.display_name || 
+                            transaction.subscription?.plan?.name || 
+                            'N/A';
+    
+    // Calculate subscription period if available
+    let subscriptionPeriod = 'N/A';
+    if (transaction.paid_at && transaction.subscription?.plan) {
+      const paidDate = new Date(transaction.paid_at);
+      const endDate = new Date(paidDate);
+      // Assuming monthly subscription, adjust based on your plan duration
+      endDate.setMonth(endDate.getMonth() + 1);
+      subscriptionPeriod = `${paidDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`;
+    } else if (transaction.status === 'pending') {
+      subscriptionPeriod = t('admin.payments_pending');
+    } else if (transaction.status === 'failed') {
+      subscriptionPeriod = t('admin.payments_failed');
+    }
+
+    return {
+      id: transaction.id.toString(),
+      user: transaction.user?.name || 'N/A',
+      userEmail: transaction.user?.email || 'N/A',
+      subscription: subscriptionName,
+      amount: parseFloat(transaction.amount.toString()),
+      currency: transaction.currency || 'USD',
+      status: transaction.status,
+      type: (transaction.type || 'subscription') as 'subscription' | 'upgrade' | 'refund',
+      paymentMethod: transaction.payment_method || 'card',
+      cardLastFour: transaction.card_last_four || '0000',
+      gateway: transaction.payment_gateway || 'stripe',
+      transactionId: transaction.transaction_id,
+      paidAt: transaction.paid_at || null,
+      subscriptionPeriod,
+      createdAt: transaction.created_at,
+    };
+  };
+
+  const fetchTransactions = async () => {
+    setIsLoading(true);
+    try {
+      const params: any = {
+        per_page: 100,
+        sort_by: 'created_at',
+        sort_order: 'desc',
+      };
+
+      if (selectedFilter !== 'all') {
+        params.status = selectedFilter;
+      }
+
+      // Apply date filter based on selected period
+      const now = new Date();
+      if (selectedPeriod === 'week') {
+        params.date_from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      } else if (selectedPeriod === 'month') {
+        params.date_from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      } else if (selectedPeriod === 'quarter') {
+        const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+        params.date_from = quarterStart.toISOString().split('T')[0];
+      } else if (selectedPeriod === 'year') {
+        params.date_from = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+      }
+
+      if (searchTerm) {
+        params.search = searchTerm;
+      }
+
+      const response = await paymentTransactionApi.getAll(params);
+      
+      if (response.success && response.data) {
+        const transactionsData = response.data.data || response.data;
+        const mappedTransactions = transactionsData.map(mapTransaction);
+        setTransactions(mappedTransactions);
+        setFilteredTransactions(mappedTransactions);
+      }
+    } catch (error: any) {
+      console.error('Error fetching transactions:', error);
+      toast.error(error.message || t('admin.payments_fetch_error') || 'Failed to fetch transactions');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fallback function to calculate statistics from loaded transactions
+  const calculateStatsFromTransactions = useCallback(() => {
+    const completed = transactions.filter(t => t.status === 'completed');
+    const pending = transactions.filter(t => t.status === 'pending');
+    const failed = transactions.filter(t => t.status === 'failed');
+    
+    const totalRevenue = completed.reduce((sum, t) => sum + t.amount, 0);
+    const averageTransaction = completed.length > 0 ? totalRevenue / completed.length : 0;
+    
+    setStats({
+      totalRevenue,
+      totalTransactions: transactions.length,
+      completedTransactions: completed.length,
+      pendingTransactions: pending.length,
+      failedTransactions: failed.length,
+      monthlyRevenue: totalRevenue,
+      averageTransaction,
+    });
+  }, [transactions]);
+
+  const fetchStatistics = async () => {
+    try {
+      const response = await paymentTransactionApi.getStatistics();
+      console.log('📊 Statistics API response:', response);
+      
+      if (response.success && response.data) {
+        const statsData = response.data;
+        console.log('📊 Statistics data:', statsData);
+        
+        const newStats = {
+          totalRevenue: parseFloat(statsData.total_revenue?.toString() || '0') || 0,
+          totalTransactions: parseInt(statsData.total_transactions?.toString() || '0') || 0,
+          completedTransactions: parseInt(statsData.completed_transactions?.toString() || '0') || 0,
+          pendingTransactions: parseInt(statsData.pending_transactions?.toString() || '0') || 0,
+          failedTransactions: parseInt(statsData.failed_transactions?.toString() || '0') || 0,
+          monthlyRevenue: parseFloat(statsData.total_revenue?.toString() || '0') || 0,
+          averageTransaction: parseFloat(statsData.average_transaction_value?.toString() || '0') || 0,
+        };
+        
+        console.log('📊 Parsed statistics:', newStats);
+        setStats(newStats);
+      } else {
+        console.warn('⚠️ Statistics API response format unexpected:', response);
+        // Fallback: calculate from loaded transactions
+        calculateStatsFromTransactions();
+      }
+    } catch (error: any) {
+      console.error('❌ Error fetching statistics:', error);
+      // Fallback: calculate from loaded transactions
+      calculateStatsFromTransactions();
+    }
+  };
 
   useEffect(() => {
-    // Simulate API call
-    const fetchTransactions = async () => {
-      setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const mockTransactions = generateMockTransactions();
-      setTransactions(mockTransactions);
-      setFilteredTransactions(mockTransactions);
-      setIsLoading(false);
-    };
-
     fetchTransactions();
-  }, [locale]);
+    fetchStatistics();
+  }, [locale, selectedFilter, selectedPeriod]);
 
+  // Recalculate stats when transactions change (as fallback)
+  useEffect(() => {
+    if (transactions.length > 0) {
+      // Only use fallback if stats are still zero after a delay
+      const timer = setTimeout(() => {
+        if (stats.totalTransactions === 0 && transactions.length > 0) {
+          console.log('📊 Using fallback statistics calculation from transactions');
+          calculateStatsFromTransactions();
+        }
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [transactions, stats.totalTransactions, calculateStatsFromTransactions]);
+
+  // Refetch when search term changes (with debounce)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchTransactions();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Filtering is now handled server-side, but we keep local filtering for immediate UI updates
   useEffect(() => {
     let filtered = transactions;
 
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(transaction => 
-        transaction.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        transaction.userEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        transaction.transactionId.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Status filter
+    // Additional client-side filtering if needed (though search is server-side)
     if (selectedFilter !== 'all') {
       filtered = filtered.filter(transaction => transaction.status === selectedFilter);
     }
 
     setFilteredTransactions(filtered);
-  }, [transactions, searchTerm, selectedFilter]);
+  }, [transactions, selectedFilter]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -158,36 +329,73 @@ const PaymentsTransactions = () => {
     );
   };
 
-  const handleViewDetails = (transaction: MockTransaction) => {
+  const handleViewDetails = (transaction: DisplayTransaction) => {
     setSelectedTransaction(transaction);
     setIsDetailsDialogOpen(true);
   };
 
-  const handleRetryPayment = (transactionId: string) => {
-    setTransactions(prev => prev.map(t => 
-      t.id === transactionId 
-        ? { ...t, status: 'pending' as const }
-        : t
-    ));
-    toast.success(t('admin.payments_retry_initiated'));
+  const handleRetryPayment = async (transactionId: string) => {
+    try {
+      const transaction = transactions.find(t => t.id === transactionId);
+      if (!transaction) return;
+
+      // Mark as pending by updating the transaction
+      await paymentTransactionApi.update(parseInt(transactionId), { status: 'pending' });
+      toast.success(t('admin.payments_retry_initiated'));
+      await fetchTransactions();
+    } catch (error: any) {
+      console.error('Error retrying payment:', error);
+      toast.error(error.message || t('admin.payments_retry_error') || 'Failed to retry payment');
+    }
   };
 
-  const handleProcessRefund = (transactionId: string) => {
-    setTransactions(prev => prev.map(t => 
-      t.id === transactionId 
-        ? { ...t, status: 'refunded' as const }
-        : t
-    ));
-    toast.success(t('admin.payments_refund_processed'));
+  const handleProcessRefund = async (transactionId: string) => {
+    try {
+      await paymentTransactionApi.refund(parseInt(transactionId));
+      toast.success(t('admin.payments_refund_processed'));
+      await fetchTransactions();
+      await fetchStatistics();
+      setIsDetailsDialogOpen(false);
+    } catch (error: any) {
+      console.error('Error processing refund:', error);
+      toast.error(error.message || t('admin.payments_refund_error') || 'Failed to process refund');
+    }
   };
 
-  const handleExportTransactions = () => {
-    // Simulate export functionality
-    toast.success(t('admin.payments_exported'));
+  const handleExportTransactions = async () => {
+    try {
+      const params: any = {};
+      if (selectedFilter !== 'all') {
+        params.status = selectedFilter;
+      }
+      if (searchTerm) {
+        params.search = searchTerm;
+      }
+
+      const response = await paymentTransactionApi.export(params);
+      if (response.success && response.data) {
+        // Convert CSV data to downloadable file
+        const csvContent = response.data.map((row: any[]) => row.join(',')).join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `transactions_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success(t('admin.payments_exported'));
+      }
+    } catch (error: any) {
+      console.error('Error exporting transactions:', error);
+      toast.error(error.message || t('admin.payments_export_error') || 'Failed to export transactions');
+    }
   };
 
-  const handleRefreshTransactions = () => {
-    // Simulate refresh
+  const handleRefreshTransactions = async () => {
+    await fetchTransactions();
+    await fetchStatistics();
     toast.success(t('admin.payments_refreshed'));
   };
 
@@ -231,15 +439,7 @@ const PaymentsTransactions = () => {
     );
   }
 
-  const stats = {
-    totalRevenue: transactions.filter(t => t.status === 'completed').reduce((sum, t) => sum + t.amount, 0),
-    totalTransactions: transactions.length,
-    completedTransactions: transactions.filter(t => t.status === 'completed').length,
-    pendingTransactions: transactions.filter(t => t.status === 'pending').length,
-    failedTransactions: transactions.filter(t => t.status === 'failed').length,
-    monthlyRevenue: transactions.filter(t => t.status === 'completed').reduce((sum, t) => sum + t.amount, 0),
-    averageTransaction: transactions.filter(t => t.status === 'completed').reduce((sum, t) => sum + t.amount, 0) / transactions.filter(t => t.status === 'completed').length
-  };
+  // Stats are now fetched from API and stored in state
 
   return (
     <div className="space-y-6">
@@ -294,7 +494,9 @@ const PaymentsTransactions = () => {
             <div>
               <p className="text-sm text-muted-foreground">{t('admin.payments_success_rate')}</p>
               <p className="text-2xl font-bold">
-                {((stats.completedTransactions / stats.totalTransactions) * 100).toFixed(1)}%
+                {stats.totalTransactions > 0 
+                  ? ((stats.completedTransactions / stats.totalTransactions) * 100).toFixed(1)
+                  : '0.0'}%
               </p>
               <p className="text-xs text-muted-foreground">
                 {stats.completedTransactions} {t('admin.payments_of')} {stats.totalTransactions} {t('admin.payments_successful')}
@@ -470,7 +672,7 @@ const PaymentsTransactions = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">{t('admin.payments_completed_count')}</p>
-              <p className="text-2xl font-bold text-green-600">{stats.completedTransactions}</p>
+              <p className="text-2xl font-bold text-green-600">{stats.completedTransactions || 0}</p>
             </div>
             <CheckCircle className="h-8 w-8 text-green-500" />
           </div>
@@ -479,7 +681,7 @@ const PaymentsTransactions = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">{t('admin.payments_pending_count')}</p>
-              <p className="text-2xl font-bold text-yellow-600">{stats.pendingTransactions}</p>
+              <p className="text-2xl font-bold text-yellow-600">{stats.pendingTransactions || 0}</p>
             </div>
             <Clock className="h-8 w-8 text-yellow-500" />
           </div>
@@ -488,7 +690,7 @@ const PaymentsTransactions = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">{t('admin.payments_failed_count')}</p>
-              <p className="text-2xl font-bold text-red-600">{stats.failedTransactions}</p>
+              <p className="text-2xl font-bold text-red-600">{stats.failedTransactions || 0}</p>
             </div>
             <XCircle className="h-8 w-8 text-red-500" />
           </div>

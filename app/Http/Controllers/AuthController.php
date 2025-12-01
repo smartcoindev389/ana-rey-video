@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class AuthController extends Controller
 {
@@ -28,21 +31,49 @@ class AuthController extends Controller
             ? 'admin' 
             : ($validated['role'] ?? 'user');
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'subscription_type' => $validated['subscription_type'],
-            'role' => $role,
-            'subscription_started_at' => now(),
-            // Set expiration date for paid plans (30 days trial/subscription period)
-            // Admin users don't have expiration
-            'subscription_expires_at' => $validated['subscription_type'] === 'admin' 
-                ? null 
-                : (in_array($validated['subscription_type'], ['basic', 'premium']) 
-                    ? now()->addDays(30) 
-                    : null),
-        ]);
+        $user = DB::transaction(function () use ($validated, $role) {
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'subscription_type' => $validated['subscription_type'],
+                'role' => $role,
+                'subscription_started_at' => now(),
+                // Set expiration date for paid plans (30 days trial/subscription period)
+                // Admin users don't have expiration
+                'subscription_expires_at' => $validated['subscription_type'] === 'admin' 
+                    ? null 
+                    : (in_array($validated['subscription_type'], ['basic', 'premium']) 
+                        ? now()->addDays(30) 
+                        : null),
+            ]);
+
+            // Create Subscription record in subscriptions table
+            $plan = SubscriptionPlan::where('name', $validated['subscription_type'])->first();
+            
+            if ($plan) {
+                $subscriptionStatus = $validated['subscription_type'] === 'freemium' ? 'active' : 'pending';
+                $expiresAt = $validated['subscription_type'] === 'admin' 
+                    ? null 
+                    : (in_array($validated['subscription_type'], ['basic', 'premium']) 
+                        ? now()->addDays(30) 
+                        : null);
+
+                Subscription::create([
+                    'user_id' => $user->id,
+                    'subscription_plan_id' => $plan->id,
+                    'status' => $subscriptionStatus,
+                    'started_at' => now(),
+                    'expires_at' => $expiresAt,
+                    'amount' => $plan->price,
+                    'billing_cycle' => 'monthly',
+                    'auto_renew' => $validated['subscription_type'] !== 'freemium',
+                    'notes' => 'Created during registration',
+                ]);
+            }
+
+            return $user;
+        });
 
         $token = $user->createToken('auth-token')->plainTextToken;
 

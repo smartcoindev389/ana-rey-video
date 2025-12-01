@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Check } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
@@ -63,13 +63,26 @@ const getPlans = (t: any): Plan[] => [
   },
 ];
 
-const Subscription = () => {
+const SignupSubscription = () => {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [backendPlans, setBackendPlans] = useState<any[]>([]);
   const navigate = useNavigate();
-  const { isAuthenticated, updateUser } = useAuth();
+  const location = useLocation();
+  const { register } = useAuth();
   const { t } = useTranslation();
+
+  // Check if state contains signup data (email, password, name)
+  const signupData = location.state as { email: string; password: string; name: string } | null;
+
+  // Redirect to auth if no signup data
+  useEffect(() => {
+    if (!signupData || !signupData.email || !signupData.password || !signupData.name) {
+      console.warn('No signup data found, redirecting to auth');
+      toast.error(t('subscription.missing_info') || 'Please complete registration first');
+      navigate("/auth");
+    }
+  }, [signupData, navigate, t]);
 
   useEffect(() => {
     // Load active plans from backend so we can map to Stripe price via plan id
@@ -79,14 +92,6 @@ const Subscription = () => {
         if (response?.success && Array.isArray(response.data)) {
           setBackendPlans(response.data);
           console.log('✅ Loaded subscription plans from backend:', response.data);
-          console.log('Plans with Stripe config:', response.data.map(p => ({
-            id: p.id,
-            name: p.name,
-            display_name: p.display_name,
-            price: p.price,
-            has_stripe: !!p.stripe_price_id,
-            stripe_price_id: p.stripe_price_id
-          })));
         } else {
           console.warn('⚠️ Backend plans response format unexpected:', response);
         }
@@ -100,110 +105,123 @@ const Subscription = () => {
   }, [t]);
 
   const handleSelectPlan = async (plan: Plan) => {
-    console.log('=== Plan Selected (Authenticated User) ===');
-    console.log('Plan:', plan.name, 'ID:', plan.id);
-    
-    if (!isAuthenticated) {
-      console.log('❌ Not authenticated, redirecting to login');
-      toast.error(t('subscription.please_login'));
+    if (!signupData) {
+      toast.error(t('subscription.missing_info'));
       navigate("/auth");
       return;
     }
+
+    console.log('=== Plan Selected (Signup) ===');
+    console.log('Plan:', plan.name, 'ID:', plan.id);
     
     setSelectedPlan(plan.name);
     setIsLoading(true);
     
     try {
-      if (plan.id === 'freemium') {
-        console.log('✅ Freemium plan selected, updating locally...');
-        const response = await api.updateSubscription(plan.id);
-        updateUser(response.user);
-        toast.success(`${t('subscription.updated')} ${plan.name}!`);
-        const locale = localStorage.getItem('i18nextLng') || 'en';
-        navigate(`/${locale}`);
-        return;
-      }
-
-      console.log('💳 Paid plan selected for upgrade, preparing Stripe checkout...');
-      console.log('Backend plans available:', backendPlans.length);
-
-      // Ensure backend plans are loaded
-      if (backendPlans.length === 0) {
-        console.warn('⚠️ Backend plans not loaded yet, fetching now...');
-        try {
-          const response = await subscriptionPlanApi.getPublic();
-          if (response?.success && Array.isArray(response.data)) {
-            setBackendPlans(response.data);
-            console.log('✅ Backend plans loaded:', response.data);
+      const { email, password, name } = signupData;
+      console.log('Registration data:', { name, email, subscription: plan.id });
+      
+      // Register user first (always freemium, then upgrade via Stripe if paid)
+      console.log('📝 Registering user as freemium...');
+      await register(name, email, password, 'freemium');
+      console.log('✅ Registration successful! User is now authenticated.');
+      
+      // Wait a moment to ensure auth state is updated
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // If it's a paid plan, trigger Stripe checkout after registration
+      if (plan.id !== 'freemium') {
+        console.log('💳 Paid plan selected, preparing Stripe checkout...');
+        
+        // Ensure backend plans are loaded
+        if (backendPlans.length === 0) {
+          console.warn('⚠️ Backend plans not loaded yet, fetching now...');
+          try {
+            const response = await subscriptionPlanApi.getPublic();
+            if (response?.success && Array.isArray(response.data)) {
+              setBackendPlans(response.data);
+              console.log('✅ Backend plans loaded:', response.data);
+            }
+          } catch (e) {
+            console.error('❌ Failed to load backend plans:', e);
+            toast.error('Failed to load subscription plans. Please try again.');
+            const locale = localStorage.getItem('i18nextLng') || 'en';
+            navigate(`/${locale}`);
+            return;
           }
-        } catch (e) {
-          console.error('❌ Failed to load backend plans:', e);
-          toast.error('Failed to load subscription plans. Please try again.');
-          return;
         }
-      }
-
-      // Find corresponding plan in backend by plan ID (freemium, basic, premium)
-      // Backend plans have 'name' field that matches plan.id
-      const match = backendPlans.find(p => p.name?.toLowerCase() === plan.id.toLowerCase());
-      console.log('🔍 Looking for plan match:', {
-        searchingFor: plan.id,
-        availablePlans: backendPlans.map(p => ({ id: p.id, name: p.name, display_name: p.display_name }))
-      });
-
-      if (!match) {
-        console.error('❌ Plan not found in backend:', {
-          planId: plan.id,
-          planName: plan.name,
+        
+        // Find corresponding plan in backend
+        const match = backendPlans.find(p => p.name?.toLowerCase() === plan.id.toLowerCase());
+        console.log('🔍 Looking for plan match:', {
+          searchingFor: plan.id,
           availablePlans: backendPlans.map(p => ({ id: p.id, name: p.name, display_name: p.display_name }))
         });
-        toast.error(t('subscription.not_available') + ` - Plan "${plan.name}" not found. Please contact support.`);
-        return;
-      }
-
-      console.log('✅ Plan found:', match);
-
-      // Check if plan has Stripe price ID configured
-      if (!match.stripe_price_id) {
-        console.error('❌ Plan does not have Stripe price ID configured:', {
-          planId: match.id,
-          planName: match.name,
-          stripe_price_id: match.stripe_price_id
-        });
-        toast.error(t('subscription.stripe_not_configured') || 'This plan is not configured for payment. Please contact support.');
-        return;
-      }
-
-      console.log('✅ Plan has Stripe price ID:', match.stripe_price_id);
-
-      // Get current locale for proper URL construction
-      const locale = localStorage.getItem('i18nextLng') || 'en';
-      const successUrl = `${window.location.origin}/${locale}?payment=success&session_id={CHECKOUT_SESSION_ID}`;
-      const cancelUrl = `${window.location.origin}/${locale}/subscription?payment=cancel`;
-
-      console.log('🚀 Creating Stripe checkout session...', {
-        planId: match.id,
-        successUrl,
-        cancelUrl
-      });
-
-      // Use API client method with authentication
-      try {
-        const data = await api.createStripeCheckoutSession(match.id, successUrl, cancelUrl);
-        console.log('📦 Stripe checkout response:', data);
         
-        if (data?.success && data.url) {
-          console.log('✅ Stripe checkout URL received, redirecting...', data.url);
-          // Redirect to Stripe Checkout
-          window.location.href = data.url;
+        if (!match) {
+          console.error('❌ Plan not found in backend during signup:', {
+            planId: plan.id,
+            planName: plan.name,
+            availablePlans: backendPlans.map(p => ({ id: p.id, name: p.name, display_name: p.display_name }))
+          });
+          toast.error(t('subscription.not_available') + ` - Plan "${plan.name}" not found. Please contact support.`);
+          // Still navigate to home since registration succeeded
+          const locale = localStorage.getItem('i18nextLng') || 'en';
+          navigate(`/${locale}`);
           return;
-        } else {
-          console.error('❌ Stripe checkout failed - no URL in response:', data);
-          throw new Error(data?.message || t('subscription.failed_start_checkout'));
         }
-      } catch (stripeError) {
-        console.error('❌ Error creating Stripe checkout session:', stripeError);
-        throw stripeError;
+
+        console.log('✅ Plan found:', match);
+
+        // Check if plan has Stripe price ID configured
+        if (!match.stripe_price_id) {
+          console.error('❌ Plan does not have Stripe price ID configured:', {
+            planId: match.id,
+            planName: match.name,
+            stripe_price_id: match.stripe_price_id
+          });
+          toast.error(t('subscription.stripe_not_configured') || 'This plan is not configured for payment. Please contact support.');
+          const locale = localStorage.getItem('i18nextLng') || 'en';
+          navigate(`/${locale}`);
+          return;
+        }
+
+        console.log('✅ Plan has Stripe price ID:', match.stripe_price_id);
+
+        // Trigger Stripe checkout for paid plan
+        const locale = localStorage.getItem('i18nextLng') || 'en';
+        const successUrl = `${window.location.origin}/${locale}?payment=success&session_id={CHECKOUT_SESSION_ID}`;
+        const cancelUrl = `${window.location.origin}/${locale}/subscription?payment=cancel`;
+
+        console.log('🚀 Creating Stripe checkout session...', {
+          planId: match.id,
+          successUrl,
+          cancelUrl
+        });
+
+        try {
+          const data = await api.createStripeCheckoutSession(match.id, successUrl, cancelUrl);
+          console.log('📦 Stripe checkout response:', data);
+          
+          if (data?.success && data.url) {
+            console.log('✅ Stripe checkout URL received, redirecting...', data.url);
+            // Redirect to Stripe Checkout
+            window.location.href = data.url;
+            return;
+          } else {
+            console.error('❌ Stripe checkout failed:', data);
+            throw new Error(data?.message || t('subscription.failed_start_checkout'));
+          }
+        } catch (stripeError) {
+          console.error('❌ Error creating Stripe checkout session:', stripeError);
+          throw stripeError;
+        }
+      } else {
+        // Freemium plan - just show success and navigate
+        console.log('✅ Freemium plan selected, no payment needed');
+        toast.success(`${t('subscription.account_created')} ${plan.name} ${t('subscription.plan_success')}`);
+        const locale = localStorage.getItem('i18nextLng') || 'en';
+        navigate(`/${locale}`);
       }
     } catch (error) {
       console.error('❌ Subscription error:', error);
@@ -228,6 +246,10 @@ const Subscription = () => {
     }
   };
 
+  if (!signupData) {
+    return null; // Will redirect in useEffect
+  }
+
   return (
     <div className="min-h-screen py-12 px-4 bg-background">
       <div className="container mx-auto max-w-6xl">
@@ -236,7 +258,7 @@ const Subscription = () => {
             {t('subscription.choose_plan')} <span className="text-primary">{t('subscription.plan')}</span>
           </h1>
           <p className="text-xl text-muted-foreground font-montserrat">
-            {t('subscription.upgrade_learning')}
+            {t('subscription.select_plan_complete')}
           </p>
         </div>
 
@@ -277,7 +299,7 @@ const Subscription = () => {
                     return (
                       <>
                         <span className="text-4xl font-bold text-primary font-playfair">{displayPrice}</span>
-                  <span className="text-muted-foreground ml-1 font-montserrat">{plan.period}</span>
+                        <span className="text-muted-foreground ml-1 font-montserrat">{plan.period}</span>
                       </>
                     );
                   })()}
@@ -308,23 +330,19 @@ const Subscription = () => {
                         </p>
                       </div>
                     )}
-              <Button
-                variant={plan.popular ? "hero" : "outline"}
-                className="w-full"
-                size="lg"
-                onClick={() => handleSelectPlan(plan)}
+                    <Button
+                      variant={plan.popular ? "hero" : "outline"}
+                      className="w-full"
+                      size="lg"
+                      onClick={() => handleSelectPlan(plan)}
                       disabled={isLoading || (!isStripeReady && plan.id !== 'freemium')}
-              >
-                {isLoading && selectedPlan === plan.name 
-                  ? t('subscription.processing')
+                    >
+                      {isLoading && selectedPlan === plan.name 
+                        ? t('subscription.processing')
                         : !isStripeReady && plan.id !== 'freemium'
                           ? 'Payment Not Available'
-                    : plan.id === 'freemium' 
-                      ? t('subscription.select_freemium')
-                      : plan.id === 'basic'
-                        ? t('subscription.select_basic')
-                        : t('subscription.select_premium')}
-              </Button>
+                        : `${t('subscription.start_with')} ${plan.name}`}
+                    </Button>
                   </>
                 );
               })()}
@@ -335,13 +353,10 @@ const Subscription = () => {
         <div className="text-center">
           <p className="text-muted-foreground mb-2 font-montserrat">{t('subscription.all_plans_trial')}</p>
           <button
-            onClick={() => {
-              const locale = localStorage.getItem('i18nextLng') || 'en';
-              navigate(`/${locale}`);
-            }}
+            onClick={() => navigate("/auth")}
             className="text-primary hover:underline font-montserrat"
           >
-            {t('subscription.maybe_later')}
+            {t('subscription.back_signup')}
           </button>
         </div>
       </div>
@@ -349,4 +364,6 @@ const Subscription = () => {
   );
 };
 
-export default Subscription;
+export default SignupSubscription;
+
+

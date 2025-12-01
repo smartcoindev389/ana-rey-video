@@ -12,6 +12,7 @@ import LocaleRedirect from "./components/LocaleRedirect";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Subscription from "./pages/Subscription";
+import SignupSubscription from "./pages/SignupSubscription";
 import Home from "./pages/Home";
 import Explore from "./pages/Explore";
 import SeriesDetail from "./pages/SeriesDetail";
@@ -68,10 +69,15 @@ const App = () => (
 
               {/* Auth Routes (no locale prefix) */}
               <Route path="/auth" element={<Auth />} />
+              
+              {/* Signup Subscription Route (no locale prefix, unprotected) */}
+              <Route path="/signup-subscription" element={<SignupSubscription />} />
 
               {/* Locale-prefixed routes */}
               <Route path="/:locale" element={<UserLayout />}>
                 <Route index element={<Home />} />
+                {/* Signup Subscription Route (with locale prefix, unprotected) */}
+                <Route path="signup-subscription" element={<SignupSubscription />} />
                 <Route path="explore" element={
                   <ProtectedRoute>
                     <Explore />

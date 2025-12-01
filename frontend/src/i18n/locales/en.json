@@ -409,6 +409,7 @@
     "maybe_later": "Maybe later",
     "account_created": "Account created successfully with",
     "plan_success": "plan!",
+    "payment_success": "Payment successful! Your subscription is now active.",
     "updated": "Subscription updated to",
     "please_login": "Please login first",
     "missing_info": "Missing registration information. Please try signing up again.",

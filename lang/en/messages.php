@@ -168,6 +168,7 @@ return [
     'subscription_maybe_later' => 'Maybe later',
     'subscription_account_created' => 'Account created successfully with',
     'subscription_plan_success' => 'plan!',
+    'subscription_payment_success' => 'Payment successful! Your subscription is now active.',
     'subscription_updated' => 'Subscription updated to',
     'subscription_please_login' => 'Please login first',
     'subscription_missing_info' => 'Missing registration information. Please try signing up again.',

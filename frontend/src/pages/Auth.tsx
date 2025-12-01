@@ -75,10 +75,10 @@ const Auth = () => {
                  navigate(`/${locale}`);
                }
       } else {
-        console.log('Redirecting to subscription page...');
-        // Redirect to subscription page for signup with locale prefix
+        console.log('Redirecting to signup subscription page...');
+        // Redirect to signup subscription page for signup
         const locale = localStorage.getItem('i18nextLng') || 'en';
-        navigate(`/${locale}/subscription`, { state: { email, password, name } });
+        navigate(`/${locale}/signup-subscription`, { state: { email, password, name } });
       }
     } catch (error) {
       console.error('Login error:', error);

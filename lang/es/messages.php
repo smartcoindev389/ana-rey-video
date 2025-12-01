@@ -168,6 +168,7 @@ return [
     'subscription_maybe_later' => 'Tal vez más tarde',
     'subscription_account_created' => 'Cuenta creada exitosamente con',
     'subscription_plan_success' => 'plan!',
+    'subscription_payment_success' => '¡Pago exitoso! Tu suscripción ya está activa.',
     'subscription_updated' => 'Suscripción actualizada a',
     'subscription_please_login' => 'Por favor inicia sesión primero',
     'subscription_missing_info' => 'Falta información de registro. Por favor intenta registrarte nuevamente.',

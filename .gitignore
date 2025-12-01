@@ -1,8 +1,6 @@
 *.log
 .DS_Store
-.env
 .env.backup
-.env.production
 .phpactor.json
 .phpunit.result.cache
 /.fleet
@@ -22,3 +20,6 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+config.bat
+temp_auto_push.bat
+temp_interactive_push.bat

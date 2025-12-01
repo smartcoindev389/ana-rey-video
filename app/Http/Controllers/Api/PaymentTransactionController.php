@@ -191,10 +191,10 @@ class PaymentTransactionController extends Controller
             'pending_transactions' => PaymentTransaction::pending()->count(),
             'failed_transactions' => PaymentTransaction::where('status', 'failed')->count(),
             'refunded_transactions' => PaymentTransaction::where('status', 'refunded')->count(),
-            'total_revenue' => PaymentTransaction::completed()->sum('amount'),
-            'pending_revenue' => PaymentTransaction::pending()->sum('amount'),
-            'refunded_amount' => PaymentTransaction::where('status', 'refunded')->sum('amount'),
-            'average_transaction_value' => PaymentTransaction::completed()->avg('amount'),
+            'total_revenue' => PaymentTransaction::completed()->sum('amount') ?? 0,
+            'pending_revenue' => PaymentTransaction::pending()->sum('amount') ?? 0,
+            'refunded_amount' => PaymentTransaction::where('status', 'refunded')->sum('amount') ?? 0,
+            'average_transaction_value' => PaymentTransaction::completed()->avg('amount') ?? 0,
         ];
 
         // Monthly revenue for the last 12 months
